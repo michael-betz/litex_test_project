@@ -3,19 +3,16 @@ BUILD_DIR=../build/
 include $(BUILD_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
 
+TARGET   = firmware
 OBJECTS  = isr.o main.o
 LDFLAGS += --no-relax --print-memory-usage
 
-all: firmware.bin
+all: $(TARGET).bin $(TARGET).lst
 
 # pull in dependency info for *existing* .o files
 -include $(OBJECTS:.o=.d)
 
-%.bin: %.elf
-	$(OBJCOPY) -O binary $< $@
-	chmod -x $@
-
-firmware.elf: $(OBJECTS)
+$(TARGET).elf: $(OBJECTS)
 	$(LD) $(LDFLAGS) \
 		-T linker.ld \
 		-N -o $@ \
@@ -26,8 +23,12 @@ firmware.elf: $(OBJECTS)
 		-lbase-nofloat -lcompiler_rt
 	chmod -x $@
 
-main.o: main.c
-	$(compile)
+%.bin: %.elf
+	$(OBJCOPY) -O binary $< $@
+	chmod -x $@
+
+%.lst: %.elf
+	riscv32-unknown-elf-objdump -d $^ > $@
 
 %.o: %.c
 	$(compile)
@@ -36,6 +37,6 @@ main.o: main.c
 	$(assemble)
 
 clean:
-	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) firmware.elf firmware.bin .*~ *~
+	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) $(TARGET).elf $(TARGET).bin $(TARGET).lst .*~ *~
 
-.PHONY: all main.o clean load
+.PHONY: all clean

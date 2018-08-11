@@ -2,13 +2,20 @@
 
 My testbed for getting the picorv32 CPU running on a cmodA7 board and learning about litex in the progress.
 
+# Install litex
+```bash
+git clone --recurse-submodules https://github.com/yetifrisstlama/litex.git
+cd litex
+python litex_setup.py init
+python litex_setup.py install
+patch litex/soc/cores/cpu/picorv32/verilog/picorv32.v picorv32.v.patch
+```
+
 # Install openocd
 ```bash
 sudo apt-get install libusb-1.0-0-dev
 git clone --recurse-submodules git://repo.or.cz/openocd.git
 cd openocd/
-git submodule init
-git submodule update
 ./bootstrap
 ./configure --enable-ftdi
 make -j4

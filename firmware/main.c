@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <irq.h>
 #include <uart.h>
 #include <console.h>
@@ -17,7 +16,6 @@ static void busy_wait(unsigned int ds)
 	while(timer0_value_read()) timer0_update_value_write(1);
 }
 
-
 static char *readstr(void)
 {
 	// FIXME picorv32: assigning to `ptr` freezes the CPU, ok on vexriscv
@@ -32,7 +30,7 @@ static char *readstr(void)
 			case 0x7f:
 			case 0x08:
 				if(ptr > 0) {
-					// ptr--;
+					ptr--;
 					putsnonl("\x08 \x08");
 				}
 				break;
@@ -42,14 +40,14 @@ static char *readstr(void)
 			case '\n':
 				s[ptr] = 0x00;
 				putsnonl("\n");
-				// ptr = 0;
+				ptr = 0;
 				return s;
 			default:
 				if(ptr >= (sizeof(s) - 1))
 					break;
 				putsnonl(c);
 				s[ptr] = c[0];
-				// ptr++;
+				ptr++;
 				break;
 		}
 	}
@@ -76,8 +74,8 @@ static char *get_token(char **str)
 static void prompt(void)
 {
 	// FIXME printf gets vexriscv stuck in ISR
-	// printf("RUNTIME>");
-	putsnonl("RUNTIME>");
+	printf("RUNTIME>");
+	// putsnonl("RUNTIME>");
 }
 
 static void help(void)
@@ -100,11 +98,11 @@ static void console_service(void)
 	str = readstr();
 	if(str == NULL) return;
 	// FIXME `get_token` freezes the CPU (picorv32 & vexriscv)
-	// token = get_token(&str);
-	token = str;
+	token = get_token(&str);
+	// token = str;
 	// FIXME freeze on picorv32 (ISR stops triggering as well)
-	// if(strcmp(token, "help") == 0)
-	// 	help();
+	if(strcmp(token, "help") == 0)
+		help();
 	// FIXME main.c:92:(.text.startup+0x144): relocation truncated to fit: R_RISCV_JAL against `*UND*' (picorv32 & vexriscv)
 	// else if(strcmp(token, "reboot") == 0)
 	// 	reboot();
@@ -113,8 +111,6 @@ static void console_service(void)
 
 int main(void)
 {
-	// Set picorv32 interrupt vector to 0x40000010
-	ctrl_progaddr_irq_write(0x40000010);
 	irq_setmask(0);
 	irq_setie(1);
 	uart_init();
@@ -129,7 +125,7 @@ int main(void)
 		// FIXME vexriscv does output `test `, should be `test 0\n`
 		// printf("test %d\n", i++);
 		// FIXME vexriscv seems to require this, else freezes
-		busy_wait(1);
+		// busy_wait(1);
 	}
 
 	return 0;
