@@ -87,28 +87,32 @@ static void help(void)
 
 static void reboot(void)
 {
-	asm("J 0");
+	printf("WOuld do a reboot now if I could ;)\n");
+	// asm("J 0");
+	// asm("call r0");
 }
 
 static void console_service(void)
 {
 	char *str;
 	char *token;
-
-	str = readstr();
-	if(str == NULL) return;
+	// str = readstr();
+	// if(str == NULL) return;
 	// FIXME `get_token` freezes the CPU (picorv32 & vexriscv)
-	token = get_token(&str);
+	// token = get_token(&str);
 	// token = str;
 	// FIXME freeze on picorv32 (ISR stops triggering as well)
-	if(strcmp(token, "help") == 0)
-		help();
+	// if(strcmp(token, "help") == 0)
+	help();
 	// FIXME main.c:92:(.text.startup+0x144): relocation truncated to fit: R_RISCV_JAL against `*UND*' (picorv32 & vexriscv)
 	// else if(strcmp(token, "reboot") == 0)
-	// 	reboot();
-	prompt();
+		// reboot();
+	// prompt();
 }
 
+// char gVar1 = 0;
+// int gVar2 = 0;
+// int gVar3 = 0;
 int main(void)
 {
 	irq_setmask(0);
@@ -119,13 +123,14 @@ int main(void)
 	help();
 	prompt();
 
+	unsigned i=0;
 	while(1) {
-		console_service();
-		// unsigned i=0;
+		printf("gVar: %d\n", 2);
 		// FIXME vexriscv does output `test `, should be `test 0\n`
-		// printf("test %d\n", i++);
+		printf("test %d,  strcmp: %d\n", i++, strcmp("help", "help "));
 		// FIXME vexriscv seems to require this, else freezes
-		// busy_wait(1);
+		busy_wait(1);
+		// console_service();
 	}
 
 	return 0;

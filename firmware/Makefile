@@ -7,7 +7,7 @@ TARGET   = firmware
 OBJECTS  = isr.o main.o
 LDFLAGS += --no-relax --print-memory-usage
 
-all: $(TARGET).bin $(TARGET).lst
+all: $(TARGET).bin
 
 # pull in dependency info for *existing* .o files
 -include $(OBJECTS:.o=.d)

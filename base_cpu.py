@@ -40,13 +40,14 @@ class BaseSoC(SoCCore):
 
     def __init__(self, platform, **kwargs):
         sys_clk_freq = int(12e6)
-        # SoC init (No CPU, we controlling the SoC with UART)
         SoCCore.__init__(self, platform, sys_clk_freq,
             # cpu_type="vexriscv",
             cpu_type="picorv32",
+            # cpu_type="lm32",
             csr_data_width=32,
-            integrated_rom_size=0x8000,
-            integrated_main_ram_size=16 * 1024,
+            integrated_rom_size=0x4000,
+            integrated_main_ram_size=0x8000,
+            integrated_sram_size=0x8000,
             ident="Wir trampeln durchs Getreide ...", ident_version=True
         )
 
