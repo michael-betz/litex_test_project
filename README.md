@@ -15,9 +15,13 @@ patch litex/soc/cores/cpu/picorv32/verilog/picorv32.v picorv32.v.patch
 ```bash
 sudo apt-get install libusb-1.0-0-dev
 git clone --recurse-submodules git://repo.or.cz/openocd.git
+
+# git clone https://github.com/SpinalHDL/openocd_riscv.git
+# wget https://raw.githubusercontent.com/m-labs/VexRiscv-verilog/master/cpu0.yaml
+
 cd openocd/
 ./bootstrap
-./configure --enable-ftdi
+./configure --enable-ftdi --enable-dummy
 make -j4
 sudo make install
 sudo cp ./contrib/60-openocd.rules /etc/udev/rules.d/

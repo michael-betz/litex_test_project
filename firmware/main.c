@@ -1,3 +1,4 @@
+// lm32: everything works as expected, no surprises
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,9 +20,10 @@ static void busy_wait(unsigned int ds)
 static char *readstr(void)
 {
 	// FIXME picorv32: assigning to `ptr` freezes the CPU, ok on vexriscv
-	static unsigned ptr;
+
 	char c[2];
 	static char s[64];
+	static int ptr = 0;
 
 	if(readchar_nonblock()) {
 		c[0] = readchar();
@@ -87,9 +89,8 @@ static void help(void)
 
 static void reboot(void)
 {
-	printf("WOuld do a reboot now if I could ;)\n");
+	printf("Would be doing a reboot now if I could ... \n");
 	// asm("J 0");
-	// asm("call r0");
 }
 
 static void console_service(void)
@@ -99,15 +100,15 @@ static void console_service(void)
 	// str = readstr();
 	// if(str == NULL) return;
 	// FIXME `get_token` freezes the CPU (picorv32 & vexriscv)
-	// token = get_token(&str);
+	token = get_token(&str);
 	// token = str;
 	// FIXME freeze on picorv32 (ISR stops triggering as well)
-	// if(strcmp(token, "help") == 0)
-	help();
+	if(strcmp(token, "help") == 0)
+		help();
 	// FIXME main.c:92:(.text.startup+0x144): relocation truncated to fit: R_RISCV_JAL against `*UND*' (picorv32 & vexriscv)
-	// else if(strcmp(token, "reboot") == 0)
-		// reboot();
-	// prompt();
+	else if(strcmp(token, "reboot") == 0)
+		reboot();
+	prompt();
 }
 
 // char gVar1 = 0;
@@ -119,7 +120,7 @@ int main(void)
 	irq_setie(1);
 	uart_init();
 
-	puts("\nLab004 - CPU testing software built "__DATE__" "__TIME__"\n");
+	puts("\nLab004xxx - CPU testing software built "__DATE__" "__TIME__"\n");
 	help();
 	prompt();
 
