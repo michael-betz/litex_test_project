@@ -7,28 +7,24 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import spi_flash
-from litex.soc.cores.clock import period_ns
+from litex.soc.cores.clock import period_ns, S7MMCM
 import cmod_a7
 import argparse
 
-# class _CRG(Module):
-#     def __init__(self, platform):
-#         self.clock_domains.cd_sys = ClockDomain()
-#         self.clock_domains.cd_clk200 = ClockDomain()
-#         clk12 = platform.request("clk12")
-#         rst = platform.request("user_btn", 0)
-#         self.specials += [
-#             Instance("BUFG", i_I=clk12, o_O=self.cd_sys.clk),
-#             AsyncResetSynchronizer(self.cd_sys, rst),
-#         ]
-
 class _CRG(Module):
-    """ clock and reset generator """
+    """
+    clock and reset generator
+    Inherit from this class to make sys_clk adjustable
+    """
     def __init__(self, platform, sys_clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
-        self.submodules.pll = pll = S7PLL(speedgrade=-1)
-        pll.register_clkin(platform.request("clk12"), 12e6)
-        pll.create_clkout(self.cd_sys, sys_clk_freq)
+        # self.clock_domains.cd_clk200 = ClockDomain()
+        self.submodules.mmcm = mmcm = S7MMCM(speedgrade=-1)
+        mmcm.register_clkin(platform.request("clk12"), 12e6)
+        # create_clkout also takes care of generating BUFG / BUFR instances
+        mmcm.create_clkout(self.cd_sys, sys_clk_freq)
+        # mmcm.create_clkout(self.cd_clk200, 200e6)
+        # self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
 
 
 class BaseSoC(SoCCore):
