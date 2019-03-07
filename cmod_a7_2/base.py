@@ -8,7 +8,6 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import spi_flash
 from litex.soc.cores.clock import period_ns, S7MMCM
-import cmod_a7
 import argparse
 
 class _CRG(Module):
@@ -40,13 +39,19 @@ class BaseSoC(SoCCore):
 
     def __init__(self, platform=None, spiflash="spiflash_1x", **kwargs):
         if platform is None:
-            platform = cmod_a7.Platform()
+            from cmod_a7 import Platform
+            platform = Platform()
+        elif platform == "sim":
+            from litex.build.sim.platform import SimPlatform
+            platform = SimPlatform()
+        print("platform", platform)
         if 'integrated_rom_size' not in kwargs:
             kwargs['integrated_rom_size'] = 0x8000
         if 'integrated_sram_size' not in kwargs:
             kwargs['integrated_sram_size'] = 0x8000
 
         sys_clk_freq = int(100e6)
+        print(kwargs)
         SoCCore.__init__(self, platform, sys_clk_freq, **kwargs)
         self.submodules.crg = _CRG(platform, sys_clk_freq)
         # self.crg.cd_sys.clk.attr.add("keep")
