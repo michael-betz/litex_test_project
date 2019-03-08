@@ -26,8 +26,8 @@ _io = [
     ## Buttons
     #set_property -dict { PACKAGE_PIN A18   IOSTANDARD LVCMOS33 } [get_ports { btn[0] }]; #IO_L19N_T3_VREF_16 Sch=btn[0]
     #set_property -dict { PACKAGE_PIN B18   IOSTANDARD LVCMOS33 } [get_ports { btn[1] }]; #IO_L19P_T3_16 Sch=btn[1]
-    ("user_btn", 0, Pins("A18"), IOStandard("LVCMOS33")),
-    ("user_btn", 1, Pins("B18"), IOStandard("LVCMOS33")),
+    ("cpu_reset", 0, Pins("A18"), IOStandard("LVCMOS33")),
+    ("user_btn", 0, Pins("B18"), IOStandard("LVCMOS33")),
 
     ## Clock signal 12 MHz
     #set_property -dict { PACKAGE_PIN L17   IOSTANDARD LVCMOS33 } [get_ports { sysclk }]; #IO_L12P_T1_MRCC_14 Sch=gclk
