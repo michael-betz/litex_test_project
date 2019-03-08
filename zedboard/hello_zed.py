@@ -17,8 +17,8 @@ def main():
     p.build(module)
 
 if __name__ == '__main__':
-    if sys.argv[1] == "prog":
-        prog = p.create_programmer("xc3sprog")
+    if len(sys.argv) > 1 and sys.argv[1] == "prog":
+        prog = p.create_programmer("openocd")
         prog.load_bitstream("build/top.bit")
     else:
         main()

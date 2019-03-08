@@ -9,19 +9,20 @@ from litex.soc.integration.builder import *
 from litex.soc.cores import spi_flash
 from litex.soc.cores.clock import period_ns, S7MMCM
 import argparse
+import importlib
 
 class _CRG(Module):
     """
     clock and reset generator
     Inherit from this class to make sys_clk adjustable
     """
-    def __init__(self, platform, sys_clk_freq):
+    def __init__(self, **kwargs):
         self.clock_domains.cd_sys = ClockDomain()
         # self.clock_domains.cd_clk200 = ClockDomain()
         self.submodules.mmcm = mmcm = S7MMCM(speedgrade=-1)
-        mmcm.register_clkin(platform.request("clk12"), 12e6)
+        mmcm.register_clkin(kwargs["platform"].request("clk12"), 12e6)
         # create_clkout also takes care of generating BUFG / BUFR instances
-        mmcm.create_clkout(self.cd_sys, sys_clk_freq)
+        mmcm.create_clkout(self.cd_sys, kwargs["clk_freq"])
         # mmcm.create_clkout(self.cd_clk200, 200e6)
         # self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
 
@@ -37,27 +38,32 @@ class BaseSoC(SoCCore):
     }
     mem_map.update(SoCCore.mem_map)
 
-    def __init__(self, platform=None, spiflash="spiflash_1x", **kwargs):
-        if platform is None:
-            from cmod_a7 import Platform
-            platform = Platform()
-        elif platform == "sim":
-            from litex.build.sim.platform import SimPlatform
-            platform = SimPlatform()
-        print("platform", platform)
-        if 'integrated_rom_size' not in kwargs:
-            kwargs['integrated_rom_size'] = 0x8000
-        if 'integrated_sram_size' not in kwargs:
-            kwargs['integrated_sram_size'] = 0x8000
+    def basesoc_args(parser):
+        soc_core_args(parser)
+        parser.add_argument("--test-arg", type=bool,
+                            help="test arg to BaseSoc")
 
-        sys_clk_freq = int(100e6)
-        print(kwargs)
-        SoCCore.__init__(self, platform, sys_clk_freq, **kwargs)
-        self.submodules.crg = _CRG(platform, sys_clk_freq)
+    def __init__(self, **kwargs):
+        kwargs.setdefault("spiflash", "spiflash_1x")
+        kwargs.setdefault("platform", "cmod_a7.Platform")
+        kwargs.setdefault("integrated_rom_size", 0x8000)
+        kwargs.setdefault("integrated_sram_size", 0x8000)
+        kwargs.setdefault("clk_freq", int(100e6))
+        print("kwargs", kwargs)
+
+        platform_module = importlib.import_module(kwargs["platform"])
+        try:
+            platform = platform_module.Platform()
+        except Exception:
+            platform = platform_module.SimPlatform()
+        print("platform", platform)
+
+        SoCCore.__init__(self, platform, **kwargs)
+        self.submodules.crg = _CRG(platform, kwargs["clk_freq"])
         # self.crg.cd_sys.clk.attr.add("keep")
         # self.platform.add_period_constraint(
         #     self.crg.cd_sys.clk,
-        #     period_ns(sys_clk_freq)
+        #     period_ns(kwargs["clk_freq"])
         # )
 
         # spi flash
@@ -94,10 +100,10 @@ class BaseSoC(SoCCore):
 def main():
     parser = argparse.ArgumentParser(description="LiteX SoC on CmodA7")
     builder_args(parser)
-    soc_core_args(parser)
+    BaseSoC.basesoc_args(parser)
     args = parser.parse_args()
     print(args)
-    soc = BaseSoC(**soc_core_argdict(args))
+    soc = BaseSoC(**vars(args))
     builder = Builder(soc, **builder_argdict(args))
     builder.build()
 
