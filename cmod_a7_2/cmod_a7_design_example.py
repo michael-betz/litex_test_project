@@ -29,24 +29,8 @@ def main():
         # integrated_sram_size=0,   # Litex will complain if 0!
         cpu_type="picorv32"
     )
-    parser.add_argument(
-        "action",
-        choices=["build", "synth", "load", "all"],
-        help="what to do"
-    )
     args = parser.parse_args()
-    kwargs = vars(args)
-    kwargs["no_compile_firmware"] = False
-    kwargs["no_compile_gateware"] = False
-    if kwargs["action"] in ("build", "all"):
-        kwargs["no_compile_gateware"] = True
-    elif kwargs["action"] in ("synth", "all"):
-        kwargs["no_compile_firmware"] = True
-    soc = MySoc(**kwargs)
-    if kwargs["action"] == "load":
-        prg = soc.platform.create_programmer()
-        prg.load_bitstream("soc_mysoc_cmod_a7/gateware/top.bit")
-        return 0
+    soc = MySoc(**vars(args))
     builder = Builder(soc, **builder_argdict(args))
     builder.build()
 
