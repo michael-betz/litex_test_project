@@ -2,8 +2,9 @@
 Example of a customized SOC based on the cmodA7 litex target
 """
 from migen import *
-from cmod_a7 import *
-from target import *
+from litex.soc.integration.builder import *
+from litex.boards.targets.cmod_a7 import BaseSoC
+import argparse
 
 
 class Blinky(Module):
