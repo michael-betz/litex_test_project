@@ -12,7 +12,7 @@ from litex.build.sim.config import SimConfig
 from litex.soc.cores import uart
 from liteeth.phy.model import LiteEthPHYModel
 from liteeth.core.mac import LiteEthMAC
-from litex.soc.integration.soc_core import mem_decoder
+from litex.soc.integration.soc_core import mem_decoder, get_mem_data
 import argparse
 
 
@@ -67,6 +67,8 @@ def main():
     MySoc.basesoc_args(parser)
     parser.add_argument("--trace", action="store_true",
                         help="enable VCD tracing")
+    parser.add_argument("--rom-init", default=None,
+                        help="rom_init file")
     parser.set_defaults(
         integrated_rom_size=0x8000,
         integrated_main_ram_size=0x8000,
@@ -77,7 +79,11 @@ def main():
         with_uart=False # We will add our own mock uart
     )
     args = parser.parse_args()
-    soc = MySoc(crg=CRG, **vars(args))
+    soc_kwargs = vars(args)
+    if args.rom_init:
+        soc_kwargs["integrated_rom_init"] = get_mem_data(args.rom_init)
+    soc = MySoc(crg=CRG, **soc_kwargs)
+
     # Push in a fake uart
     soc.submodules.uart_phy = uart.RS232PHYModel(soc.platform.request("serial"))
     soc.submodules.uart = uart.UART(soc.uart_phy)
