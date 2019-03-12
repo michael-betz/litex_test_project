@@ -76,8 +76,7 @@ static char *get_token(char **str)
 static void prompt(void)
 {
 	// FIXME printf gets vexriscv stuck in ISR
-	printf("RUNTIME>");
-	// putsnonl("RUNTIME>");
+	putsnonl("RUNTIME>");
 }
 
 static void help(void)
@@ -90,18 +89,18 @@ static void help(void)
 static void reboot(void)
 {
 	printf("Would be doing a reboot now if I could ... \n");
-	// asm("J 0");
+	asm("J 0");
 }
 
 static void console_service(void)
 {
 	char *str;
 	char *token;
-	// str = readstr();
-	// if(str == NULL) return;
+	str = readstr();
+	if(str == NULL) return;
 	// FIXME `get_token` freezes the CPU (picorv32 & vexriscv)
 	token = get_token(&str);
-	// token = str;
+	token = str;
 	// FIXME freeze on picorv32 (ISR stops triggering as well)
 	if(strcmp(token, "help") == 0)
 		help();
@@ -126,12 +125,12 @@ int main(void)
 
 	unsigned i=0;
 	while(1) {
-		printf("gVar: %d\n", 2);
+		// printf("gVar: %d\n", 2);
 		// FIXME vexriscv does output `test `, should be `test 0\n`
-		printf("test %d,  strcmp: %d\n", i++, strcmp("help", "help "));
+		// printf("test %d,  strcmp: %d\n", i++, strcmp("help", "help "));
 		// FIXME vexriscv seems to require this, else freezes
 		busy_wait(1);
-		// console_service();
+		console_service();
 	}
 
 	return 0;

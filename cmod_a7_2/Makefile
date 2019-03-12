@@ -4,7 +4,7 @@ TOP_V   = $(BUILD_FOLDER)/gateware/top.v
 TOP_BIT = $(BUILD_FOLDER)/gateware/top.bit
 COMMON_OPTS = --output-dir $(BUILD_FOLDER) \
 			  --csr-csv $(BUILD_FOLDER)/csr.csv \
-			  --cpu-type vexriscv
+			  --cpu-type picorv32
 
 all: clean $(TOP_V)
 

@@ -14,7 +14,7 @@ else
 	CRT_O :=$(CRT_O)ctr.o
 endif
 
-all: $(TARGET).bin
+all: $(TARGET).init
 
 # pull in dependency info for *existing* .o files
 -include $(OBJECTS:.o=.d)
@@ -51,7 +51,14 @@ endif
 %.o: %.S
 	$(assemble)
 
-clean:
-	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) $(TARGET).elf $(TARGET).bin $(TARGET).lst .*~ *~
+%.init: %.bin
+	python3 bin2init.py $^ $(CPUENDIANNESS) > $@
 
-.PHONY: all clean
+emu: $(TARGET).init
+	cp $^ ../build/gateware/mem.init
+	(cd ../build/gateware/; obj_dir/Vdut)
+
+clean:
+	$(RM) $(OBJECTS) $(OBJECTS:.o=.d) $(TARGET).elf $(TARGET).bin $(TARGET).lst .*~ *~ $(TARGET).init
+
+.PHONY: all clean emu

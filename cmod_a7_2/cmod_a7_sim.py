@@ -90,15 +90,15 @@ def main():
 
     sim_config = SimConfig(default_clk="sys_clk")
     # sim_config.add_module("ethernet", "eth", args={"interface": "tap0", "ip": "192.168.1.100"})
-    # sim_config.add_module("serial2console", "serial")
-    sim_config.add_module("serial2tcp", "serial", args={"port": 55555})
+    sim_config.add_module("serial2console", "serial")
+    # sim_config.add_module("serial2tcp", "serial", args={"port": 55555})
     # now you can do these 2 things to get a terminal
     # telnet localhost 55555
     # litex_term socket://localhost:55555
     # soc.add_constant("TFTP_SERVER_PORT", int(tftp_port))
 
     builder = Builder(soc, **builder_argdict(args))
-    builder.build(run=False, sim_config=sim_config)
+    builder.build(run=False, sim_config=sim_config, trace=args.trace)
 
 
 if __name__ == "__main__":
