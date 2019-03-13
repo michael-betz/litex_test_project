@@ -3,9 +3,9 @@ Hello world example for the ZedBoard with litex
 """
 import sys
 from migen import *
-from zedboard import *
+from litex.boards.platforms import zedboard
 
-p = Platform()
+p = zedboard.Platform()
 
 def main():
     led = p.request("user_led")
