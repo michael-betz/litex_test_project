@@ -1,11 +1,11 @@
 """
-Hello world example for the ZedBoard with litex
+Hello world example for the sp605 with litex
 """
 import sys
 from migen import *
-from litex.boards.platforms import zedboard
+from litex.boards.platforms import sp605
 
-p = zedboard.Platform()
+p = sp605.Platform()
 
 def main():
     led = p.request("user_led")
@@ -17,8 +17,8 @@ def main():
     p.build(module)
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == "prog":
-        prog = p.create_programmer("openocd")
+    if "config" in sys.argv:
+        prog = p.create_programmer()
         prog.load_bitstream("build/top.bit")
     else:
         main()

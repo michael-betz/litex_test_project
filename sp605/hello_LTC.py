@@ -6,11 +6,12 @@ FMC board trough SPI over UartWishbone Bridge
 python3 hello_LTC.py <build / config>
 """
 from migen import *
-from litex.boards.platforms import zedboard
+from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
-from litex.soc.cores import dna, xadc, uart, clock
+from litex.soc.cores import dna, uart
+from sp605_crg import SP605_CRG
 from sys import argv, exit
 
 
@@ -23,7 +24,7 @@ class HelloLtc(SoCCore):
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
     def __init__(self, platform, **kwargs):
-        sys_clk_freq = int(1e9 / platform.default_clk_period) # 100 MHz, 10 ns
+        sys_clk_freq = int(100e6) # 100 MHz, 10 ns
         SoCCore.__init__(
             self, platform, sys_clk_freq,
             cpu_type=None,
@@ -46,30 +47,27 @@ class HelloLtc(SoCCore):
         self.add_wb_master(self.cpu.wishbone)
 
         # Clock Reset Generation
-        self.submodules.crg = CRG(platform.request("clk100"), platform.request("user_btn"))
+        self.submodules.crg = SP605_CRG(platform, sys_clk_freq)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
 
         # Blinky
         led = platform.request("user_led")
-        counter = Signal(24)
+        counter = Signal(26)
         self.comb += led.eq(counter[-1])
         self.sync += counter.eq(counter + 1)
 
 
 if __name__ == '__main__':
-    platform = zedboard.Platform()
-    soc = HelloLtc(platform)
-    if len(argv) != 2:
+    p = sp605.Platform()
+    soc = HelloLtc(p)
+    if len(argv) < 2:
         print(__doc__)
         exit(-1)
-    if argv[1] == "build":
-        builder = Builder(soc, output_dir="build", csr_csv="csr.csv")
+    if "build" in argv:
+        builder = Builder(soc, output_dir="build", csr_csv="build/csr.csv")
         builder.build()
-    elif argv[1] == "config":
-        prog = platform.create_programmer()
+    if "config" in argv:
+        prog = p.create_programmer()
         prog.load_bitstream("build/gateware/top.bit")
-    else:
-        print(__doc__)
-        exit(-1)

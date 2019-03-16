@@ -1,0 +1,56 @@
+from migen import *
+from migen.genlib.io import DifferentialInput
+from migen.genlib.resetsync import AsyncResetSynchronizer
+from fractions import Fraction
+
+
+class SP605_CRG(Module):
+    """
+    Clock and reset generator for SP605 (driven by the 200 MHz on-board crystal)
+    """
+    def __init__(self, platform, clk_freq):
+        self.clock_domains.cd_sys = ClockDomain()
+        self.clock_domains.cd_sys_ps = ClockDomain()
+
+        f0 = 1e9 / platform.default_clk_period
+
+        p_clk = platform.request(platform.default_clk_name)
+        se_clk = Signal()
+
+        self.specials += Instance(
+            "IBUFGDS",
+            i_I=p_clk.p,
+            i_IB=p_clk.n,
+            o_O=se_clk
+        )
+
+        f = Fraction(int(clk_freq), int(f0))
+        n, m, p = f.denominator, f.numerator, 8
+        assert f0 / n * m == clk_freq
+        pll_lckd = Signal()
+        pll_fb = Signal()
+        pll = Signal(6)
+        self.specials.pll = Instance("PLL_ADV", p_SIM_DEVICE="SPARTAN6",
+                                     p_BANDWIDTH="OPTIMIZED", p_COMPENSATION="INTERNAL",
+                                     p_REF_JITTER=.01, p_CLK_FEEDBACK="CLKFBOUT",
+                                     i_DADDR=0, i_DCLK=0, i_DEN=0, i_DI=0, i_DWE=0, i_RST=0, i_REL=0,
+                                     p_DIVCLK_DIVIDE=1, p_CLKFBOUT_MULT=m*p//n, p_CLKFBOUT_PHASE=0.,
+                                     i_CLKIN1=se_clk, i_CLKIN2=0, i_CLKINSEL=1,
+                                     p_CLKIN1_PERIOD=1000000000/f0, p_CLKIN2_PERIOD=0.,
+                                     i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb, o_LOCKED=pll_lckd,
+                                     o_CLKOUT0=pll[0], p_CLKOUT0_DUTY_CYCLE=.5,
+                                     o_CLKOUT1=pll[1], p_CLKOUT1_DUTY_CYCLE=.5,
+                                     o_CLKOUT2=pll[2], p_CLKOUT2_DUTY_CYCLE=.5,
+                                     o_CLKOUT3=pll[3], p_CLKOUT3_DUTY_CYCLE=.5,
+                                     o_CLKOUT4=pll[4], p_CLKOUT4_DUTY_CYCLE=.5,
+                                     o_CLKOUT5=pll[5], p_CLKOUT5_DUTY_CYCLE=.5,
+                                     p_CLKOUT0_PHASE=0., p_CLKOUT0_DIVIDE=p//1,
+                                     p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=p//1,
+                                     p_CLKOUT2_PHASE=0., p_CLKOUT2_DIVIDE=p//1,
+                                     p_CLKOUT3_PHASE=0., p_CLKOUT3_DIVIDE=p//1,
+                                     p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,  # sys
+                                     p_CLKOUT5_PHASE=270., p_CLKOUT5_DIVIDE=p//1,  # sys_ps
+        )
+        self.specials += Instance("BUFG", i_I=pll[4], o_O=self.cd_sys.clk)
+        self.specials += Instance("BUFG", i_I=pll[5], o_O=self.cd_sys_ps.clk)
+        self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd)
