@@ -10,7 +10,7 @@ from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
-from litex.soc.cores import dna, uart
+from litex.soc.cores import dna, uart, spi
 from sp605_crg import SP605_CRG
 from sys import argv, exit
 
@@ -19,7 +19,8 @@ from sys import argv, exit
 class HelloLtc(SoCCore):
     # Peripherals CSR declaration
     csr_peripherals = [
-        "dna"
+        "dna",
+        "spi"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -57,6 +58,19 @@ class HelloLtc(SoCCore):
         counter = Signal(26)
         self.comb += led.eq(counter[-1])
         self.sync += counter.eq(counter + 1)
+
+        # SPI master
+        spi_ext = [("LTC_SPI", 0,
+            Subsignal("cs_n", Pins("LPC:LA14_P")),
+            Subsignal("miso", Pins("LPC:LA14_N"), Misc("PULLUP")),
+            Subsignal("mosi", Pins("LPC:LA27_P")),
+            Subsignal("clk",  Pins("LPC:LA27_N")),
+            IOStandard("LVCMOS18")
+        )]
+        platform.add_extension(spi_ext)
+        spi_pads = platform.request("LTC_SPI")
+        self.submodules.spi = spi.SPIMaster(spi_pads)
+        self.comb += platform.request("user_led").eq(spi_pads.cs_n == 0)
 
 
 if __name__ == '__main__':

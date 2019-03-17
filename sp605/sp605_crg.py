@@ -30,10 +30,11 @@ class SP605_CRG(Module):
         pll_lckd = Signal()
         pll_fb = Signal()
         pll = Signal(6)
+        rst = platform.request("cpu_reset")
         self.specials.pll = Instance("PLL_ADV", p_SIM_DEVICE="SPARTAN6",
                                      p_BANDWIDTH="OPTIMIZED", p_COMPENSATION="INTERNAL",
                                      p_REF_JITTER=.01, p_CLK_FEEDBACK="CLKFBOUT",
-                                     i_DADDR=0, i_DCLK=0, i_DEN=0, i_DI=0, i_DWE=0, i_RST=0, i_REL=0,
+                                     i_DADDR=0, i_DCLK=0, i_DEN=0, i_DI=0, i_DWE=0, i_RST=rst, i_REL=0,
                                      p_DIVCLK_DIVIDE=1, p_CLKFBOUT_MULT=m*p//n, p_CLKFBOUT_PHASE=0.,
                                      i_CLKIN1=se_clk, i_CLKIN2=0, i_CLKINSEL=1,
                                      p_CLKIN1_PERIOD=1000000000/f0, p_CLKIN2_PERIOD=0.,
