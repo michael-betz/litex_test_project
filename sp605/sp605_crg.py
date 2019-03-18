@@ -10,7 +10,7 @@ class SP605_CRG(Module):
     """
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_sys_ps = ClockDomain()
+        self.clk_114 = Signal()
 
         f0 = 1e9 / platform.default_clk_period
 
@@ -49,9 +49,9 @@ class SP605_CRG(Module):
                                      p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=p//1,
                                      p_CLKOUT2_PHASE=0., p_CLKOUT2_DIVIDE=p//1,
                                      p_CLKOUT3_PHASE=0., p_CLKOUT3_DIVIDE=p//1,
-                                     p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,  # sys
-                                     p_CLKOUT5_PHASE=270., p_CLKOUT5_DIVIDE=p//1,  # sys_ps
+                                     p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,  # sys = 100 MHz
+                                     p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=7      # 114 MHz
         )
         self.specials += Instance("BUFG", i_I=pll[4], o_O=self.cd_sys.clk)
-        self.specials += Instance("BUFG", i_I=pll[5], o_O=self.cd_sys_ps.clk)
+        self.specials += Instance("BUFG", i_I=pll[5], o_O=self.clk_114)
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd)

@@ -3,14 +3,19 @@ Trying to communicate with the LTC2175 chip on a
 FMC board trough SPI over UartWishbone Bridge
 ... wish me luck :p
 
+okay, this works, next step: connect to the LVDS FRAME(_P/N)
+signal and measure its frequency, which is sample rate / 2 due to DDR:
+f_frame = f_enc / 2
+
 python3 hello_LTC.py <build / config>
 """
 from migen import *
+from migen.genlib.io import DifferentialInput
 from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
-from litex.soc.cores import dna, uart, spi
+from litex.soc.cores import dna, uart, spi, frequency_meter
 from sp605_crg import SP605_CRG
 from sys import argv, exit
 
@@ -20,7 +25,8 @@ class HelloLtc(SoCCore):
     # Peripherals CSR declaration
     csr_peripherals = [
         "dna",
-        "spi"
+        "spi",
+        "f_frame"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -59,18 +65,92 @@ class HelloLtc(SoCCore):
         self.comb += led.eq(counter[-1])
         self.sync += counter.eq(counter + 1)
 
+        # FMC LPC connectivity
+        ltc_connection = [
+            ("LTC_SPI", 0,
+                Subsignal("cs_n", Pins("LPC:LA14_P")),
+                Subsignal("miso", Pins("LPC:LA14_N"), Misc("PULLUP")),
+                Subsignal("mosi", Pins("LPC:LA27_P")),
+                Subsignal("clk",  Pins("LPC:LA27_N")),
+                IOStandard("LVCMOS25")
+            ),
+            ("LTC_OUT", 0,
+                Subsignal("a_p", Pins("LPC:LA03_P")),
+                Subsignal("a_n", Pins("LPC:LA03_N")),
+                Subsignal("b_p", Pins("LPC:LA08_P")),
+                Subsignal("b_n", Pins("LPC:LA08_N")),
+                IOStandard("LVDS_25"),
+                Misc("DIFF_TERM=TRUE")
+            ),
+            ("LTC_OUT", 1,
+                Subsignal("a_p", Pins("LPC:LA12_P")),
+                Subsignal("a_n", Pins("LPC:LA12_N")),
+                Subsignal("b_p", Pins("LPC:LA16_P")),
+                Subsignal("b_n", Pins("LPC:LA16_N")),
+                IOStandard("LVDS_25"),
+                Misc("DIFF_TERM=TRUE")
+            ),
+            ("LTC_OUT", 2,
+                Subsignal("a_p", Pins("LPC:LA22_P")),
+                Subsignal("a_n", Pins("LPC:LA22_N")),
+                Subsignal("b_p", Pins("LPC:LA25_P")),
+                Subsignal("b_n", Pins("LPC:LA25_N")),
+                IOStandard("LVDS_25"),
+                Misc("DIFF_TERM=TRUE")
+            ),
+            ("LTC_OUT", 3,
+                Subsignal("a_p", Pins("LPC:LA29_P")),
+                Subsignal("a_n", Pins("LPC:LA29_N")),
+                Subsignal("b_p", Pins("LPC:LA31_P")),
+                Subsignal("b_n", Pins("LPC:LA31_N")),
+                IOStandard("LVDS_25"),
+                Misc("DIFF_TERM=TRUE")
+            ),
+            ("LTC_FR", 0,
+                Subsignal("p", Pins("LPC:LA18_CC_P")),
+                Subsignal("n", Pins("LPC:LA18_CC_N")),
+                IOStandard("LVDS_25"),
+                Misc("DIFF_TERM=TRUE")
+            ),
+            ("LTC_DCO", 0,
+                Subsignal("p", Pins("LPC:LA17_CC_P")),
+                Subsignal("n", Pins("LPC:LA17_CC_N")),
+                IOStandard("LVDS_25"),
+                Misc("DIFF_TERM=TRUE")
+            ),
+            ("ENC_CLK", 0,
+                Subsignal("p", Pins("SMA_GPIO:P")),
+                Subsignal("n", Pins("SMA_GPIO:N")),
+                # Need to mod. the eval board before it can
+                # accept a differential clock
+                IOStandard("LVCMOS25")
+            )
+        ]
+        platform.add_extension(ltc_connection)
+
         # SPI master
-        spi_ext = [("LTC_SPI", 0,
-            Subsignal("cs_n", Pins("LPC:LA14_P")),
-            Subsignal("miso", Pins("LPC:LA14_N"), Misc("PULLUP")),
-            Subsignal("mosi", Pins("LPC:LA27_P")),
-            Subsignal("clk",  Pins("LPC:LA27_N")),
-            IOStandard("LVCMOS18")
-        )]
-        platform.add_extension(spi_ext)
         spi_pads = platform.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
         self.comb += platform.request("user_led").eq(spi_pads.cs_n == 0)
+
+        # Measure frame rate
+        # Accumulates `frm` cycles for 10e6 `sys_clk` cycles
+        self.submodules.f_frame = frequency_meter.FrequencyMeter(int(10e6))
+        frm_pads = platform.request("LTC_FR")
+        frm_se = Signal()
+        self.specials += DifferentialInput(frm_pads.p, frm_pads.n, frm_se)
+        self.comb += self.f_frame.clk.eq(frm_se)
+
+        # Provide a 114 MHz ENC clock signal on SMA_GPIO_P
+        enc_out = platform.request("ENC_CLK").p
+        self.specials += Instance("ODDR2",
+            o_Q=enc_out,
+            i_C0=self.crg.clk_114,
+            i_C1=~self.crg.clk_114,
+            i_CE=1,
+            i_D0=1,
+            i_D1=0
+        ),
 
 
 if __name__ == '__main__':
