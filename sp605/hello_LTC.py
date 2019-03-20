@@ -139,7 +139,7 @@ class HelloLtc(SoCCore):
         frm_pads = platform.request("LTC_FR")
         frm_se = Signal()
         self.specials += DifferentialInput(frm_pads.p, frm_pads.n, frm_se)
-        self.comb += self.f_frame.clk.eq(frm_se)
+        # self.comb += self.f_frame.clk.eq(frm_se)
 
         # Provide a 114 MHz ENC clock signal on SMA_GPIO_P
         enc_out = platform.request("ENC_CLK").p
@@ -150,7 +150,8 @@ class HelloLtc(SoCCore):
             i_CE=1,
             i_D0=1,
             i_D1=0
-        ),
+        )
+        self.comb += self.f_frame.clk.eq(self.crg.clk_114)
 
 
 if __name__ == '__main__':
