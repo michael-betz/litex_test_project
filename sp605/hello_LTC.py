@@ -131,15 +131,16 @@ class HelloLtc(SoCCore):
         # SPI master
         spi_pads = platform.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
-        self.comb += platform.request("user_led").eq(spi_pads.cs_n == 0)
+        self.comb += platform.request("user_led").eq(~spi_pads.cs_n)
 
         # Measure frame rate
-        # Accumulates `frm` cycles for 10e6 `sys_clk` cycles
-        self.submodules.f_frame = frequency_meter.FrequencyMeter(int(10e6))
+        # Accumulates `frm` cycles for 100e6 cycles of 1 ns each = [Hz]
+        self.submodules.f_frame = frequency_meter.FrequencyMeter(int(100e6))
         frm_pads = platform.request("LTC_FR")
         frm_se = Signal()
         self.specials += DifferentialInput(frm_pads.p, frm_pads.n, frm_se)
-        # self.comb += self.f_frame.clk.eq(frm_se)
+        self.comb += self.f_frame.clk.eq(frm_se)
+        self.comb += platform.request("user_led").eq(frm_se)
 
         # Provide a 114 MHz ENC clock signal on SMA_GPIO_P
         enc_out = platform.request("ENC_CLK").p
@@ -151,7 +152,7 @@ class HelloLtc(SoCCore):
             i_D0=1,
             i_D1=0
         )
-        self.comb += self.f_frame.clk.eq(self.crg.clk_114)
+        # self.comb += self.f_frame.clk.eq(self.crg.clk_114)
 
 
 if __name__ == '__main__':
