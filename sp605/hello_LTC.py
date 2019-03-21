@@ -143,15 +143,15 @@ class HelloLtc(SoCCore):
         self.comb += platform.request("user_led").eq(frm_se)
 
         # Provide a 114 MHz ENC clock signal on SMA_GPIO_P
-        enc_out = platform.request("ENC_CLK").p
-        self.specials += Instance("ODDR2",
-            o_Q=enc_out,
-            i_C0=self.crg.clk_114,
-            i_C1=~self.crg.clk_114,
-            i_CE=1,
-            i_D0=1,
-            i_D1=0
-        )
+        # enc_out = platform.request("ENC_CLK").p
+        # self.specials += Instance("ODDR2",
+        #     o_Q=enc_out,
+        #     i_C0=self.crg.clk_114,
+        #     i_C1=~self.crg.clk_114,
+        #     i_CE=1,
+        #     i_D0=1,
+        #     i_D1=0
+        # )
         # self.comb += self.f_frame.clk.eq(self.crg.clk_114)
 
 
