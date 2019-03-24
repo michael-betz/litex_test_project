@@ -1,0 +1,62 @@
+[*]
+[*] GTKWave Analyzer v3.3.98 (w)1999-2019 BSI
+[*] Sun Mar 24 04:09:04 2019
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes/iserdes.vcd"
+[dumpfile_mtime] "Sun Mar 24 04:08:16 2019"
+[dumpfile_size] 34860966
+[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes/iserdes.gtkw"
+[timestart] 5503320
+[size] 1596 853
+[pos] -1 -1
+*-13.000000 5513310 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] iserdes_tb.
+[treeopen] iserdes_tb.serdes_dat_0.loop0[0].
+[sst_width] 229
+[signals_width] 199
+[sst_expanded] 1
+[sst_vpaned_height] 344
+@420
+iserdes_tb.cc
+@800200
+-CLK
+@28
+iserdes_tb.fr_clk
+iserdes_tb.dco_clk_p
+[color] 3
+iserdes_tb.out_a_p
+@1000200
+-CLK
+@28
+iserdes_tb.reset
+[color] 7
+iserdes_tb.serdes_dat_0.cal_data_master
+[color] 7
+iserdes_tb.serdes_dat_0.cal_data_slave
+[color] 7
+iserdes_tb.serdes_dat_0.rst_data
+iserdes_tb.serdes_dat_0.inc_data
+@200
+-
+@28
+[color] 2
+iserdes_tb.serdes_dat_0.rxioclkp
+@29
+iserdes_tb.serdes_dat_0.ddly_m[1:0]
+@200
+-
+@c00022
+iserdes_tb.data_out[7:0]
+@28
+(0)iserdes_tb.data_out[7:0]
+(1)iserdes_tb.data_out[7:0]
+(2)iserdes_tb.data_out[7:0]
+(3)iserdes_tb.data_out[7:0]
+(4)iserdes_tb.data_out[7:0]
+(5)iserdes_tb.data_out[7:0]
+(6)iserdes_tb.data_out[7:0]
+(7)iserdes_tb.data_out[7:0]
+@1401200
+-group_end
+[pattern_trace] 1
+[pattern_trace] 0

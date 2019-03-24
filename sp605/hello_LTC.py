@@ -10,13 +10,14 @@ f_frame = f_enc / 2
 python3 hello_LTC.py <build / config>
 """
 from migen import *
-from migen.genlib.io import DifferentialInput
+from migen.genlib.io import DifferentialInput, DifferentialOutput
 from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi, frequency_meter
 from sp605_crg import SP605_CRG
+from sp6iserdes.Sp6LvdsPhy import LTCPhy
 from sys import argv, exit
 
 
@@ -26,7 +27,8 @@ class HelloLtc(SoCCore):
     csr_peripherals = [
         "dna",
         "spi",
-        "f_frame"
+        "f_frame",
+        "lvds"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -118,12 +120,14 @@ class HelloLtc(SoCCore):
                 IOStandard("LVDS_25"),
                 Misc("DIFF_TERM=TRUE")
             ),
+            # Connect GPIO_SMA on SP605 with CLK input on 1525A
+            # Alternatively, use a Si570 eval board as clock source
             ("ENC_CLK", 0,
                 Subsignal("p", Pins("SMA_GPIO:P")),
                 Subsignal("n", Pins("SMA_GPIO:N")),
-                # Need to mod. the eval board before it can
-                # accept a differential clock
-                IOStandard("LVCMOS25")
+                # Note: the LTC eval board needs to be modded
+                # to accept a differential clock
+                IOStandard("LVDS_25")
             )
         ]
         platform.add_extension(ltc_connection)
@@ -142,17 +146,8 @@ class HelloLtc(SoCCore):
         self.comb += self.f_frame.clk.eq(frm_se)
         self.comb += platform.request("user_led").eq(frm_se)
 
-        # Provide a 114 MHz ENC clock signal on SMA_GPIO_P
-        enc_out = platform.request("ENC_CLK").p
-        self.specials += Instance("ODDR2",
-            o_Q=enc_out,
-            i_C0=self.crg.clk_114,
-            i_C1=~self.crg.clk_114,
-            i_CE=1,
-            i_D0=1,
-            i_D1=0
-        )
-        # self.comb += self.f_frame.clk.eq(self.crg.clk_114)
+        # LVDS phy
+        self.submodules.lvds = LTCPhy(platform)
 
 
 if __name__ == '__main__':
