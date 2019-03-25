@@ -1,0 +1,100 @@
+[*]
+[*] GTKWave Analyzer v3.3.98 (w)1999-2019 BSI
+[*] Mon Mar 25 05:32:07 2019
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes_pll/iserdes.vcd"
+[dumpfile_mtime] "Mon Mar 25 05:31:16 2019"
+[dumpfile_size] 1800374
+[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes_pll/iserdes.sav"
+[timestart] 137000
+[size] 1596 853
+[pos] -1 -1
+*-15.000000 214300 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] iserdes_tb.
+[treeopen] iserdes_tb.serdec_clk.
+[treeopen] iserdes_tb.serdes_dat_0.loop0[0].
+[sst_width] 280
+[signals_width] 294
+[sst_expanded] 1
+[sst_vpaned_height] 300
+@800200
+-CLK
+@28
+iserdes_tb.fr_clk
+iserdes_tb.dco_clk_p
+[color] 5
+iserdes_tb.out_a_p
+[color] 5
+iserdes_tb.out_b_p
+@1000200
+-CLK
+@c00200
+-pll_clk
+@28
+iserdes_tb.serdec_clk.iob_datain
+@22
+[color] 3
+iserdes_tb.serdec_clk.iodelay_m.idelay_val_pe_reg[7:0]
+[color] 3
+iserdes_tb.serdec_clk.iodelay_s.idelay_val_pe_reg[7:0]
+@28
+iserdes_tb.serdec_clk.ddly_m
+iserdes_tb.serdec_clk.ddly_s
+[color] 7
+iserdes_tb.serdec_clk.cal_clk
+[color] 7
+iserdes_tb.serdec_clk.rst_clk
+iserdes_tb.serdec_clk.rx_pll_lckd
+[color] 1
+iserdes_tb.serdec_clk.buf_P_clk
+iserdes_tb.serdec_clk.rx_pllout_xs
+iserdes_tb.serdec_clk.rx_pllout_x1
+@1401200
+-pll_clk
+@c00200
+-data
+@28
+[color] 7
+iserdes_tb.serdes_dat_0.cal_data_master
+[color] 7
+iserdes_tb.serdes_dat_0.cal_data_slave
+[color] 7
+iserdes_tb.serdes_dat_0.rst_data
+@22
+[color] 3
+iserdes_tb.serdes_dat_0.loop0[0].iodelay_m.idelay_val_pe_reg[7:0]
+[color] 3
+iserdes_tb.serdes_dat_0.loop0[0].iodelay_s.idelay_val_pe_reg[7:0]
+@28
+[color] 1
+iserdes_tb.serdes_dat_0.rxioclk
+@1401200
+-data
+@800022
+iserdes_tb.data_out_a[7:0]
+@28
+(0)iserdes_tb.data_out_a[7:0]
+(1)iserdes_tb.data_out_a[7:0]
+(2)iserdes_tb.data_out_a[7:0]
+(3)iserdes_tb.data_out_a[7:0]
+(4)iserdes_tb.data_out_a[7:0]
+(5)iserdes_tb.data_out_a[7:0]
+(6)iserdes_tb.data_out_a[7:0]
+(7)iserdes_tb.data_out_a[7:0]
+@800023
+iserdes_tb.data_out_b[7:0]
+@29
+(0)iserdes_tb.data_out_b[7:0]
+(1)iserdes_tb.data_out_b[7:0]
+(2)iserdes_tb.data_out_b[7:0]
+(3)iserdes_tb.data_out_b[7:0]
+(4)iserdes_tb.data_out_b[7:0]
+(5)iserdes_tb.data_out_b[7:0]
+(6)iserdes_tb.data_out_b[7:0]
+(7)iserdes_tb.data_out_b[7:0]
+@1001201
+-group_end
+@1001200
+-group_end
+[pattern_trace] 1
+[pattern_trace] 0

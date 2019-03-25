@@ -1,36 +1,38 @@
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2009 Xilinx, Inc.
 // This design is confidential and proprietary of Xilinx, All Rights Reserved.
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //   ____  ____
 //  /   /\/   /
 // /___/  \  /   Vendor: Xilinx
 // \   \   \/    Version: 1.0
-//  \   \        Filename: serdes_1_to_n_data_ddr_s8_diff.v
+//  \   \        Filename: serdes_1_to_n_data_s8_diff.vhd
 //  /   /        Date Last Modified:  November 5 2009
-// /___/   /\    Date Created: September 1 2009
+// /___/   /\    Date Created: August 1 2008
 // \   \  /  \
 //  \___\/\___\
 //
 //Device:       Spartan 6
-//Purpose:      D-bit generic 1:n data receiver module with differential inputs for DDR systems
+//Purpose:      D-bit generic 1:n data receiver module with differential inputs
 //              Takes in 1 bit of differential data and deserialises this to n bits
 //              data is received LSB first
 //              Serial input words
 //              Line0     : 0,   ...... DS-(S+1)
 //              Line1     : 1,   ...... DS-(S+2)
 //              Line(D-1) : .           .
-//              Line(D)   : D-1, ...... DS
+//              Line0(D)  : D-1, ...... DS
 //              Parallel output word
 //              DS, DS-1 ..... 1, 0
 //
 //              Includes state machine to control CAL and the phase detector
-//              Data inversion can be accomplished via the RX_SWAP_MASK parameter if required
+//              Data inversion can be accomplished via the RX_RX_SWAP_MASK
+//              parameter if required
+//
 //Reference:
 //
 //Revision History:
 //    Rev 1.0 - First created (nicks)
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //
 //  Disclaimer:
 //
@@ -64,23 +66,22 @@
 
 `timescale 1ps/1ps
 
-module serdes_1_to_n_data_ddr_s8_diff (use_phase_detector, datain_p, datain_n, rxioclkp, rxioclkn, rxserdesstrobe, reset, gclk, bitslip, debug_in, data_out, debug) ;
+module serdes_1_to_n_data_s8_diff (use_phase_detector, datain_p, datain_n, rxioclk, rxserdesstrobe, reset, gclk, bitslip, debug_in, data_out, debug) ;
 
 parameter integer S = 8 ;                       // Parameter to set the serdes factor 1..8
 parameter integer D = 16 ;                      // Set the number of inputs and outputs
 parameter         DIFF_TERM = "FALSE" ;         // Parameter to enable internal differential termination
 
-input                   use_phase_detector ;    // '1' enables the phase detcetor logic
+input                   use_phase_detector ;    // '1' enables the phase detector logic
 input   [D-1:0]         datain_p ;              // Input from LVDS receiver pin
 input   [D-1:0]         datain_n ;              // Input from LVDS receiver pin
-input                   rxioclkp ;              // IO Clock network
-input                   rxioclkn ;              // IO Clock network
+input                   rxioclk ;               // IO Clock network
 input                   rxserdesstrobe ;        // Parallel data capture strobe
 input                   reset ;                 // Reset line
 input                   gclk ;                  // Global clock
 input                   bitslip ;               // Bitslip control line
 input   [1:0]           debug_in ;              // Debug Inputs
-output  [(D*S)-1:0]     data_out ;              // Output data
+output  [(8*D)-1:0]     data_out ;              // Output data
 output  [2*D+6:0]       debug ;                 // Debug bus, 2D+6 = 2 lines per input (from mux and ce) + 7, leave nc if debug not required
 
 wire    [D-1:0]         ddly_m;                 // Master output from IODELAY1
@@ -108,9 +109,9 @@ wire    [(8*D)-1:0]     mdataout ;              //
 reg     [4:0]           pdcounter ;
 wire    [D-1:0]         valid_data ;
 wire    [D-1:0]         incdec_data ;
+reg                     flag ;
 reg     [D-1:0]         mux ;
 reg                     ce_data_inta ;
-reg                     flag ;
 wire    [D:0]           incdec_data_or ;
 wire    [D-1:0]         incdec_data_im ;
 wire    [D:0]           valid_data_or ;
@@ -118,15 +119,16 @@ wire    [D-1:0]         valid_data_im ;
 wire    [D:0]           busy_data_or ;
 wire    [D-1:0]         all_ce ;
 
-parameter       SIM_TAP_DELAY = 49 ;            //
+parameter         SIM_TAP_DELAY = 49 ;          //
 parameter [D-1:0] RX_SWAP_MASK = 16'h0000 ;     // pinswap mask for input bits (0 = no swap (default), 1 = swap). Allows inputs to be connected the wrong way round to ease PCB routing.
 
 assign busy_data = busys ;
-assign cal_data_slave = cal_data_sint ;
 assign debug = {mux, cal_data_master, rst_data, cal_data_slave, busy_data_d, inc_data, ce_data, valid_data_d, incdec_data_d};
 
-genvar i ;
+genvar i ;                                      // Limit the output data bus to the most significant 'S' number of bits
 genvar j ;
+
+assign cal_data_slave = cal_data_sint ;
 
 always @ (posedge gclk or posedge reset)
 begin
@@ -134,19 +136,19 @@ if (reset == 1'b1) begin
         state <= 0 ;
         cal_data_master <= 1'b0 ;
         cal_data_sint <= 1'b0 ;
-        counter <= 9'b000000000 ;
+        counter <= 9'h000 ;
         enable <= 1'b0 ;
         mux <= 16'h0001 ;
 end
 else begin
-        counter <= counter + 9'b000000001 ;
+        counter <= counter + 9'h001 ;
         if (counter[8] == 1'b1) begin
-                counter <= 9'b000000000 ;
+                counter <= 9'h000 ;
         end
         if (counter[5] == 1'b1) begin
                 enable <= 1'b1 ;
         end
-        if (state == 0 && enable == 1'b1) begin                         // Wait for all IODELAYs to be available
+        if (state == 0 && enable == 1'b1) begin                         // Wait for IODELAY to be available
                 cal_data_master <= 1'b0 ;
                 cal_data_sint <= 1'b0 ;
                 rst_data <= 1'b0 ;
@@ -161,7 +163,7 @@ else begin
                         state <= 2 ;
                 end
         end
-        else if (state == 2) begin                                      // Now RST all master and slave IODELAYs, needed for simulation, not for the silicon
+        else if (state == 2) begin                                      // Now RST master and slave IODELAYs needed for simulation, not for the silicon
                 cal_data_master <= 1'b0 ;
                 cal_data_sint <= 1'b0 ;
                 if (busy_data_d == 1'b0) begin
@@ -169,7 +171,7 @@ else begin
                         state <= 3 ;
                 end
         end
-        else if (state == 3) begin                                      // Wait fo all IODELAYs to be available
+        else if (state == 3) begin                                      // Wait for IODELAY to be available
                 rst_data <= 1'b0 ;
                 if (busy_data_d == 1'b0) begin
                         state <= 4 ;
@@ -190,8 +192,8 @@ else begin
                 end
         end
         else if (state == 6) begin                                      // Wait for command to be accepted
+                cal_data_sint <= 1'b0 ;
                 if (busy_data_d == 1'b1) begin
-                        cal_data_sint <= 1'b0 ;
                         state <= 7 ;
                 end
         end
@@ -207,7 +209,7 @@ end
 always @ (posedge gclk or posedge reset)                                // Per-bit phase detection state machine
 begin
 if (reset == 1'b1) begin
-        pdcounter <= 5'h10 ;
+        pdcounter <= 5'b1000 ;
         ce_data_inta <= 1'b0 ;
         flag <= 1'b0 ;                                                  // flag is there to only allow one inc or dec per cal (test)
 end
@@ -220,7 +222,7 @@ else begin
                         ce_data = mux ;
                 end
                 else begin
-                        ce_data = mux ^ mux ;
+                        ce_data = 64'h0000000000000000 ;
                 end
                 if (state == 7) begin
                         flag <= 1'b0 ;
@@ -279,7 +281,7 @@ assign busy_data_or[i+1] = busy_data[i] | busy_data_or[i] ;                     
 
 assign all_ce[i] = debug_in[0] ;
 
-assign rx_data_in_fix[i] = rx_data_in[i] ^ RX_SWAP_MASK[i] ;    // Invert signals as required
+assign rx_data_in_fix[i] = rx_data_in[i] ^ RX_SWAP_MASK[i] ;                            // Invert data signals as required
 
 IBUFDS #(
         .DIFF_TERM              (DIFF_TERM))
@@ -289,7 +291,7 @@ data_in (
         .O                      (rx_data_in[i]));
 
 IODELAY2 #(
-        .DATA_RATE              ("DDR"),                // <SDR>, DDR
+        .DATA_RATE              ("SDR"),                // <SDR>, DDR
         .IDELAY_VALUE           (0),                    // {0 ... 255}
         .IDELAY2_VALUE          (0),                    // {0 ... 255}
         .IDELAY_MODE            ("NORMAL" ),            // NORMAL, PCI
@@ -307,8 +309,8 @@ iodelay_m (
         .ODATAIN                (1'b0),                 // data from OLOGIC/OSERDES2
         .DATAOUT                (ddly_m[i]),            // Output data 1 to ILOGIC/ISERDES2
         .DATAOUT2               (),                     // Output data 2 to ILOGIC/ISERDES2
-        .IOCLK0                 (rxioclkp),             // High speed clock for calibration
-        .IOCLK1                 (rxioclkn),             // High speed clock for calibration
+        .IOCLK0                 (rxioclk),              // High speed clock for calibration
+        .IOCLK1                 (1'b0),                 // High speed clock for calibration
         .CLK                    (gclk),                 // Fabric clock (GCLK) for control signals
         .CAL                    (cal_data_master),      // Calibrate control signal
         .INC                    (inc_data),             // Increment counter
@@ -317,7 +319,7 @@ iodelay_m (
         .BUSY                   ()) ;                   // output signal indicating sync circuit has finished / calibration has finished
 
 IODELAY2 #(
-        .DATA_RATE              ("DDR"),                // <SDR>, DDR
+        .DATA_RATE              ("SDR"),                // <SDR>, DDR
         .IDELAY_VALUE           (0),                    // {0 ... 255}
         .IDELAY2_VALUE          (0),                    // {0 ... 255}
         .IDELAY_MODE            ("NORMAL" ),            // NORMAL, PCI
@@ -335,8 +337,8 @@ iodelay_s (
         .ODATAIN                (1'b0),                 // data from OLOGIC/OSERDES2
         .DATAOUT                (ddly_s[i]),            // Output data 1 to ILOGIC/ISERDES2
         .DATAOUT2               (),                     // Output data 2 to ILOGIC/ISERDES2
-        .IOCLK0                 (rxioclkp),             // High speed clock for calibration
-        .IOCLK1                 (rxioclkn),             // High speed clock for calibration
+        .IOCLK0                 (rxioclk),              // High speed clock for calibration
+        .IOCLK1                 (1'b0),                 // High speed clock for calibration
         .CLK                    (gclk),                 // Fabric clock (GCLK) for control signals
         .CAL                    (cal_data_slave),       // Calibrate control signal
         .INC                    (inc_data),             // Increment counter
@@ -346,15 +348,15 @@ iodelay_s (
 
 ISERDES2 #(
         .DATA_WIDTH             (S),                    // SERDES word width.  This should match the setting is BUFPLL
-        .DATA_RATE              ("DDR"),                // <SDR>, DDR
+        .DATA_RATE              ("SDR"),                // <SDR>, DDR
         .BITSLIP_ENABLE         ("TRUE"),               // <FALSE>, TRUE
         .SERDES_MODE            ("MASTER"),             // <DEFAULT>, MASTER, SLAVE
         .INTERFACE_TYPE         ("RETIMED"))            // NETWORKING, NETWORKING_PIPELINED, <RETIMED>
 iserdes_m (
         .D                      (ddly_m[i]),
         .CE0                    (1'b1),
-        .CLK0                   (rxioclkp),
-        .CLK1                   (rxioclkn),
+        .CLK0                   (rxioclk),
+        .CLK1                   (1'b0),
         .IOCE                   (rxserdesstrobe),
         .RST                    (reset),
         .CLKDIV                 (gclk),
@@ -374,15 +376,15 @@ iserdes_m (
 
 ISERDES2 #(
         .DATA_WIDTH             (S),                    // SERDES word width.  This should match the setting is BUFPLL
-        .DATA_RATE              ("DDR"),                // <SDR>, DDR
+        .DATA_RATE              ("SDR"),                // <SDR>, DDR
         .BITSLIP_ENABLE         ("TRUE"),               // <FALSE>, TRUE
         .SERDES_MODE            ("SLAVE"),              // <DEFAULT>, MASTER, SLAVE
         .INTERFACE_TYPE         ("RETIMED"))            // NETWORKING, NETWORKING_PIPELINED, <RETIMED>
 iserdes_s (
         .D                      (ddly_s[i]),
         .CE0                    (1'b1),
-        .CLK0                   (rxioclkp),
-        .CLK1                   (rxioclkn),
+        .CLK0                   (rxioclk),
+        .CLK1                   (1'b0),
         .IOCE                   (rxserdesstrobe),
         .RST                    (reset),
         .CLKDIV                 (gclk),
@@ -402,10 +404,11 @@ iserdes_s (
 
 // Assign received data bits to correct place in data word, and invert as necessary using information from the data mask
 
-for (j = 7 ; j >= (8-S) ; j = j-1)                      // j is for serdes factor
-begin : loop2
-assign data_out[((D*(j+S-8))+i)] = mdataout[(8*i)+j] ;
-end
+// for (j = 7 ; j >= (8-S) ; j = j-1)                   // j is for serdes factor
+// begin : loop2
+// assign data_out[((D*(j+S-8))+i)] = mdataout[(8*i)+j] ;
+// end
+assign data_out = mdataout;
 end
 endgenerate
 

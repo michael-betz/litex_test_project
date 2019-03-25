@@ -13,12 +13,37 @@ from migen import *
 from migen.genlib.io import DifferentialInput, DifferentialOutput
 from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
+from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi, frequency_meter
 from sp605_crg import SP605_CRG
-from sp6iserdes.Sp6LvdsPhy import LTCPhy
+from sp6iserdes_pll.Sp6LvdsPhy import Sp6LvdsPhy
 from sys import argv, exit
+
+
+def myzip(*vals):
+    return [i for t in zip(*vals) for i in t]
+
+
+class LTCPhy(Sp6LvdsPhy, AutoCSR):
+    def __init__(self, platform):
+        Sp6LvdsPhy.__init__(self, S=8, D=2, DCO_CLK_PERIOD_NS=2.0)
+        pads_dco = platform.request("LTC_DCO")
+        pads_chx = platform.request("LTC_OUT", 2)
+        self.data_peek = CSRStatus(16)
+        self.bitslip_csr = CSR()
+        self.comb += [
+            self.dco_p.eq(pads_dco.p),
+            self.dco_n.eq(pads_dco.n),
+            self.lvds_data_p.eq(Cat(pads_chx.b_p, pads_chx.a_p)),
+            self.lvds_data_n.eq(Cat(pads_chx.b_n, pads_chx.a_n)),
+            self.data_peek.status.eq(Cat(
+                myzip(self.data_out[:8], self.data_out[8:])[::-1]
+            )),
+            self.bitslip.eq(self.bitslip_csr.re)
+        ]
+        Sp6LvdsPhy.add_sources(platform)
 
 
 # create our soc (no cpu, only wishbone 2 serial)
@@ -76,7 +101,7 @@ class HelloLtc(SoCCore):
                 Subsignal("clk",  Pins("LPC:LA27_N")),
                 IOStandard("LVCMOS25")
             ),
-            ("LTC_OUT", 0,
+            ("LTC_OUT", 0,  # Bank 0
                 Subsignal("a_p", Pins("LPC:LA03_P")),
                 Subsignal("a_n", Pins("LPC:LA03_N")),
                 Subsignal("b_p", Pins("LPC:LA08_P")),
@@ -84,7 +109,7 @@ class HelloLtc(SoCCore):
                 IOStandard("LVDS_25"),
                 Misc("DIFF_TERM=TRUE")
             ),
-            ("LTC_OUT", 1,
+            ("LTC_OUT", 1,  # Bank 0
                 Subsignal("a_p", Pins("LPC:LA12_P")),
                 Subsignal("a_n", Pins("LPC:LA12_N")),
                 Subsignal("b_p", Pins("LPC:LA16_P")),
@@ -92,7 +117,7 @@ class HelloLtc(SoCCore):
                 IOStandard("LVDS_25"),
                 Misc("DIFF_TERM=TRUE")
             ),
-            ("LTC_OUT", 2,
+            ("LTC_OUT", 2,  # Bank 2
                 Subsignal("a_p", Pins("LPC:LA22_P")),
                 Subsignal("a_n", Pins("LPC:LA22_N")),
                 Subsignal("b_p", Pins("LPC:LA25_P")),
@@ -100,7 +125,7 @@ class HelloLtc(SoCCore):
                 IOStandard("LVDS_25"),
                 Misc("DIFF_TERM=TRUE")
             ),
-            ("LTC_OUT", 3,
+            ("LTC_OUT", 3,  # Bank 2
                 Subsignal("a_p", Pins("LPC:LA29_P")),
                 Subsignal("a_n", Pins("LPC:LA29_N")),
                 Subsignal("b_p", Pins("LPC:LA31_P")),
@@ -108,13 +133,13 @@ class HelloLtc(SoCCore):
                 IOStandard("LVDS_25"),
                 Misc("DIFF_TERM=TRUE")
             ),
-            ("LTC_FR", 0,
+            ("LTC_FR", 0,  # Bank 2
                 Subsignal("p", Pins("LPC:LA18_CC_P")),
                 Subsignal("n", Pins("LPC:LA18_CC_N")),
                 IOStandard("LVDS_25"),
                 Misc("DIFF_TERM=TRUE")
             ),
-            ("LTC_DCO", 0,
+            ("LTC_DCO", 0,  # Bank 2
                 Subsignal("p", Pins("LPC:LA17_CC_P")),
                 Subsignal("n", Pins("LPC:LA17_CC_N")),
                 IOStandard("LVDS_25"),

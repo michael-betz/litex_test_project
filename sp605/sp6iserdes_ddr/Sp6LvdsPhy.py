@@ -4,13 +4,14 @@ import os
 
 
 class Sp6LvdsPhy(Module):
-    def __init__(self, S=8, D=2):
+    def __init__(self, S=8, D=2, DCO_CLK_PERIOD_NS=2.0):
         self.dco_p = Signal()
         self.dco_n = Signal()
         self.lvds_data_p = Signal(D)
         self.lvds_data_n = Signal(D)
         self.data_out = Signal(S * D)
         self.clk_out = Signal()
+        self.bitslip = Signal()    # Pulse to rotate the ISERDES output bits
 
         ###
 
@@ -41,7 +42,7 @@ class Sp6LvdsPhy(Module):
             i_rxserdesstrobe=serdesstrobe,
             i_reset=ResetSignal(),
             i_gclk=ClockSignal(),
-            i_bitslip=0,
+            i_bitslip=self.bitslip,
             o_data_out=self.data_out
         )
 
