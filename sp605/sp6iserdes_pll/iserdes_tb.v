@@ -44,7 +44,7 @@ module iserdes_tb;
         end
         repeat (3) @(posedge sys_clk);
         reset <= 0;
-        #15000
+        #5000
         $finish();
     end
     integer cc = 0;
@@ -84,7 +84,7 @@ serdes_1_to_n_data_s8_diff #(
     .rxioclk        (rxioclk),
     .rxserdesstrobe (rx_serdesstrobe),
     .reset          (reset),
-    .gclk           (sys_clk),
+    .gclk           (sample_clk),
     .bitslip        (bitslip),
     // .data_out       ({frame_out, data_out_b, data_out_a}),
     .data_out       (data_out),

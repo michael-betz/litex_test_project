@@ -289,12 +289,14 @@ assign rx_data_in_fix[i] = rx_data_in[i] ^ RX_SWAP_MASK[i] ;                    
 
 // Keep track of IDELAY2 settings for debugging
 always @(posedge gclk) begin
+    if (reset)
+        delayValues[i * 9 +: 9] <= 9'h0;
+    else
         if (ce_data[i]) begin
-                if (inc_data)
-                        delayValues[i * 9 +: 9] <= delayValues[i * 9 +: 9] + 1;
-                else
-
-                        delayValues[i * 9 +: 9] <= delayValues[i * 9 +: 9] - 1;
+            if (inc_data)
+                delayValues[i * 9 +: 9] <= delayValues[i * 9 +: 9] + 1;
+            else
+                delayValues[i * 9 +: 9] <= delayValues[i * 9 +: 9] - 1;
         end
 end
 

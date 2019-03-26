@@ -13,11 +13,11 @@ class Sp6LvdsPhy(Module):
         self.bitslip = Signal()    # Pulse to rotate the ISERDES output bits
         self.delVals = [Signal((9, True)) for i in range(D)]
 
-
         ###
 
         rxioclk = Signal()
         serdesstrobe = Signal()
+        # reset = Signal()
 
         self.specials += Instance(
             "serdes_1_to_n_clk_pll_s8_diff",
@@ -43,7 +43,7 @@ class Sp6LvdsPhy(Module):
             i_rxioclk=rxioclk,
             i_rxserdesstrobe=serdesstrobe,
             i_reset=ResetSignal(),
-            i_gclk=ClockSignal(),
+            i_gclk=self.clk_out,
             i_bitslip=self.bitslip,
             o_data_out=self.data_out,
             o_delayVals=Cat(self.delVals)
