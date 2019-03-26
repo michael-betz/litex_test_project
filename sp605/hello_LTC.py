@@ -10,7 +10,7 @@ f_frame = f_enc / 2
 python3 hello_LTC.py <build / config>
 """
 from migen import *
-from migen.genlib.io import DifferentialInput, DifferentialOutput
+from migen.genlib.io import DifferentialInput  # , DifferentialOutput
 from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.interconnect.csr import *
@@ -32,7 +32,9 @@ class LTCPhy(Sp6LvdsPhy, AutoCSR):
         pads_dco = platform.request("LTC_DCO")
         pads_chx = platform.request("LTC_OUT", 2)
         self.data_peek = CSRStatus(16)
-        self.bitslip_csr = CSR()
+        self.bitslip_csr = CSR(1)
+        self.idelay_a = CSRStatus(9)
+        self.idelay_b = CSRStatus(9)
         self.comb += [
             self.dco_p.eq(pads_dco.p),
             self.dco_n.eq(pads_dco.n),
@@ -41,7 +43,9 @@ class LTCPhy(Sp6LvdsPhy, AutoCSR):
             self.data_peek.status.eq(Cat(
                 myzip(self.data_out[:8], self.data_out[8:])[::-1]
             )),
-            self.bitslip.eq(self.bitslip_csr.re)
+            self.bitslip.eq(self.bitslip_csr.re),
+            self.idelay_a.status.eq(self.delVals[0]),
+            self.idelay_b.status.eq(self.delVals[1])
         ]
         Sp6LvdsPhy.add_sources(platform)
 

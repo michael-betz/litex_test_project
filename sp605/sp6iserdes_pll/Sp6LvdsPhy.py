@@ -11,6 +11,8 @@ class Sp6LvdsPhy(Module):
         self.data_out = Signal(S * D)
         self.clk_out = Signal()
         self.bitslip = Signal()    # Pulse to rotate the ISERDES output bits
+        self.delVals = [Signal((9, True)) for i in range(D)]
+
 
         ###
 
@@ -43,7 +45,8 @@ class Sp6LvdsPhy(Module):
             i_reset=ResetSignal(),
             i_gclk=ClockSignal(),
             i_bitslip=self.bitslip,
-            o_data_out=self.data_out
+            o_data_out=self.data_out,
+            o_delayVals=Cat(self.delVals)
         )
 
     @staticmethod

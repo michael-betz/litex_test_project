@@ -17,7 +17,7 @@ module iserdes_tb;
         forever #(DCO_CLK_PERIOD / 2) dco_clk_p = ~dco_clk_p;
     end
     // reg [15:0] testPattern = 16'b1110000000000010;
-    reg [15:0] testPattern = 16'b0000000000000101;
+    reg [15:0] testPattern = 16'b0000000000001101;
     reg [15:0] temp = 0;
 
     always begin
@@ -44,7 +44,7 @@ module iserdes_tb;
         end
         repeat (3) @(posedge sys_clk);
         reset <= 0;
-        #3000
+        #15000
         $finish();
     end
     integer cc = 0;
@@ -72,6 +72,7 @@ wire [23:0]data_out;
 wire [7:0] data_out_a;
 wire [7:0] data_out_b;
 wire [7:0] frame_out;
+wire signed [8:0] del_a, del_b, del_fr;
 reg bitslip=0;
 serdes_1_to_n_data_s8_diff #(
     .S              (8),
@@ -88,7 +89,8 @@ serdes_1_to_n_data_s8_diff #(
     // .data_out       ({frame_out, data_out_b, data_out_a}),
     .data_out       (data_out),
     .debug_in       (),
-    .debug          ()
+    .debug          (),
+    .delayVals      ({del_fr, del_b, del_a})
 );
 
 always @(posedge sample_clk) begin

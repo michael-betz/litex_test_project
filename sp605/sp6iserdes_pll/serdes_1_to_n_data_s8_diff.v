@@ -66,7 +66,7 @@
 
 `timescale 1ps/1ps
 
-module serdes_1_to_n_data_s8_diff (use_phase_detector, datain_p, datain_n, rxioclk, rxserdesstrobe, reset, gclk, bitslip, debug_in, data_out, debug) ;
+module serdes_1_to_n_data_s8_diff (use_phase_detector, datain_p, datain_n, rxioclk, rxserdesstrobe, reset, gclk, bitslip, debug_in, data_out, debug, delayVals) ;
 
 parameter integer S = 8 ;                       // Parameter to set the serdes factor 1..8
 parameter integer D = 16 ;                      // Set the number of inputs and outputs
@@ -83,6 +83,7 @@ input                   bitslip ;               // Bitslip control line
 input   [1:0]           debug_in ;              // Debug Inputs
 output  [(8*D)-1:0]     data_out ;              // Output data
 output  [2*D+6:0]       debug ;                 // Debug bus, 2D+6 = 2 lines per input (from mux and ce) + 7, leave nc if debug not required
+output  signed [9*D-1:0]       delayVals;              // Debug: current (estimated) IDELAY2 state as 9 bit signed number
 
 wire    [D-1:0]         ddly_m;                 // Master output from IODELAY1
 wire    [D-1:0]         ddly_s;                 // Slave output from IODELAY1
@@ -269,6 +270,9 @@ assign incdec_data_or[0] = 1'b0 ;                                               
 assign valid_data_or[0] = 1'b0 ;
 assign busy_data_or[0] = 1'b0 ;
 
+reg signed [9 * D - 1 : 0] delayValues = 0;
+assign delayVals = delayValues;
+
 generate
 for (i = 0 ; i <= (D-1) ; i = i+1)
 begin : loop0
@@ -282,6 +286,17 @@ assign busy_data_or[i+1] = busy_data[i] | busy_data_or[i] ;                     
 assign all_ce[i] = debug_in[0] ;
 
 assign rx_data_in_fix[i] = rx_data_in[i] ^ RX_SWAP_MASK[i] ;                            // Invert data signals as required
+
+// Keep track of IDELAY2 settings for debugging
+always @(posedge gclk) begin
+        if (ce_data[i]) begin
+                if (inc_data)
+                        delayValues[i * 9 +: 9] <= delayValues[i * 9 +: 9] + 1;
+                else
+
+                        delayValues[i * 9 +: 9] <= delayValues[i * 9 +: 9] - 1;
+        end
+end
 
 IBUFDS #(
         .DIFF_TERM              (DIFF_TERM))
