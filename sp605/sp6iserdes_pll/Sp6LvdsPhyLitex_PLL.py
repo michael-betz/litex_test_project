@@ -15,6 +15,7 @@ class Sp6LvdsPhy(Module):
         self.data_outs = [Signal(S) for i in range(D)]
         self.clk_out = Signal()        # dat aout clock
         self.bitslip = Signal()        # Pulse to rotate
+        self.serdesstrobe = Signal()
 
         ###
 
@@ -45,20 +46,20 @@ class Sp6LvdsPhy(Module):
             lvds_data = Signal()
             lvds_data_m = Signal()
             lvds_data_s = Signal()
-            self.special += Instance(
+            self.specials += Instance(
                 "IBUFDS",
                 i_I=self.lvds_data_p[i],
                 i_IB=self.lvds_data_n[i],
                 o_O=lvds_data
             )
-            self.special += Instance(
+            self.specials += Instance(
                 "IODELAY2",
                 p_SERDES_MODE="MASTER",
                 i_IDATAIN=lvds_data,
                 o_DATAOUT=lvds_data_m,
                 **idelay_default
             )
-            self.special += Instance(
+            self.specials += Instance(
                 "IODELAY2",
                 p_SERDES_MODE="SLAVE",
                 i_IDATAIN=lvds_data,
@@ -73,14 +74,14 @@ class Sp6LvdsPhy(Module):
                 "i_CE0": 1,
                 "i_CLK0": ClockSignal("dco2x"),
                 "i_CLK1": 0,
-                "i_IOCE": serdesstrobe,
+                "i_IOCE": self.serdesstrobe,
                 "i_RST": ResetSignal("sample"),
                 "i_CLKDIV": ClockSignal("sample"),
                 "i_BITSLIP": self.bitslip
             }
             cascade_up = Signal()
             cascade_down = Signal()
-            self.special += Instance(
+            self.specials += Instance(
                 "ISERDES2",
                 p_SERDES_MODE="MASTER",
                 i_D=lvds_data_m,
@@ -92,7 +93,7 @@ class Sp6LvdsPhy(Module):
                 o_SHIFTOUT=cascade_down,
                 **iserdes_default
             )
-            self.special += Instance(
+            self.specials += Instance(
                 "ISERDES2",
                 p_SERDES_MODE="SLAVE",
                 i_D=lvds_data_s,
@@ -104,3 +105,16 @@ class Sp6LvdsPhy(Module):
                 o_SHIFTOUT=cascade_up,
                 **iserdes_default
             )
+
+
+if __name__ == '__main__':
+    dut = Sp6LvdsPhy()
+    if len(argv) < 2:
+        print(__doc__)
+        exit(-1)
+    if "build" in argv:
+        builder = Builder(soc, output_dir="build", csr_csv="build/csr.csv")
+        builder.build()
+    if "config" in argv:
+        prog = p.create_programmer()
+        prog.load_bitstream("build/gateware/top.bit")
