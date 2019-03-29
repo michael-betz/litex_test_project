@@ -56,16 +56,17 @@ module IserdesSp6_tb;
     //  DUT
     //------------------------------------------------------------------------
     reg bitslip = 0;
-    wire sample_clk = 0;
+    wire sample_clk, dco2x_clk;
     top dut (
+        .dco_p          (dco_clk_p),
+        .dco_n          (~dco_clk_p),
         .lvds_data_p    ({out_b_p, out_a_p}),
         .lvds_data_n    ({~out_b_p, ~out_a_p}),
         .data_outs      (),
         .data_outs_1    (),
-        .sample_clk     (sample_clk),
         .bitslip        (bitslip),
-        .serdesstrobe   (1'b0),
-        .dco2x_clk      (1'b0)
+        .sample_clk     (sample_clk),
+        .dco2x_clk      (dco2x_clk)
     );
 
     always @(posedge sample_clk) begin

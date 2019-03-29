@@ -15,23 +15,85 @@
 from sys import argv
 from migen import *
 from litex.soc.interconnect.csr import *
+from migen.build.xilinx import XilinxPlatform
 
 
 class IserdesSp6(Module):
-    def __init__(self, S=8, D=2):
+    def __init__(self, DCO_PERIOD, S=8, D=2, M=2):
+        """
+        S = serialization factor
+        D = number of parallel lanes
+        M=1 for sdr, 2 for ddr, N for divide by N LVDS clock
+        """
+        self.dco_p = Signal()      # DDR pixel clock
+        self.dco_n = Signal()
+
         self.lvds_data_p = Signal(D)   # data lanes
         self.lvds_data_n = Signal(D)
+
         # parallel data out, S-bit serdes on D-lanes
         self.data_outs = [Signal(S) for i in range(D)]
-        self.clk_out = Signal()        # dat aout clock
         self.bitslip = Signal()        # Pulse to rotate
-        self.serdesstrobe = Signal()
 
         self.clock_domains.dco2x = ClockDomain()   # LVDS bit clock
         self.clock_domains.sample = ClockDomain()  # ADC sample clock
 
         ###
 
+        # -----------------------------
+        #  Generate clocks
+        # -----------------------------
+        serdesstrobe = Signal()
+        dco = Signal()
+        self.specials += Instance(
+            "IBUFDS",
+            i_I=self.dco_p,
+            i_IB=self.dco_n,
+            o_O=dco
+        )
+        clkfbout = Signal()
+        pll_locked = Signal()
+        pll_clk0 = Signal()
+        pll_clk1 = Signal()
+        self.specials += Instance(
+            "PLL_BASE",
+            p_CLKIN_PERIOD=DCO_PERIOD,
+            p_CLKFBOUT_MULT=M,
+            p_CLKOUT0_DIVIDE=1,
+            p_CLKOUT1_DIVIDE=S,
+            p_COMPENSATION="SOURCE_SYNCHRONOUS",
+            p_CLK_FEEDBACK="CLKOUT0",
+
+            i_RST=0,
+            i_CLKIN=dco,
+            i_CLKFBIN=clkfbout,
+
+            o_CLKFBOUT=clkfbout,
+            o_CLKOUT0=pll_clk0,
+            o_CLKOUT1=pll_clk1,
+            o_LOCKED=pll_locked
+        )
+        self.specials += Instance(
+            "BUFG",
+            i_I=pll_clk1,
+            o_O=ClockSignal("sample")
+        )
+
+        locked_async = Signal()
+        self.specials += Instance(
+            "BUFPLL",
+            p_DIVIDE=S,
+            i_PLLIN=pll_clk0,
+            i_GCLK=ClockSignal("sample"),
+            i_LOCKED=pll_locked,
+            o_IOCLK=ClockSignal("dco2x"),
+            o_LOCK=locked_async,
+            o_SERDESSTROBE=serdesstrobe
+        )
+
+        # -----------------------------
+        #  Data lanes
+        # -----------------------------
         idelay_default = {
             "p_SIM_TAPDELAY_VALUE": 49,
             "p_DATA_RATE": "SDR",
@@ -87,7 +149,7 @@ class IserdesSp6(Module):
                 "i_CE0": 1,
                 "i_CLK0": ClockSignal("dco2x"),
                 "i_CLK1": 0,
-                "i_IOCE": self.serdesstrobe,
+                "i_IOCE": serdesstrobe,
                 "i_RST": ResetSignal("sample"),
                 "i_CLKDIV": ClockSignal("sample"),
                 "i_BITSLIP": self.bitslip
@@ -120,91 +182,22 @@ class IserdesSp6(Module):
             )
 
 
-# class S6Clocking(Module, AutoCSR):
-#     def __init__(self, pads, clkin_freq=None, M=2, S=8):
-#         self._pll_reset = CSRStorage(reset=1)
-#         self._locked = CSRStatus()
-
-#         self.locked = Signal()
-#         self.serdesstrobe = Signal()
-#         self.clock_domains._cd_pix = ClockDomain()
-#         self.clock_domains._cd_pix_o = ClockDomain()
-#         self.clock_domains._cd_pix2x = ClockDomain()
-#         self.clock_domains._cd_pix10x = ClockDomain(reset_less=True)
-
-#         # # #
-
-#         self.clk_input = Signal()
-#         self.specials += Instance("IBUFDS", name="hdmi_in_ibufds",
-#                                   i_I=pads.clk_p, i_IB=pads.clk_n,
-#                                   o_O=self.clk_input)
-
-#         clkfbout = Signal()
-#         pll_locked = Signal()
-#         pll_clk0 = Signal()
-#         pll_clk1 = Signal()
-#         pll_clk2 = Signal()
-#         pll_drdy = Signal()
-#         self.sync += If(self._pll_read.re | self._pll_write.re,
-#             self._pll_drdy.status.eq(0)
-#         ).Elif(pll_drdy,
-#             self._pll_drdy.status.eq(1)
-#         )
-#         self.specials += [
-#             Instance("PLL_ADV",
-#                 p_CLKFBOUT_MULT=M,
-#                 p_CLKOUT0_DIVIDE=1,
-#                 p_CLKOUT1_DIVIDE=1,
-#                 p_CLKOUT2_DIVIDE=S,
-#                 p_COMPENSATION="SOURCE_SYNCHRONOUS",
-#                 p_CLK_FEEDBACK="CLKOUT0",
-
-#                 i_CLKINSEL=1,
-#                 i_CLKIN1=self.clk_input,
-#                 o_CLKOUT0=pll_clk0, o_CLKOUT1=pll_clk1, o_CLKOUT2=pll_clk2,
-#                 o_CLKFBOUT=clkfbout, i_CLKFBIN=clkfbout,
-#                 o_LOCKED=pll_locked, i_RST=self._pll_reset.storage,
-
-#                 i_DADDR=self._pll_adr.storage,
-#                 o_DO=self._pll_dat_r.status,
-#                 i_DI=self._pll_dat_w.storage,
-#                 i_DEN=self._pll_read.re | self._pll_write.re,
-#                 i_DWE=self._pll_write.re,
-#                 o_DRDY=pll_drdy,
-#                 i_DCLK=ClockSignal())
-#         ]
-
-#         locked_async = Signal()
-#         self.specials += [
-#             Instance("BUFPLL", name="hdmi_in_bufpll", p_DIVIDE=5,
-#                 i_PLLIN=pll_clk0, i_GCLK=ClockSignal("pix2x"), i_LOCKED=pll_locked,
-#                 o_IOCLK=self._cd_pix10x.clk, o_LOCK=locked_async, o_SERDESSTROBE=self.serdesstrobe),
-#             Instance("BUFG", name="hdmi_in_pix2x_bufg", i_I=pll_clk1, o_O=self._cd_pix2x.clk),
-#             Instance("BUFG", name="hdmi_in_pix_bufg", i_I=pll_clk2, o_O=self._cd_pix.clk),
-#             MultiReg(locked_async, self.locked, "sys")
-#         ]
-#         self.comb += self._locked.status.eq(self.locked)
-
-#         self.specials += [
-#             AsyncResetSynchronizer(self._cd_pix, ~locked_async),
-#             AsyncResetSynchronizer(self._cd_pix2x, ~locked_async),
-#         ]
-#         self.comb += self._cd_pix_o.clk.eq(self._cd_pix.clk)
-
 if __name__ == '__main__':
     from migen.fhdl.verilog import convert
-    d = IserdesSp6()
+    S = 8
+    DCO_PERIOD = 1 / (125e6 * S) * 1e9 * 2
+    d = IserdesSp6(DCO_PERIOD, S)
     convert(
         d,
         ios={
+            d.dco_p,
+            d.dco_n,
             d.dco2x.clk,
             d.sample.clk,
-            d.serdesstrobe,
             d.bitslip,
             d.lvds_data_p,
             d.lvds_data_n,
             *d.data_outs
-            # d.clk_out
         },
         display_run=True
     ).write(argv[0].replace(".py", ".v"))
