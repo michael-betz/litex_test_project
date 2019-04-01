@@ -48,28 +48,26 @@ module IserdesSp6_tb;
         #5000
         $finish();
     end
-    integer cc = 0;
-    always @(posedge sys_clk) cc <= cc + 1;
 
 
     //------------------------------------------------------------------------
     //  DUT
     //------------------------------------------------------------------------
     reg bitslip = 0;
-    wire sample_clk, dco2x_clk;
+    wire sample_clk;
     top dut (
         .dco_p          (dco_clk_p),
         .dco_n          (~dco_clk_p),
         .lvds_data_p    ({out_b_p, out_a_p}),
         .lvds_data_n    ({~out_b_p, ~out_a_p}),
         .data_outs      (),
-        .data_outs_1    (),
         .bitslip        (bitslip),
-        .sample_clk     (sample_clk),
-        .dco2x_clk      (dco2x_clk)
+        .sample_clk     (sample_clk)
     );
 
+    integer cc = 0;
     always @(posedge sample_clk) begin
+        cc <= cc + 1;
         bitslip <= 0;
         // if ((cc % 20) == 0) bitslip <= 1;
         if (cc == 100) bitslip <= 1;

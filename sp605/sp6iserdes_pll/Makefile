@@ -6,6 +6,7 @@ SRC_V = $(SIM_PATH)/glbl.v $(wildcard *.v)
 TARGET = iserdes
 
 all: $(TARGET).vcd
+view: $(TARGET)_view
 
 #-------
 # xsim
