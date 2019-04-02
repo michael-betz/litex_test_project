@@ -10,7 +10,7 @@ class SP605_CRG(Module):
     """
     def __init__(self, platform, clk_freq):
         self.clock_domains.cd_sys = ClockDomain()
-        self.clk_114 = Signal()
+        self.clock_domains.clk_114 = ClockDomain()
 
         f0 = 1e9 / platform.default_clk_period
 
@@ -31,7 +31,9 @@ class SP605_CRG(Module):
         pll_fb = Signal()
         pll = Signal(6)
         rst = platform.request("cpu_reset")
-        self.specials.pll = Instance("PLL_ADV", p_SIM_DEVICE="SPARTAN6",
+        self.specials.pll = Instance("PLL_ADV",
+                                     name="PLL_CRG",
+                                     p_SIM_DEVICE="SPARTAN6",
                                      p_BANDWIDTH="OPTIMIZED", p_COMPENSATION="INTERNAL",
                                      p_REF_JITTER=.01, p_CLK_FEEDBACK="CLKFBOUT",
                                      i_DADDR=0, i_DCLK=0, i_DEN=0, i_DI=0, i_DWE=0, i_RST=rst, i_REL=0,
@@ -50,8 +52,9 @@ class SP605_CRG(Module):
                                      p_CLKOUT2_PHASE=0., p_CLKOUT2_DIVIDE=p//1,
                                      p_CLKOUT3_PHASE=0., p_CLKOUT3_DIVIDE=p//1,
                                      p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=p//1,  # sys = 100 MHz
-                                     p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=7      # 114 MHz
+                                     p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=7      # 800 MHz / 7 = 114.285 MHz
         )
-        self.specials += Instance("BUFG", i_I=pll[4], o_O=self.cd_sys.clk)
-        self.specials += Instance("BUFG", i_I=pll[5], o_O=self.clk_114)
+        self.specials += Instance("BUFG", i_I=pll[4], o_O=ClockSignal("sys"))
+        self.specials += Instance("BUFG", i_I=pll[5], o_O=ClockSignal("clk_114"))
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd)
+        self.specials += AsyncResetSynchronizer(self.clk_114, ~pll_lckd)

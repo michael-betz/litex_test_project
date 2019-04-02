@@ -18,7 +18,32 @@ from litex.soc.interconnect.csr import *
 from litex.soc.cores import frequency_meter
 from migen.build.xilinx import XilinxPlatform
 from migen.genlib.cdc import MultiReg, PulseSynchronizer, BusSynchronizer
+from migen.genlib.cdc import AsyncResetSynchronizer
 from migen.genlib.misc import WaitTimer, timeline
+
+
+class LedBlinker(Module):
+    def __init__(self, clk_in, f_clk=100e6):
+        """
+        for debugging clocks
+        toggles output at 1 Hz
+        """
+        self.out = Signal()
+
+        ###
+
+        self.clock_domains.cd_led = ClockDomain(reset_less=True)
+        self.comb += self.cd_led.clk.eq(clk_in)
+        max_cnt = int(f_clk // 2)
+        cntr = Signal(max=max_cnt + 1)
+        self.sync.led += [
+            If(cntr == (max_cnt),
+                cntr.eq(0),
+                self.out.eq(~self.out)
+            ).Else(
+                cntr.eq(cntr + 1)
+            )
+        ]
 
 
 def myzip(*vals):
@@ -42,6 +67,7 @@ class IserdesSp6(Module):
 
         # Control signals (on sample clock domain)
         self.bitslip = Signal()        # Pulse to rotate
+        self.pll_reset = Signal(reset=1)      # Reset PLL and `sample` clock domain
 
         # parallel data out, S-bit serdes on D-lanes
         self.data_outs = [Signal(S) for i in range(D)]
@@ -120,35 +146,32 @@ class IserdesSp6(Module):
         # -----------------------------
         #  Generate clocks
         # -----------------------------
-        dco = Signal()
+        self.dco = Signal()
         self.specials += Instance(
             "IBUFDS",
             i_I=self.dco_p,
             i_IB=self.dco_n,
-            o_O=dco
+            o_O=self.dco
         )
         dco_m = Signal()
         dco_s = Signal()
         self.specials += Instance(
             "IODELAY2",
             p_SERDES_MODE="MASTER",
-            p_IDELAY_TYPE="FIXED",
-            i_IDATAIN=dco,
+            p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX",
+            i_IDATAIN=self.dco,
             i_CAL=idelay_cal_m,
             o_DATAOUT=dco_m,
             o_BUSY=idelay_busy,
             **idelay_default
         )
-        idel_busy = Signal()
         self.specials += Instance(
             "IODELAY2",
             p_SERDES_MODE="SLAVE",
-            p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX",
-            i_IDATAIN=dco,
-            o_DATAOUT=dco_s,
+            p_IDELAY_TYPE="FIXED",
+            i_IDATAIN=self.dco,
             i_CAL=idelay_cal_m,
-            o_BUSY=idel_busy,
-
+            o_DATAOUT=dco_s,
             **idelay_default
         )
         cascade_up = Signal()
@@ -197,29 +220,47 @@ class IserdesSp6(Module):
         )
         pll_clk0 = Signal()
         pll_clk2 = Signal()
-        pll_locked = Signal()
+        self.pll_locked = Signal()
+
+        clkfbout = Signal()
+
         self.specials += Instance(
-            "PLL_BASE",
-            p_CLKIN_PERIOD=DCO_PERIOD,
+            "PLL_ADV",
+            name="PLL_IOCLOCK",
+            p_SIM_DEVICE="SPARTAN6",
+            p_CLKIN1_PERIOD=DCO_PERIOD,
             p_DIVCLK_DIVIDE=1,
             p_CLKFBOUT_MULT=M,
             p_CLKOUT0_DIVIDE=1,
             p_CLKOUT2_DIVIDE=S,
-            p_COMPENSATION="SOURCE_SYNCHRONOUS",
-            p_CLK_FEEDBACK="CLKOUT0",
-            i_RST=ResetSignal("sample"),
-            i_CLKIN=pll_clkin,
-            i_CLKFBIN=pll_clkfbin,
+            # p_COMPENSATION="SOURCE_SYNCHRONOUS",
+            p_COMPENSATION="INTERNAL",
+            # p_CLK_FEEDBACK="CLKOUT0",
+
+            i_RST=self.pll_reset,
+            i_CLKINSEL=1,
+            i_CLKIN1=pll_clkin,
+            i_CLKIN2=0,
+            # i_CLKFBIN=pll_clkfbin,
+            o_CLKFBOUT=clkfbout, i_CLKFBIN=clkfbout,
+
+            i_DADDR=0,
+            i_DI=0,
+            i_DEN=0,
+            i_DWE=0,
+            i_DCLK=0,
+
             o_CLKOUT0=pll_clk0,
             o_CLKOUT2=pll_clk2,
-            o_LOCKED=pll_locked
+            o_LOCKED=self.pll_locked
         )
+
         self.specials += Instance(
             "BUFPLL",
             p_DIVIDE=S,
             i_PLLIN=pll_clk0,
             i_GCLK=ClockSignal("sample"),
-            i_LOCKED=pll_locked,
+            i_LOCKED=self.pll_locked,
             o_IOCLK=ClockSignal("ioclock"),
             # o_LOCK=,
             o_SERDESSTROBE=serdesstrobe
@@ -296,10 +337,16 @@ class LTCPhy(IserdesSp6, AutoCSR):
     wire things up to CSRs
     this is done here to keep IserdesSp6 easily simulateable
     """
-    def __init__(self, platform):
-        IserdesSp6.__init__(self, S=8, D=1, M=2, DCO_PERIOD=2.0)
-        pads_dco = platform.request("LTC_DCO")
+    def __init__(self, platform, f_enc):
+        S = 8
+        DCO_PERIOD = 1 / (f_enc) * 1e9
+        print("f_enc:", f_enc)
+        print("DCO_PERIOD:", DCO_PERIOD)
+        IserdesSp6.__init__(self, S=S, D=1, M=8, DCO_PERIOD=DCO_PERIOD)
+        # pads_dco = platform.request("LTC_DCO")
+        pads_frm = platform.request("LTC_FR")
         pads_chx = platform.request("LTC_OUT", 2)
+
         # ISE gets grumpy otherwise ...
         self.specials += Instance(
             "IBUFDS",
@@ -307,6 +354,10 @@ class LTCPhy(IserdesSp6, AutoCSR):
             i_IB=pads_chx.b_n,
             o_O=Signal()
         )
+
+        # Sync resets
+        self.specials += AsyncResetSynchronizer(self.sample, ~self.pll_locked)
+
         # CSRs for peeking at clock / data patterns
         self.data_peek = CSRStatus(8)
         self.specials += MultiReg(
@@ -318,26 +369,43 @@ class LTCPhy(IserdesSp6, AutoCSR):
             self.clk_data_out,
             self.clk_peek.status
         )
+
         # CSR for triggering bit-slip
         self.bitslip_csr = CSR(1)
         self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
+
         # Frequency counter for sample clock
         self.submodules.f_sample = frequency_meter.FrequencyMeter(int(100e6))
+
+        # Blinkies to see the clocks
+        self.submodules.blinky_frm = LedBlinker(self.dco, f_enc)
+        self.submodules.blinky_sample = LedBlinker(ClockSignal("sample"), f_enc)
+
         self.comb += [
             self.f_sample.clk.eq(ClockSignal("sample")),
-            self.dco_p.eq(pads_dco.p),
-            self.dco_n.eq(pads_dco.n),
+            # self.dco_p.eq(pads_dco.p),
+            # self.dco_n.eq(pads_dco.n),
+            self.dco_p.eq(pads_frm.p),
+            self.dco_n.eq(pads_frm.n),
             self.lvds_data_p.eq(pads_chx.a_p),
             self.lvds_data_n.eq(pads_chx.a_n),
             self.bs_sync.i.eq(self.bitslip_csr.re),
-            self.bitslip.eq(self.bs_sync.o)
+            self.bitslip.eq(self.bs_sync.o),
+            self.pll_reset.eq(ResetSignal("sys")),
+            platform.request("user_led").eq(self.pll_reset),
+            platform.request("user_led").eq(self.pll_locked),
+            platform.request("user_led").eq(self.blinky_frm.out),
+            platform.request("user_led").eq(self.blinky_sample.out)
         ]
 
 
 if __name__ == '__main__':
     from migen.fhdl.verilog import convert
+    f_enc = 125e6
     S = 8
-    DCO_PERIOD = 1 / (125e6 * S) * 1e9 * 2
+    DCO_PERIOD = 1 / (f_enc * S) * 1e9 * 2
+    print("f_enc:", f_enc)
+    print("DCO_PERIOD:", DCO_PERIOD)
     d = IserdesSp6(S=S, D=1, M=2, DCO_PERIOD=DCO_PERIOD)
     convert(
         d,
@@ -349,6 +417,7 @@ if __name__ == '__main__':
             d.bitslip,
             d.lvds_data_p,
             d.lvds_data_n,
+            d.pll_reset,
             *d.data_outs
         },
         display_run=True

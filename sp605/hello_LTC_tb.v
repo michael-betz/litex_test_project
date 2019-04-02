@@ -1,19 +1,19 @@
 `timescale 1 ns / 1 ps
 
-module IserdesSp6_tb;
-    localparam real SYS_CLK_PERIOD = 1e9 / 100e6;    // Simulated clock period in [ns]
+module hello_LTC_tb;
+    localparam real XTAL_PERIOD = 1e9 / 200e6;    // Simulated clock period in [ns]
     localparam real FR_CLK_PERIOD = 1e9 / 125e6 * 2; // DDR
     localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 8.0; // DDR
 
     //------------------------------------------------------------------------
     // Clock and fake LVDS lanes generation
     //------------------------------------------------------------------------
-    reg sys_clk = 1;
+    reg xtal_clk = 1;
     reg fr_clk = 1;
     reg dco_clk_p = 0;
     reg out_a_p = 0;
     reg out_b_p = 0;
-    always #(SYS_CLK_PERIOD / 2) sys_clk = ~sys_clk;
+    always #(XTAL_PERIOD / 2) xtal_clk = ~xtal_clk;
     always #(FR_CLK_PERIOD / 2) fr_clk = ~fr_clk;
     initial begin
         #(DCO_CLK_PERIOD / 4.2);
@@ -40,10 +40,10 @@ module IserdesSp6_tb;
     reg reset = 1;
     initial begin
         if ($test$plusargs("vcd")) begin
-            $dumpfile("IserdesSp6.vcd");
-            $dumpvars(5, IserdesSp6_tb);
+            $dumpfile("hello_LTC.vcd");
+            $dumpvars(5, hello_LTC_tb);
         end
-        repeat (3) @(posedge sys_clk);
+        repeat (3) @(posedge xtal_clk);
         reset <= 0;
         #5000
         $finish();
@@ -53,24 +53,21 @@ module IserdesSp6_tb;
     //------------------------------------------------------------------------
     //  DUT
     //------------------------------------------------------------------------
-    reg bitslip = 0;
-    wire sample_clk;
     top dut (
-        .dco_p          (dco_clk_p),
-        .dco_n          (~dco_clk_p),
-        .lvds_data_p    ({out_b_p, out_a_p}),
-        .lvds_data_n    ({~out_b_p, ~out_a_p}),
-        .data_outs      (),
-        .bitslip        (bitslip),
-        .sample_clk     (sample_clk),
-        .pll_reset      (reset)
+        .serial_cts     (1'b0),
+        .serial_rts     (1'b0),
+        .serial_rx      (1'b0),
+        .clk200_p       (xtal_clk),
+        .clk200_n       (~xtal_clk),
+        .cpu_reset      (reset),
+        .LTC_SPI_miso   (1'b0),
+        .LTC_FR_p       (fr_clk),
+        .LTC_FR_n       (~fr_clk),
+        .LTC_DCO_p      (dco_clk_p),
+        .LTC_DCO_n      (~dco_clk_p),
+        .LTC_OUT2_a_p   (out_a_p),
+        .LTC_OUT2_a_n   (~out_a_p),
+        .LTC_OUT2_b_p   (1'b0),
+        .LTC_OUT2_b_n   (1'b1)
     );
-
-    integer cc = 0;
-    always @(posedge sample_clk) begin
-        cc <= cc + 1;
-        bitslip <= 0;
-        // if ((cc % 20) == 0) bitslip <= 1;
-        if (cc == 100) bitslip <= 1;
-    end
 endmodule

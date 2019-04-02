@@ -62,12 +62,6 @@ class HelloLtc(SoCCore):
         # FPGA identification
         self.submodules.dna = dna.DNA()
 
-        # Blinky
-        led = platform.request("user_led")
-        counter = Signal(26)
-        self.comb += led.eq(counter[-1])
-        self.sync += counter.eq(counter + 1)
-
         # FMC LPC connectivity
         ltc_connection = [
             ("LTC_SPI", 0,
@@ -136,27 +130,25 @@ class HelloLtc(SoCCore):
         # SPI master
         spi_pads = platform.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
-        self.comb += platform.request("user_led").eq(~spi_pads.cs_n)
 
         # Measure frame rate
         # Accumulates `frm` cycles for 100e6 cycles of 1 ns each = [Hz]
-        self.submodules.f_frame = frequency_meter.FrequencyMeter(int(100e6))
-        frm_pads = platform.request("LTC_FR")
-        frm_se = Signal()
-        self.specials += DifferentialInput(frm_pads.p, frm_pads.n, frm_se)
-        self.comb += self.f_frame.clk.eq(frm_se)
-        self.comb += platform.request("user_led").eq(frm_se)
+        # frm_pads = platform.request("LTC_FR")
+        # self.clock_domains.cd_frm = ClockDomain()
+        # self.specials += DifferentialInput(frm_pads.p, frm_pads.n, ClockSignal("frm"))
+        # self.submodules.f_frame = frequency_meter.FrequencyMeter(int(100e6))
+        # self.comb += self.f_frame.clk.eq(ClockSignal("frm"))
 
         # LVDS phy
-        self.submodules.lvds = LTCPhy(platform)
+        self.submodules.lvds = LTCPhy(platform, 800e6 / 7)
 
         # Provide a 114 MHz ENC clock signal on SMA_GPIO
         enc_out = Signal()
         self.specials += Instance(
             "ODDR2",
             o_Q=enc_out,
-            i_C0=self.crg.clk_114,
-            i_C1=~self.crg.clk_114,
+            i_C0=ClockSignal("clk_114"),
+            i_C1=~ClockSignal("clk_114"),
             i_CE=1,
             i_D0=1,
             i_D1=0
