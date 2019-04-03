@@ -47,19 +47,34 @@ class LedBlinker(Module):
 
 
 def myzip(*vals):
+    """
+    interleave elements in a flattened list
+
+    >>> myzip([1,2,3], ['a', 'b', 'c'])
+    [1, 'a', 2, 'b', 3, 'c']
+    """
     return [i for t in zip(*vals) for i in t]
 
 
 class IserdesSp6(Module):
-    def __init__(self, S=8, D=2, M=2, DCO_PERIOD=2.0):
+    def __init__(self, S=8, D=2, M=2, MIRROR_BITS=False, DCO_PERIOD=2.0):
         """
+        Clock and data lanes must be in-phase (edge aligned)
         S = serialization factor (bits per frame)
         D = number of parallel lanes
         M = bits per DCO period per lane
         M = 1 for sdr, 2 for ddr, higher for a divided clock
         DCO_PERIOD [ns] for PLL_BASE
+
+        data_outs[i] = parallel data of the i'th lvds lane
+
+        MIRROR_BITS = False:
+            first bit of the serial stream clocked in ends up in the
+            LSB of data_outs
+
+        Note: LTC2175 streams the MSB first and needs bit-mirroring
         """
-        self.dco_p = Signal()      # LVDS clock
+        self.dco_p = Signal()          # LVDS clock
         self.dco_n = Signal()
 
         self.lvds_data_p = Signal(D)   # data lanes
@@ -67,7 +82,7 @@ class IserdesSp6(Module):
 
         # Control signals (on sample clock domain)
         self.bitslip = Signal()        # Pulse to rotate
-        self.pll_reset = Signal(reset=1)      # Reset PLL and `sample` clock domain
+        self.pll_reset = Signal(reset=1)  # Reset PLL and `sample` clock domain
 
         # parallel data out, S-bit serdes on D-lanes
         self.data_outs = [Signal(S) for i in range(D)]
@@ -77,7 +92,6 @@ class IserdesSp6(Module):
 
         self.clock_domains.ioclock = ClockDomain()  # LVDS bit clock
         self.clock_domains.sample = ClockDomain()   # ADC sample clock
-
 
         # -----------------------------
         #  IDELAY calibration
@@ -101,11 +115,11 @@ class IserdesSp6(Module):
                 (50, [initial_tl_done.eq(1)])
             ]
         )
-        # Periodically re-calibrate slave IDELAY2s
+        # Periodically re-calibrate all slave IDELAY2s
         self.sync.sample += timeline(
             initial_tl_done,
             [
-                (2**16, [idelay_cal_s.eq(1)])
+                (2**26, [idelay_cal_s.eq(1)])  # every 0.54 s at 125 MHz
             ]
         )
 
@@ -190,6 +204,10 @@ class IserdesSp6(Module):
             o_SHIFTOUT=cascade_down,
             **iserdes_default
         )
+        # Using the delay matched BUFIO2 and BUFIO2FB,
+        # the PLL will generate a ioclock which is phase-
+        # aligned with the dco clock at the input of the
+        # ISERDES
         self.specials += Instance(
             "ISERDES2",
             p_SERDES_MODE="SLAVE",
@@ -221,9 +239,6 @@ class IserdesSp6(Module):
         pll_clk0 = Signal()
         pll_clk2 = Signal()
         self.pll_locked = Signal()
-
-        clkfbout = Signal()
-
         self.specials += Instance(
             "PLL_ADV",
             name="PLL_IOCLOCK",
@@ -233,16 +248,16 @@ class IserdesSp6(Module):
             p_CLKFBOUT_MULT=M,
             p_CLKOUT0_DIVIDE=1,
             p_CLKOUT2_DIVIDE=S,
-            # p_COMPENSATION="SOURCE_SYNCHRONOUS",
-            p_COMPENSATION="INTERNAL",
-            # p_CLK_FEEDBACK="CLKOUT0",
+            p_COMPENSATION="SOURCE_SYNCHRONOUS",
+            # p_COMPENSATION="INTERNAL",
+            p_CLK_FEEDBACK="CLKOUT0",
 
             i_RST=self.pll_reset,
             i_CLKINSEL=1,
             i_CLKIN1=pll_clkin,
             i_CLKIN2=0,
-            # i_CLKFBIN=pll_clkfbin,
-            o_CLKFBOUT=clkfbout, i_CLKFBIN=clkfbout,
+            i_CLKFBIN=pll_clkfbin,
+            # o_CLKFBOUT=clkfbout, i_CLKFBIN=clkfbout,
 
             i_DADDR=0,
             i_DI=0,
@@ -254,7 +269,6 @@ class IserdesSp6(Module):
             o_CLKOUT2=pll_clk2,
             o_LOCKED=self.pll_locked
         )
-
         self.specials += Instance(
             "BUFPLL",
             p_DIVIDE=S,
@@ -272,7 +286,7 @@ class IserdesSp6(Module):
         )
 
         # -----------------------------
-        #  Data lanes
+        #  Data lanes with phase detector
         # -----------------------------
         for i in range(D):
             lvds_data = Signal()
@@ -306,15 +320,16 @@ class IserdesSp6(Module):
             )
             cascade_up = Signal()
             cascade_down = Signal()
+            tempData = Signal(8)
             self.specials += Instance(
                 "ISERDES2",
                 p_SERDES_MODE="MASTER",
                 i_D=lvds_data_m,
                 i_SHIFTIN=cascade_up,
-                o_Q4=self.data_outs[i][7],
-                o_Q3=self.data_outs[i][6],
-                o_Q2=self.data_outs[i][5],
-                o_Q1=self.data_outs[i][4],
+                o_Q4=tempData[7],
+                o_Q3=tempData[6],
+                o_Q2=tempData[5],
+                o_Q1=tempData[4],
                 o_SHIFTOUT=cascade_down,
                 **iserdes_default
             )
@@ -323,45 +338,43 @@ class IserdesSp6(Module):
                 p_SERDES_MODE="SLAVE",
                 i_D=lvds_data_s,
                 i_SHIFTIN=cascade_down,
-                o_Q4=self.data_outs[i][3],
-                o_Q3=self.data_outs[i][2],
-                o_Q2=self.data_outs[i][1],
-                o_Q1=self.data_outs[i][0],
+                o_Q4=tempData[3],
+                o_Q3=tempData[2],
+                o_Q2=tempData[1],
+                o_Q1=tempData[0],
                 o_SHIFTOUT=cascade_up,
                 **iserdes_default
             )
+            if MIRROR_BITS:
+                self.comb += self.data_outs[i].eq(tempData[::-1])
+            else:
+                self.comb += self.data_outs[i].eq(tempData)
 
 
 class LTCPhy(IserdesSp6, AutoCSR):
     """
     wire things up to CSRs
-    this is done here to keep IserdesSp6 easily simulateable
+    this is done here to keep IserdesSp6 more or less simulate-able
     """
     def __init__(self, platform, f_enc):
         S = 8
+        M = 8
         DCO_PERIOD = 1 / (f_enc) * 1e9
         print("f_enc:", f_enc)
         print("DCO_PERIOD:", DCO_PERIOD)
-        IserdesSp6.__init__(self, S=S, D=1, M=8, DCO_PERIOD=DCO_PERIOD)
+        IserdesSp6.__init__(self, S=S, D=2, M=M, MIRROR_BITS=True, DCO_PERIOD=DCO_PERIOD)
         # pads_dco = platform.request("LTC_DCO")
         pads_frm = platform.request("LTC_FR")
         pads_chx = platform.request("LTC_OUT", 2)
-
-        # ISE gets grumpy otherwise ...
-        self.specials += Instance(
-            "IBUFDS",
-            i_I=pads_chx.b_p,
-            i_IB=pads_chx.b_n,
-            o_O=Signal()
-        )
 
         # Sync resets
         self.specials += AsyncResetSynchronizer(self.sample, ~self.pll_locked)
 
         # CSRs for peeking at clock / data patterns
-        self.data_peek = CSRStatus(8)
+        self.data_peek = CSRStatus(16)
         self.specials += MultiReg(
-            self.data_outs[0],
+            # LVDS_B (data_outs[1]) has the LSB and needs to come first!
+            Cat(myzip(self.data_outs[1], self.data_outs[0])),
             self.data_peek.status
         )
         self.clk_peek = CSRStatus(8)
@@ -383,12 +396,14 @@ class LTCPhy(IserdesSp6, AutoCSR):
 
         self.comb += [
             self.f_sample.clk.eq(ClockSignal("sample")),
+            # PLL does not lock when using the 500 MHz DDR DCO
             # self.dco_p.eq(pads_dco.p),
             # self.dco_n.eq(pads_dco.n),
+            # (mis)using FRAME as /8 clock works fine and gives us a bitslip test-pattern
             self.dco_p.eq(pads_frm.p),
             self.dco_n.eq(pads_frm.n),
-            self.lvds_data_p.eq(pads_chx.a_p),
-            self.lvds_data_n.eq(pads_chx.a_n),
+            self.lvds_data_p.eq(Cat(pads_chx.a_p, pads_chx.b_p)),
+            self.lvds_data_n.eq(Cat(pads_chx.a_n, pads_chx.b_n)),
             self.bs_sync.i.eq(self.bitslip_csr.re),
             self.bitslip.eq(self.bs_sync.o),
             self.pll_reset.eq(ResetSignal("sys")),
