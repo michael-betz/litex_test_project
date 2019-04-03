@@ -88,10 +88,31 @@ class IserdesSp6(Module):
         self.data_outs = [Signal(S) for i in range(D)]
         self.clk_data_out = Signal(8)
 
+        # Phase detector related
+        self.pd_int_period = Signal(32, reset=2**23)  # number of sample clock cycles to integrate
+        self.pd_int_phases = [Signal((32, True)) for i in range(D)]  # Integrated Phase detector values (int32)
+        self.id_auto_control = Signal()   # When 1 = auto increment / decrement IDELAY based on PD value
+
+        # Idelay control
+        self.id_mux = Signal(max=D + 1)   # To select a LVDS lane
+        self.id_inc = Signal(1)
+        self.id_dec = Signal(1)
+
         ###
 
         self.clock_domains.ioclock = ClockDomain()  # LVDS bit clock
         self.clock_domains.sample = ClockDomain()   # ADC sample clock
+
+        # Accumulator regs for phase detector
+        pd_int_accus = [Signal.like(s) for s in self.pd_int_phases]
+        pd_int_cnt = Signal(32)
+        self.sync.sample += [
+            If(pd_int_cnt == 0,
+                pd_int_cnt.eq(self.pd_int_period),
+            ).Else(
+                pd_int_cnt.eq(pd_int_cnt - 1)
+            )
+        ]
 
         # -----------------------------
         #  IDELAY calibration
@@ -136,9 +157,6 @@ class IserdesSp6(Module):
             "i_IOCLK0": ClockSignal("ioclock"),
             "i_IOCLK1": 0,
             "i_CLK": ClockSignal("sample"),
-             # A faire: wire these up
-            "i_INC": 0,
-            "i_CE": 0,
             "i_RST": idelay_rst
         }
 
@@ -175,6 +193,8 @@ class IserdesSp6(Module):
             p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX",
             i_IDATAIN=self.dco,
             i_CAL=idelay_cal_m,
+            i_CE=0,
+            i_INC=0,
             o_DATAOUT=dco_m,
             o_BUSY=idelay_busy,
             **idelay_default
@@ -185,6 +205,8 @@ class IserdesSp6(Module):
             p_IDELAY_TYPE="FIXED",
             i_IDATAIN=self.dco,
             i_CAL=idelay_cal_m,
+            i_CE=0,
+            i_INC=0,
             o_DATAOUT=dco_s,
             **idelay_default
         )
@@ -292,6 +314,17 @@ class IserdesSp6(Module):
             lvds_data = Signal()
             lvds_data_m = Signal()
             lvds_data_s = Signal()
+            id_CE = Signal()
+            id_INC = Signal()
+            self.comb += [
+                If(self.id_auto_control,
+                    id_CE.eq(pd_int_cnt == 1),
+                    id_INC.eq(self.pd_int_phases[i] < 0)
+                ).Else(
+                    id_CE.eq((self.id_mux == i) & (self.id_inc ^ self.id_dec)),
+                    id_INC.eq(self.id_inc)
+                )
+            ]
             self.specials += Instance(
                 "IBUFDS",
                 i_I=self.lvds_data_p[i],
@@ -306,6 +339,8 @@ class IserdesSp6(Module):
                 i_IDATAIN=lvds_data,
                 i_CAL=idelay_cal_m,
                 o_DATAOUT=lvds_data_m,
+                i_CE=id_CE,
+                i_INC=id_INC,
                 **idelay_default
             )
             self.specials += Instance(
@@ -316,11 +351,16 @@ class IserdesSp6(Module):
                 i_IDATAIN=lvds_data,
                 i_CAL=idelay_cal_s,
                 o_DATAOUT=lvds_data_s,
+                i_CE=id_CE,
+                i_INC=id_INC,
                 **idelay_default
             )
             cascade_up = Signal()
             cascade_down = Signal()
             tempData = Signal(8)
+            pdValid = Signal()
+            pdInc = Signal()
+            pdAcc = pd_int_accus[i]
             self.specials += Instance(
                 "ISERDES2",
                 p_SERDES_MODE="MASTER",
@@ -331,8 +371,29 @@ class IserdesSp6(Module):
                 o_Q2=tempData[5],
                 o_Q1=tempData[4],
                 o_SHIFTOUT=cascade_down,
+                # The phase detector outputs
+                o_VALID=pdValid,
+                o_INCDEC=pdInc,
                 **iserdes_default
             )
+            # Accumulate increment / decrement pulses
+            self.sync.sample += [
+                If(pd_int_cnt == 0,
+                    # Latch accumulator value into pd_int_phase
+                    self.pd_int_phases[i].eq(pdAcc),
+                    # Reset accumulators
+                    pdAcc.eq(0),
+                ).Else(
+                    # Accumulate
+                    If(pdValid,
+                        If(pdInc,
+                            pdAcc.eq(pdAcc - 1)
+                        ).Else(
+                            pdAcc.eq(pdAcc + 1)
+                        )
+                    )
+                )
+            ]
             self.specials += Instance(
                 "ISERDES2",
                 p_SERDES_MODE="SLAVE",
@@ -359,10 +420,11 @@ class LTCPhy(IserdesSp6, AutoCSR):
     def __init__(self, platform, f_enc):
         S = 8
         M = 8
+        D = 2
         DCO_PERIOD = 1 / (f_enc) * 1e9
         print("f_enc:", f_enc)
         print("DCO_PERIOD:", DCO_PERIOD)
-        IserdesSp6.__init__(self, S=S, D=2, M=M, MIRROR_BITS=True, DCO_PERIOD=DCO_PERIOD)
+        IserdesSp6.__init__(self, S=S, D=D, M=M, MIRROR_BITS=True, DCO_PERIOD=DCO_PERIOD)
         # pads_dco = platform.request("LTC_DCO")
         pads_frm = platform.request("LTC_FR")
         pads_chx = platform.request("LTC_OUT", 2)
@@ -387,6 +449,39 @@ class LTCPhy(IserdesSp6, AutoCSR):
         self.bitslip_csr = CSR(1)
         self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
 
+        # CSR to read phase detectors
+        for i, phase_sample in enumerate(self.pd_int_phases):
+            pd_phase_x = CSRStatus(32, name="pd_phase_{:d}".format(i))
+            self.specials += MultiReg(
+                phase_sample,
+                pd_phase_x.status
+            )
+            setattr(self, "pd_phase_{:d}".format(i), pd_phase_x)
+
+        # CSR for setting PD integration cycles
+        self.pd_period_csr = CSRStorage(32, reset=2**20)
+        # Not sure if MultiReg is really needed here?
+        self.specials += MultiReg(
+            self.pd_period_csr.storage,
+            self.pd_int_period
+        )
+
+        # CSR for moving a IDELAY2 up / down
+        self.idelay_auto = CSRStorage(1)
+        self.idelay_mux = CSRStorage(8)
+        self.idelay_inc = CSR(1)
+        self.idelay_dec = CSR(1)
+        self.submodules.idelay_inc_sync = PulseSynchronizer("sys", "sample")
+        self.submodules.idelay_dec_sync = PulseSynchronizer("sys", "sample")
+        self.specials += MultiReg(
+            self.idelay_auto.storage,
+            self.id_auto_control
+        )
+        self.specials += MultiReg(
+            self.idelay_mux.storage,
+            self.id_mux
+        )
+
         # Frequency counter for sample clock
         self.submodules.f_sample = frequency_meter.FrequencyMeter(int(100e6))
 
@@ -410,7 +505,11 @@ class LTCPhy(IserdesSp6, AutoCSR):
             platform.request("user_led").eq(self.pll_reset),
             platform.request("user_led").eq(self.pll_locked),
             platform.request("user_led").eq(self.blinky_frm.out),
-            platform.request("user_led").eq(self.blinky_sample.out)
+            platform.request("user_led").eq(self.blinky_sample.out),
+            self.idelay_inc_sync.i.eq(self.idelay_inc.re),
+            self.idelay_dec_sync.i.eq(self.idelay_dec.re),
+            self.id_inc.eq(self.idelay_inc_sync.o),
+            self.id_dec.eq(self.idelay_dec_sync.o)
         ]
 
 

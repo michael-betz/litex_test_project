@@ -28,7 +28,6 @@ class HelloLtc(SoCCore):
     csr_peripherals = [
         "dna",
         "spi",
-        "f_frame",
         "lvds"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
