@@ -1,0 +1,21 @@
+[timestart] 0
+[size] 1916 1037
+[pos] -1 -1
+*-17.000000 36700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] hello_LTC_tb.
+[treeopen] hello_LTC_tb.dut.
+[sst_width] 210
+[signals_width] 169
+[sst_expanded] 1
+[sst_vpaned_height] 307
+@28
+hello_LTC_tb.dut.cpu_reset
+@200
+-
+@28
+hello_LTC_tb.dut.user_led
+hello_LTC_tb.dut.user_led_1
+hello_LTC_tb.dut.user_led_2
+hello_LTC_tb.dut.user_led_3
+[pattern_trace] 1
+[pattern_trace] 0
