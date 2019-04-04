@@ -16,7 +16,7 @@ module IserdesSp6_tb;
     always #(SYS_CLK_PERIOD / 2) sys_clk = ~sys_clk;
     always #(FR_CLK_PERIOD / 2) fr_clk = ~fr_clk;
     initial begin
-        #(DCO_CLK_PERIOD / 4.2);
+        #(DCO_CLK_PERIOD / 4);
         forever #(DCO_CLK_PERIOD / 2) dco_clk_p = ~dco_clk_p;
     end
     // reg [15:0] testPattern = 16'b1110000000000010;
@@ -56,14 +56,21 @@ module IserdesSp6_tb;
     reg bitslip = 0;
     wire sample_clk;
     top dut (
-        .dco_p          (dco_clk_p),
-        .dco_n          (~dco_clk_p),
-        .lvds_data_p    ({out_b_p, out_a_p}),
-        .lvds_data_n    ({~out_b_p, ~out_a_p}),
+        .dco_p          (fr_clk),
+        .dco_n          (~fr_clk),
+        // .lvds_data_p    ({out_b_p, out_a_p}),
+        // .lvds_data_n    ({~out_b_p, ~out_a_p}),
+        .lvds_data_p    (out_a_p),
+        .lvds_data_n    (~out_a_p),
         .data_outs      (),
         .bitslip        (bitslip),
         .sample_clk     (sample_clk),
-        .pll_reset      (reset)
+        .pll_reset      (reset),
+        .pd_int_period  (32'd10),
+        .id_auto_control(1'b1),
+        .id_mux         (1'b0),
+        .id_inc         (1'b0),
+        .id_dec         (1'b0)
     );
 
     integer cc = 0;

@@ -84,19 +84,19 @@ class IserdesSp6(Module):
         self.bitslip = Signal()        # Pulse to rotate
         self.pll_reset = Signal(reset=1)  # Reset PLL and `sample` clock domain
 
+        # Phase detector readout
+        self.pd_int_period = Signal(32, reset=2**23)  # input for number of sample clock cycles to integrate
+        self.pd_int_phases = [Signal((32, True)) for i in range(D)]  # outputs integrated Phase detector values (int32)
+        self.id_auto_control = Signal()   # input to enable auto increment / decrement IDELAY based on PD value
+
+        # Idelay control inputs
+        self.id_mux = Signal(max=D + 1)   # select a LVDS lane
+        self.id_inc = Signal(1)
+        self.id_dec = Signal(1)
+
         # parallel data out, S-bit serdes on D-lanes
         self.data_outs = [Signal(S) for i in range(D)]
         self.clk_data_out = Signal(8)
-
-        # Phase detector related
-        self.pd_int_period = Signal(32, reset=2**23)  # number of sample clock cycles to integrate
-        self.pd_int_phases = [Signal((32, True)) for i in range(D)]  # Integrated Phase detector values (int32)
-        self.id_auto_control = Signal()   # When 1 = auto increment / decrement IDELAY based on PD value
-
-        # Idelay control
-        self.id_mux = Signal(max=D + 1)   # To select a LVDS lane
-        self.id_inc = Signal(1)
-        self.id_dec = Signal(1)
 
         ###
 
@@ -107,10 +107,10 @@ class IserdesSp6(Module):
         pd_int_accus = [Signal.like(s) for s in self.pd_int_phases]
         pd_int_cnt = Signal(32)
         self.sync.sample += [
-            If(pd_int_cnt == 0,
-                pd_int_cnt.eq(self.pd_int_period),
+            If(pd_int_cnt == self.pd_int_period,
+                pd_int_cnt.eq(0),
             ).Else(
-                pd_int_cnt.eq(pd_int_cnt - 1)
+                pd_int_cnt.eq(pd_int_cnt + 1)
             )
         ]
 
@@ -317,8 +317,9 @@ class IserdesSp6(Module):
             id_CE = Signal()
             id_INC = Signal()
             self.comb += [
+                # Mux the IDELAY control inputs (auto / manual)
                 If(self.id_auto_control,
-                    id_CE.eq(pd_int_cnt == 1),
+                    id_CE.eq((pd_int_cnt == 1) & initial_tl_done),
                     id_INC.eq(self.pd_int_phases[i] < 0)
                 ).Else(
                     id_CE.eq((self.id_mux == i) & (self.id_inc ^ self.id_dec)),
@@ -378,13 +379,14 @@ class IserdesSp6(Module):
             )
             # Accumulate increment / decrement pulses
             self.sync.sample += [
-                If(pd_int_cnt == 0,
+                If(pd_int_cnt == self.pd_int_period,
                     # Latch accumulator value into pd_int_phase
                     self.pd_int_phases[i].eq(pdAcc),
                     # Reset accumulators
-                    pdAcc.eq(0),
+                    pdAcc.eq(0)
                 ).Else(
                     # Accumulate
+                    # pdAcc.eq(pdAcc - 1)
                     If(pdValid,
                         If(pdInc,
                             pdAcc.eq(pdAcc - 1)
@@ -517,10 +519,10 @@ if __name__ == '__main__':
     from migen.fhdl.verilog import convert
     f_enc = 125e6
     S = 8
-    DCO_PERIOD = 1 / (f_enc * S) * 1e9 * 2
+    DCO_PERIOD = 1 / (f_enc) * 1e9
     print("f_enc:", f_enc)
     print("DCO_PERIOD:", DCO_PERIOD)
-    d = IserdesSp6(S=S, D=1, M=2, DCO_PERIOD=DCO_PERIOD)
+    d = IserdesSp6(S=S, D=1, M=8, DCO_PERIOD=DCO_PERIOD)
     convert(
         d,
         ios={
@@ -532,6 +534,12 @@ if __name__ == '__main__':
             d.lvds_data_p,
             d.lvds_data_n,
             d.pll_reset,
+            d.pd_int_period,
+            d.id_auto_control,
+            d.id_mux,
+            d.id_inc,
+            d.id_dec,
+            *d.pd_int_phases,
             *d.data_outs
         },
         display_run=True
