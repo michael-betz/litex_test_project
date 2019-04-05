@@ -249,8 +249,8 @@ class IserdesSp6(Module):
             i_CLKFBIN=pll_clkfbin,
             # o_CLKFBOUT=clkfbout, i_CLKFBIN=clkfbout,
 
-            i_DADDR=0,
-            i_DI=0,
+            i_DADDR=Signal(5),
+            i_DI=Signal(16),
             i_DEN=0,
             i_DWE=0,
             i_DCLK=0,

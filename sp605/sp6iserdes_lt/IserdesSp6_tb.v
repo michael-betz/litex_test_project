@@ -60,8 +60,8 @@ module IserdesSp6_tb;
     //------------------------------------------------------------------------
     reg bitslip = 0;
     wire sample_clk;
-    wire [8:0] data_outs;
-    wire [8:0] clk_data_out;
+    wire [7:0] data_outs;
+    wire [7:0] clk_data_out;
     top dut (
         .dco_p          (fr_clk),
         .dco_n          (~fr_clk),
