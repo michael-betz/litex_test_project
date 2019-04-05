@@ -1,18 +1,22 @@
-# Spartan6 ISERDES receiver for LVDS ADCs
-# This is a rather uninformed mashup of
-#
-#  * serdes_1_to_n_data_ddr_s8_diff.v
-#  * litevideo/datacapture.py
-#
-# ... you get what you pay for ;)
-#
-# Migen can't handle the simulation of Xilinx hardware primitives
-# like PLL or IDELAY
-# hence this python file is only used to generate verilog code,
-# which is then simulated traditionally in iverilog.
-# Try `make view`
+"""\
+Spartan6 ISERDES receiver for LVDS ADCs
 
-from sys import argv, path
+This is a rather uninformed mashup of
+ * serdes_1_to_n_data_ddr_s8_diff.v
+ * litevideo/datacapture.py
+
+... you get what you pay for ;)
+
+Migen can't handle the simulation of Xilinx hardware primitives
+like PLL or IDELAY
+hence this python file is only used to generate verilog code,
+which is then simulated traditionally in iverilog.
+
+try `python3 IserdesSp6.py build`
+or `make view`
+"""
+
+from sys import argv, path, exit
 from migen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.cores import frequency_meter
@@ -494,6 +498,9 @@ class LTCPhy(IserdesSp6, AutoCSR):
 
 
 if __name__ == '__main__':
+    if "build" not in argv:
+        print(__doc__)
+        exit(-1)
     from migen.fhdl.verilog import convert
     f_enc = 125e6
     S = 8

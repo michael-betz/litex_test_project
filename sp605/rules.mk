@@ -9,7 +9,7 @@ config: $(TARGET).py
 	python3 $< config
 
 %.v: %.py
-	python3 $^
+	python3 $< build
 
 %_tb: %_tb.v $(SRC_V)
 	iverilog $(SIM_INCLUDES) -o $@ $^
