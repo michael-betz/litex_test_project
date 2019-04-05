@@ -75,17 +75,6 @@ class IserdesSp6(Module):
         self.clock_domains.ioclock = ClockDomain()  # LVDS bit clock
         self.clock_domains.sample = ClockDomain()   # ADC sample clock
 
-        # Accumulator regs for phase detector
-        pd_int_accus = [Signal.like(s) for s in self.pd_int_phases]
-        pd_int_cnt = Signal(32)
-        self.sync.sample += [
-            If(pd_int_cnt == self.pd_int_period,
-                pd_int_cnt.eq(0),
-            ).Else(
-                pd_int_cnt.eq(pd_int_cnt + 1)
-            )
-        ]
-
         # -----------------------------
         #  IDELAY calibration
         # -----------------------------
@@ -93,6 +82,7 @@ class IserdesSp6(Module):
         idelay_cal_m = Signal()
         idelay_cal_s = Signal()
         idelay_busy = Signal()
+        # High when IDELAY initialization complete
         initial_tl_done = Signal()
         self.sync.sample += [
             idelay_cal_m.eq(0),
@@ -287,6 +277,17 @@ class IserdesSp6(Module):
             o_O=ClockSignal("sample")
         )
 
+        # Accumulator regs for phase detector
+        pd_int_accus = [Signal.like(s) for s in self.pd_int_phases]
+        pd_int_cnt = Signal(32)
+        self.sync.sample += [
+            If(pd_int_cnt == self.pd_int_period,
+                pd_int_cnt.eq(0),
+            ).Elif(initial_tl_done,     # only start counting when idelays are calibrated
+                pd_int_cnt.eq(pd_int_cnt + 1)
+            )
+        ]
+
         # -----------------------------
         #  Data lanes with phase detector
         # -----------------------------
@@ -296,13 +297,20 @@ class IserdesSp6(Module):
             lvds_data_s = Signal()
             id_CE = Signal()
             id_INC = Signal()
+            # -------------------------------------
+            #  Idelay control (auto / manual)
+            # -------------------------------------
             self.sync.sample += [
-                # Mux the IDELAY control inputs (auto / manual)
+                # Mux the IDELAY control inputs
                 If(self.id_auto_control,
                     id_CE.eq(
-                        initial_tl_done &
-                        (pd_int_cnt == 0) &
-                        (self.pd_int_phases[i] != 0)
+                        (pd_int_cnt == 1) &
+                        # Adjust IDELAYS at end of each accumulator cycle
+                        # (self.pd_int_phases[i] != 0)
+                        # Adjust IDELAYs when consistently early / late
+                        # during _all_ accumulator cycles
+                        ((self.pd_int_phases[i] >= self.pd_int_period) |
+                        (self.pd_int_phases[i] <= -self.pd_int_period))
                     ),
                     id_INC.eq(self.pd_int_phases[i] < 0)
                 ).Else(
