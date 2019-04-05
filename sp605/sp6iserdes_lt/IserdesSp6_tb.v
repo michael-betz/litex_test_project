@@ -2,8 +2,8 @@
 
 module IserdesSp6_tb;
     localparam real SYS_CLK_PERIOD = 1e9 / 100e6;    // Simulated clock period in [ns]
-    localparam real FR_CLK_PERIOD = 1e9 / 125e6 * 2; // DDR
-    localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 8.0; // DDR
+    localparam real FR_CLK_PERIOD = 1e9 / 125e6; // SDR
+    localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 4.0; // DDR
 
     //------------------------------------------------------------------------
     // Clock and fake LVDS lanes generation
@@ -45,7 +45,7 @@ module IserdesSp6_tb;
         end
         repeat (3) @(posedge sys_clk);
         reset <= 0;
-        #5000
+        #4000
         $finish();
     end
 
@@ -66,7 +66,7 @@ module IserdesSp6_tb;
         .bitslip        (bitslip),
         .sample_clk     (sample_clk),
         .pll_reset      (reset),
-        .pd_int_period  (32'd10),
+        .pd_int_period  (32'd64),
         .id_auto_control(1'b1),
         .id_mux         (1'b0),
         .id_inc         (1'b0),
@@ -79,5 +79,7 @@ module IserdesSp6_tb;
         bitslip <= 0;
         // if ((cc % 20) == 0) bitslip <= 1;
         if (cc == 100) bitslip <= 1;
+        if (cc == 110) bitslip <= 1;
+        if (cc == 120) bitslip <= 1;
     end
 endmodule

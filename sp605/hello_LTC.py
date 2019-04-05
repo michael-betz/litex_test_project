@@ -130,14 +130,6 @@ class HelloLtc(SoCCore):
         spi_pads = platform.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
 
-        # Measure frame rate
-        # Accumulates `frm` cycles for 100e6 cycles of 1 ns each = [Hz]
-        # frm_pads = platform.request("LTC_FR")
-        # self.clock_domains.cd_frm = ClockDomain()
-        # self.specials += DifferentialInput(frm_pads.p, frm_pads.n, ClockSignal("frm"))
-        # self.submodules.f_frame = frequency_meter.FrequencyMeter(int(100e6))
-        # self.comb += self.f_frame.clk.eq(ClockSignal("frm"))
-
         # LVDS phy
         self.submodules.lvds = LTCPhy(platform, 800e6 / 7)
 

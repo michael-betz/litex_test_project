@@ -12,7 +12,7 @@
 # which is then simulated traditionally in iverilog.
 # Try `make view`
 
-from sys import argv
+from sys import argv, path
 from migen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.cores import frequency_meter
@@ -20,40 +20,8 @@ from migen.build.xilinx import XilinxPlatform
 from migen.genlib.cdc import MultiReg, PulseSynchronizer, BusSynchronizer
 from migen.genlib.cdc import AsyncResetSynchronizer
 from migen.genlib.misc import WaitTimer, timeline
-
-
-class LedBlinker(Module):
-    def __init__(self, clk_in, f_clk=100e6):
-        """
-        for debugging clocks
-        toggles output at 1 Hz
-        """
-        self.out = Signal()
-
-        ###
-
-        self.clock_domains.cd_led = ClockDomain(reset_less=True)
-        self.comb += self.cd_led.clk.eq(clk_in)
-        max_cnt = int(f_clk // 2)
-        cntr = Signal(max=max_cnt + 1)
-        self.sync.led += [
-            If(cntr == (max_cnt),
-                cntr.eq(0),
-                self.out.eq(~self.out)
-            ).Else(
-                cntr.eq(cntr + 1)
-            )
-        ]
-
-
-def myzip(*vals):
-    """
-    interleave elements in a flattened list
-
-    >>> myzip([1,2,3], ['a', 'b', 'c'])
-    [1, 'a', 2, 'b', 3, 'c']
-    """
-    return [i for t in zip(*vals) for i in t]
+path.append("..")
+from general import *
 
 
 class IserdesSp6(Module):
@@ -147,6 +115,7 @@ class IserdesSp6(Module):
         idelay_default = {
             "p_SIM_TAPDELAY_VALUE": 49,
             "p_DATA_RATE": "SDR",
+            "p_COUNTER_WRAPAROUND": "WRAPAROUND",
             "p_IDELAY_VALUE": 0,
             "p_IDELAY2_VALUE": 0,
             "p_ODELAY_VALUE": 0,
@@ -264,12 +233,19 @@ class IserdesSp6(Module):
         self.specials += Instance(
             "PLL_ADV",
             name="PLL_IOCLOCK",
+            p_BANDWIDTH="OPTIMIZED",
             p_SIM_DEVICE="SPARTAN6",
             p_CLKIN1_PERIOD=DCO_PERIOD,
+            p_CLKIN2_PERIOD=DCO_PERIOD,
             p_DIVCLK_DIVIDE=1,
             p_CLKFBOUT_MULT=M,
+            p_CLKFBOUT_PHASE=0.0,
             p_CLKOUT0_DIVIDE=1,
             p_CLKOUT2_DIVIDE=S,
+            p_CLKOUT0_DUTY_CYCLE=0.5,
+            p_CLKOUT2_DUTY_CYCLE=0.5,
+            p_CLKOUT0_PHASE=0.0,
+            p_CLKOUT2_PHASE=0.0,
             p_COMPENSATION="SOURCE_SYNCHRONOUS",
             # p_COMPENSATION="INTERNAL",
             p_CLK_FEEDBACK="CLKOUT0",
@@ -316,10 +292,14 @@ class IserdesSp6(Module):
             lvds_data_s = Signal()
             id_CE = Signal()
             id_INC = Signal()
-            self.comb += [
+            self.sync.sample += [
                 # Mux the IDELAY control inputs (auto / manual)
                 If(self.id_auto_control,
-                    id_CE.eq((pd_int_cnt == 1) & initial_tl_done),
+                    id_CE.eq(
+                        initial_tl_done &
+                        (pd_int_cnt == 0) &
+                        (self.pd_int_phases[i] != 0)
+                    ),
                     id_INC.eq(self.pd_int_phases[i] < 0)
                 ).Else(
                     id_CE.eq((self.id_mux == i) & (self.id_inc ^ self.id_dec)),
@@ -336,7 +316,6 @@ class IserdesSp6(Module):
                 "IODELAY2",
                 p_SERDES_MODE="MASTER",
                 p_IDELAY_TYPE="DIFF_PHASE_DETECTOR",
-                p_COUNTER_WRAPAROUND="WRAPAROUND",
                 i_IDATAIN=lvds_data,
                 i_CAL=idelay_cal_m,
                 o_DATAOUT=lvds_data_m,
@@ -348,7 +327,6 @@ class IserdesSp6(Module):
                 "IODELAY2",
                 p_SERDES_MODE="SLAVE",
                 p_IDELAY_TYPE="DIFF_PHASE_DETECTOR",
-                p_COUNTER_WRAPAROUND="WRAPAROUND",
                 i_IDATAIN=lvds_data,
                 i_CAL=idelay_cal_s,
                 o_DATAOUT=lvds_data_s,
@@ -421,7 +399,7 @@ class LTCPhy(IserdesSp6, AutoCSR):
     """
     def __init__(self, platform, f_enc):
         S = 8
-        M = 8
+        M = 8  # 8 DCO ticks during one frame tick
         D = 2
         DCO_PERIOD = 1 / (f_enc) * 1e9
         print("f_enc:", f_enc)
@@ -522,7 +500,7 @@ if __name__ == '__main__':
     DCO_PERIOD = 1 / (f_enc) * 1e9
     print("f_enc:", f_enc)
     print("DCO_PERIOD:", DCO_PERIOD)
-    d = IserdesSp6(S=S, D=1, M=8, DCO_PERIOD=DCO_PERIOD)
+    d = IserdesSp6(S=S, D=1, M=8, MIRROR_BITS=True, DCO_PERIOD=DCO_PERIOD)
     convert(
         d,
         ios={

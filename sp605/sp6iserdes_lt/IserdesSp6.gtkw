@@ -1,11 +1,11 @@
-[timestart] 840800
+[timestart] 0
 [size] 1916 1037
 [pos] -1 -1
-*-17.000000 1152111 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-20.000000 545000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] IserdesSp6_tb.
 [treeopen] IserdesSp6_tb.dut.
-[sst_width] 312
-[signals_width] 273
+[sst_width] 235
+[signals_width] 280
 [sst_expanded] 1
 [sst_vpaned_height] 232
 @420
@@ -21,8 +21,11 @@ IserdesSp6_tb.out_a_p
 IserdesSp6_tb.out_b_p
 @1000200
 -fake_lanes
+@800200
+-dut_outputs
 @28
 IserdesSp6_tb.dut.pll_locked
+IserdesSp6_tb.sample_clk
 IserdesSp6_tb.bitslip
 @c00022
 IserdesSp6_tb.dut.data_outs[7:0]
@@ -50,11 +53,15 @@ IserdesSp6_tb.dut.clk_data_out[7:0]
 (7)IserdesSp6_tb.dut.clk_data_out[7:0]
 @1401200
 -group_end
-@28
-IserdesSp6_tb.sample_clk
+@1000200
+-dut_outputs
 @c00200
 -idelay_cal
 @28
+IserdesSp6_tb.dut.lvds_data
+IserdesSp6_tb.dut.lvds_data_m
+IserdesSp6_tb.dut.lvds_data_s
+IserdesSp6_tb.dut.ioclock_clk
 IserdesSp6_tb.dut.idelay_rst
 IserdesSp6_tb.dut.IODELAY2.BUSY
 IserdesSp6_tb.dut.idelay_cal_m
@@ -62,20 +69,47 @@ IserdesSp6_tb.dut.idelay_cal_s
 IserdesSp6_tb.dut.initial_tl_done
 @1401200
 -idelay_cal
-@800200
--PHASE
+@c00200
+-idelay_state
 @24
-IserdesSp6_tb.dut.pd_int_cnt[31:0]
+[color] 6
+IserdesSp6_tb.dut.IODELAY2.max_delay[7:0]
+IserdesSp6_tb.dut.IODELAY2.idelay_val_pe_m_reg[7:0]
+IserdesSp6_tb.dut.IODELAY2_1.idelay_val_pe_m_reg[7:0]
+IserdesSp6_tb.dut.IODELAY2_2.idelay_val_pe_m_reg[7:0]
+IserdesSp6_tb.dut.IODELAY2_3.idelay_val_pe_m_reg[7:0]
+@1401200
+-idelay_state
+@c00201
+-PHASE
+@200
+-Phase detector outputs
 @28
 IserdesSp6_tb.dut.pdInc
 IserdesSp6_tb.dut.pdValid
+@200
+-Integrated phase
+@24
+[color] 7
+IserdesSp6_tb.dut.pd_int_period[31:0]
+[color] 7
+IserdesSp6_tb.dut.pd_int_cnt[31:0]
 @420
+[color] 7
 IserdesSp6_tb.dut.pd_int_accus[31:0]
+[color] 1
 IserdesSp6_tb.dut.pd_int_phases[31:0]
+@200
+-IDELAY controls
 @28
 IserdesSp6_tb.dut.id_CE
 IserdesSp6_tb.dut.id_INC
-@1000200
+@200
+-ISERDES sampling
+@28
+IserdesSp6_tb.dut.ISERDES2_2.clk_int
+IserdesSp6_tb.dut.ISERDES2_2.D_IN
+@1401201
 -PHASE
 [pattern_trace] 1
 [pattern_trace] 0
