@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.98 (w)1999-2019 BSI
-[*] Fri Apr  5 04:54:31 2019
+[*] Fri Apr  5 05:53:39 2019
 [*]
 [dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes_lt/IserdesSp6.vcd"
-[dumpfile_mtime] "Fri Apr  5 04:52:03 2019"
-[dumpfile_size] 5251081
+[dumpfile_mtime] "Fri Apr  5 05:51:59 2019"
+[dumpfile_size] 5975968
 [savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes_lt/IserdesSp6.gtkw"
 [timestart] 0
 [size] 1596 853
 [pos] -1 -1
-*-20.000000 1304111 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-20.000000 1305000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] IserdesSp6_tb.
 [sst_width] 235
 [signals_width] 280
@@ -17,7 +17,7 @@
 [sst_vpaned_height] 232
 @420
 IserdesSp6_tb.cc
-@800200
+@c00200
 -fake_lanes
 @28
 IserdesSp6_tb.dco_clk_p
@@ -26,15 +26,15 @@ IserdesSp6_tb.fr_clk
 IserdesSp6_tb.out_a_p
 [color] 2
 IserdesSp6_tb.out_b_p
-@1000200
+@1401200
 -fake_lanes
-@800200
+@800201
 -dut_outputs
-@28
+@29
 IserdesSp6_tb.dut.pll_locked
 IserdesSp6_tb.sample_clk
 IserdesSp6_tb.bitslip
-@c00022
+@c00023
 IserdesSp6_tb.dut.data_outs[7:0]
 @28
 (0)IserdesSp6_tb.dut.data_outs[7:0]
@@ -45,9 +45,9 @@ IserdesSp6_tb.dut.data_outs[7:0]
 (5)IserdesSp6_tb.dut.data_outs[7:0]
 (6)IserdesSp6_tb.dut.data_outs[7:0]
 (7)IserdesSp6_tb.dut.data_outs[7:0]
-@1401200
+@1401201
 -group_end
-@c00022
+@c00023
 IserdesSp6_tb.dut.clk_data_out[7:0]
 @28
 (0)IserdesSp6_tb.dut.clk_data_out[7:0]
@@ -58,9 +58,9 @@ IserdesSp6_tb.dut.clk_data_out[7:0]
 (5)IserdesSp6_tb.dut.clk_data_out[7:0]
 (6)IserdesSp6_tb.dut.clk_data_out[7:0]
 (7)IserdesSp6_tb.dut.clk_data_out[7:0]
-@1401200
+@1401201
 -group_end
-@1000200
+@1000201
 -dut_outputs
 @c00200
 -idelay_cal
@@ -76,7 +76,7 @@ IserdesSp6_tb.dut.idelay_cal_s
 IserdesSp6_tb.dut.initial_tl_done
 @1401200
 -idelay_cal
-@c00200
+@800200
 -idelay_state
 @24
 [color] 6
@@ -85,9 +85,9 @@ IserdesSp6_tb.dut.IODELAY2.idelay_val_pe_m_reg[7:0]
 IserdesSp6_tb.dut.IODELAY2_1.idelay_val_pe_m_reg[7:0]
 IserdesSp6_tb.dut.IODELAY2_2.idelay_val_pe_m_reg[7:0]
 IserdesSp6_tb.dut.IODELAY2_3.idelay_val_pe_m_reg[7:0]
-@1401200
+@1000200
 -idelay_state
-@800200
+@c00200
 -PHASE
 @200
 -Phase detector outputs
@@ -104,20 +104,20 @@ IserdesSp6_tb.dut.pd_int_cnt[31:0]
 @420
 [color] 7
 IserdesSp6_tb.dut.pd_int_accus[31:0]
-[color] 1
+[color] 3
 IserdesSp6_tb.dut.pd_int_phases[31:0]
 @200
 -IDELAY controls
-@29
-IserdesSp6_tb.dut.id_CE
 @28
+[color] 1
+IserdesSp6_tb.dut.id_CE
 IserdesSp6_tb.dut.id_INC
 @200
 -ISERDES sampling
 @28
 IserdesSp6_tb.dut.ISERDES2_2.clk_int
 IserdesSp6_tb.dut.ISERDES2_2.D_IN
-@1000200
+@1401200
 -PHASE
 [pattern_trace] 1
 [pattern_trace] 0

@@ -4,6 +4,8 @@ module IserdesSp6_tb;
     localparam real SYS_CLK_PERIOD = 1e9 / 100e6;    // Simulated clock period in [ns]
     localparam real FR_CLK_PERIOD = 1e9 / 125e6; // SDR
     localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 4.0; // DDR
+    // Testpattern! LSB ends up on on LVDS lane B!
+    localparam [15:0] TP = 16'b0011110111011010;
 
     //------------------------------------------------------------------------
     // Clock and fake LVDS lanes generation
@@ -19,12 +21,10 @@ module IserdesSp6_tb;
         #(DCO_CLK_PERIOD / 4);
         forever #(DCO_CLK_PERIOD / 2) dco_clk_p = ~dco_clk_p;
     end
-    // reg [15:0] testPattern = 16'b1110000000000010;
-    reg [15:0] testPattern = 16'b0000000000001101;
     reg [15:0] temp = 0;
     always begin
         // Craft 2 x 8 bit DDR signals according to timing diagram in LTC datasheet
-        temp = testPattern;
+        temp = TP;
         repeat (8) begin
             out_a_p = (temp & 16'h8000) != 0;
             temp = temp << 1;
@@ -38,6 +38,7 @@ module IserdesSp6_tb;
     //  Handle the power on Reset
     //------------------------------------------------------------------------
     reg reset = 1;
+    integer pass=1;
     initial begin
         if ($test$plusargs("vcd")) begin
             $dumpfile("IserdesSp6.vcd");
@@ -46,6 +47,10 @@ module IserdesSp6_tb;
         repeat (3) @(posedge sys_clk);
         reset <= 0;
         #4000
+        if(pass)
+            $display("PASS");
+        else
+            $display("FAIL");
         $finish();
     end
 
@@ -55,6 +60,8 @@ module IserdesSp6_tb;
     //------------------------------------------------------------------------
     reg bitslip = 0;
     wire sample_clk;
+    wire [8:0] data_outs;
+    wire [8:0] clk_data_out;
     top dut (
         .dco_p          (fr_clk),
         .dco_n          (~fr_clk),
@@ -62,7 +69,8 @@ module IserdesSp6_tb;
         // .lvds_data_n    ({~out_b_p, ~out_a_p}),
         .lvds_data_p    (out_a_p),
         .lvds_data_n    (~out_a_p),
-        .data_outs      (),
+        .data_outs      (data_outs),
+        .clk_data_out   (clk_data_out),
         .bitslip        (bitslip),
         .sample_clk     (sample_clk),
         .pll_reset      (reset),
@@ -74,6 +82,8 @@ module IserdesSp6_tb;
     );
 
     integer cc = 0;
+    reg [7:0] tp_a = {TP[15], TP[13], TP[11], TP[9], TP[7], TP[5], TP[3], TP[1]};
+    reg [7:0] tp_b = {TP[14], TP[12], TP[10], TP[8], TP[6], TP[4], TP[2], TP[0]};
     always @(posedge sample_clk) begin
         cc <= cc + 1;
         bitslip <= 0;
@@ -81,5 +91,9 @@ module IserdesSp6_tb;
         if (cc == 100) bitslip <= 1;
         if (cc == 110) bitslip <= 1;
         if (cc == 120) bitslip <= 1;
+        if (cc > 150) begin
+            if ((data_outs != tp_a) || (clk_data_out != 8'h0F))
+                pass = 0;
+        end
     end
 endmodule
