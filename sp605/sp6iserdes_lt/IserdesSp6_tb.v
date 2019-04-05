@@ -87,7 +87,6 @@ module IserdesSp6_tb;
     always @(posedge sample_clk) begin
         cc <= cc + 1;
         bitslip <= 0;
-        // if ((cc % 20) == 0) bitslip <= 1;
         if (cc == 100) bitslip <= 1;
         if (cc == 110) bitslip <= 1;
         if (cc == 120) bitslip <= 1;

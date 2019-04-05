@@ -1,3 +1,6 @@
-TARGET = IserdesSp6
-SRC_V = $(SIM_PATH)/glbl.v $(TARGET).v $(wildcard *.v)
+TARGET = Acquisition
+SRC_V = $(TARGET).v
 include ../rules.mk
+
+$(TARGET).vcd: $(TARGET).py
+	python3 $< sim

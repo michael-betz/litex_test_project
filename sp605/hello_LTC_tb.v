@@ -2,8 +2,10 @@
 
 module hello_LTC_tb;
     localparam real XTAL_PERIOD = 1e9 / 200e6;    // Simulated clock period in [ns]
-    localparam real FR_CLK_PERIOD = 1e9 / 125e6 * 2; // DDR
-    localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 8.0; // DDR
+    localparam real FR_CLK_PERIOD = 1e9 / 125e6;  // SDR
+    localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 4.0; // DDR
+    // Testpattern! LSB ends up on on LVDS lane B!
+    localparam [15:0] TP = 16'b0011110111011010;
 
     //------------------------------------------------------------------------
     // Clock and fake LVDS lanes generation
@@ -16,15 +18,14 @@ module hello_LTC_tb;
     always #(XTAL_PERIOD / 2) xtal_clk = ~xtal_clk;
     always #(FR_CLK_PERIOD / 2) fr_clk = ~fr_clk;
     initial begin
-        #(DCO_CLK_PERIOD / 4.2);
+        #(DCO_CLK_PERIOD / 4);
         forever #(DCO_CLK_PERIOD / 2) dco_clk_p = ~dco_clk_p;
     end
-    // reg [15:0] testPattern = 16'b1110000000000010;
-    reg [15:0] testPattern = 16'b0000000000001101;
+
     reg [15:0] temp = 0;
     always begin
         // Craft 2 x 8 bit DDR signals according to timing diagram in LTC datasheet
-        temp = testPattern;
+        temp = TP;
         repeat (8) begin
             out_a_p = (temp & 16'h8000) != 0;
             temp = temp << 1;
