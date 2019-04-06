@@ -1,31 +1,32 @@
 [timestart] 0
 [size] 956 1037
 [pos] -1 -1
-*-8.000000 535 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-7.000000 106 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [sst_width] 210
 [signals_width] 231
 [sst_expanded] 1
 [sst_vpaned_height] 111
-@28
+@29
+[color] 6
 sys_clk
-@8024
-data_in[15:0]
+@28
+[color] 7
+sample_clk
+@8022
+main_data_in[15:0]
 @20000
 -
 -
-@820
-[color] 7
-state[95:0]
-@29
-[color] 2
-trigger
+-
+-
 @22
-storage[15:0]
-@24
-dat_w[15:0]
-adr[3:0]
+main_storage[15:0]
+@820
+simulator_state[95:0]
 @28
 [color] 3
-we
+main_busy
+@22
+main_adr[3:0]
 [pattern_trace] 1
 [pattern_trace] 0

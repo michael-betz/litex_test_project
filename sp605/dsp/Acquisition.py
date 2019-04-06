@@ -27,6 +27,7 @@ class Acquisition(Module, AutoCSR):
         trig = Signal()
         self.trig_csr = CSR()
         self.trig_level = CSRStorage(16, reset=(1 << 15))
+        self.clock_domains.sample = ClockDomain()
 
         if mem is None:
             mem = Memory(16, 12)
@@ -34,20 +35,19 @@ class Acquisition(Module, AutoCSR):
         p1 = mem.get_port(write_capable=True)
         self.specials += p1
         self.comb += p1.dat_w.eq(self.data_in)
-        fsm = FSM()
-        self.submodules += fsm
+        self.submodules.fsm = ClockDomainsRenamer("sample")(FSM())
         trig_d = Signal()
         data_in_d = Signal.like(self.data_in)
-        self.sync += [
+        self.sync.sample += [
             trig_d.eq(trig),
             data_in_d.eq(self.data_in)
         ]
-        fsm.act("WAIT_TRIGGER",
+        self.fsm.act("WAIT_TRIGGER",
             If(trig & ~trig_d,
                 NextState("WAIT_LEVEL")
             )
         )
-        fsm.act("WAIT_LEVEL",
+        self.fsm.act("WAIT_LEVEL",
             If((data_in_d < self.trig_level.storage) &
                (self.data_in >= self.trig_level.storage),
                 p1.we.eq(1),
@@ -55,7 +55,7 @@ class Acquisition(Module, AutoCSR):
                 NextState("ACQUIRE")
             )
         )
-        fsm.act("ACQUIRE",
+        self.fsm.act("ACQUIRE",
             p1.we.eq(1),
             NextValue(p1.adr, p1.adr + 1),
             If(p1.adr >= mem.depth - 1,
@@ -81,10 +81,7 @@ def sample_generator(dut):
         yield
 
 
-if __name__ == '__main__':
-    if len(argv) <= 1:
-        print(__doc__)
-        exit(-1)
+def main():
     dut = Acquisition()
     if "build" in argv:
         ''' generate a .v file for simulation with Icarus / general usage '''
@@ -92,6 +89,7 @@ if __name__ == '__main__':
         convert(
             dut,
             ios={
+                dut.sample.clk,
                 dut.data_in,
                 dut.trigger
             },
@@ -100,7 +98,14 @@ if __name__ == '__main__':
     if "sim" in argv:
         run_simulation(
             dut,
-            sample_generator(dut),
+            {"sample": sample_generator(dut)},
             {"sys": 10, "sample": 9},
             vcd_name=argv[0].replace(".py", ".vcd")
         )
+
+
+if __name__ == '__main__':
+    if len(argv) <= 1:
+        print(__doc__)
+        exit(-1)
+    main()
