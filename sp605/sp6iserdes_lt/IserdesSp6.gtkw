@@ -1,11 +1,3 @@
-[*]
-[*] GTKWave Analyzer v3.3.98 (w)1999-2019 BSI
-[*] Fri Apr  5 05:53:39 2019
-[*]
-[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes_lt/IserdesSp6.vcd"
-[dumpfile_mtime] "Fri Apr  5 05:51:59 2019"
-[dumpfile_size] 5975968
-[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/sp6iserdes_lt/IserdesSp6.gtkw"
 [timestart] 0
 [size] 1596 853
 [pos] -1 -1

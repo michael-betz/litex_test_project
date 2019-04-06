@@ -304,11 +304,11 @@ class IserdesSp6(Module):
                     id_CE.eq(
                         (pd_int_cnt == 1) &
                         # Adjust IDELAYS at end of each accumulator cycle
-                        # (self.pd_int_phases[i] != 0)
+                        (self.pd_int_phases[i] != 0)
                         # Adjust IDELAYs when consistently early / late
                         # during _all_ accumulator cycles
-                        ((self.pd_int_phases[i] >= self.pd_int_period) |
-                        (self.pd_int_phases[i] <= -self.pd_int_period))
+                        # ((self.pd_int_phases[i] >= self.pd_int_period) |
+                        # (self.pd_int_phases[i] <= -self.pd_int_period))
                     ),
                     id_INC.eq(self.pd_int_phases[i] < 0)
                 ).Else(
@@ -416,10 +416,14 @@ class LTCPhy(IserdesSp6, AutoCSR):
         pads_chx = platform.request("LTC_OUT", 2)
 
         # CSRs for peeking at clock / data patterns
+        self.sample_out = Signal(16)
+        # LVDS_B (data_outs[1]) has the LSB and needs to come first!
+        self.comb += self.sample_out.eq(
+            Cat(myzip(self.data_outs[1], self.data_outs[0]))
+        )
         self.data_peek = CSRStatus(16)
         self.specials += MultiReg(
-            # LVDS_B (data_outs[1]) has the LSB and needs to come first!
-            Cat(myzip(self.data_outs[1], self.data_outs[0])),
+            self.sample_out,
             self.data_peek.status
         )
         self.clk_peek = CSRStatus(8)
