@@ -11,7 +11,7 @@ config: $(TARGET).py
 %.v: %.py
 	python3 $< build
 
-%_tb: %_tb.v $(SRC_V)
+%_tb: %_tb.v $(SRC_V) $(TARGET:=.v)
 	iverilog $(SIM_INCLUDES) -o $@ $^
 
 %.vcd: %_tb
@@ -22,6 +22,7 @@ config: $(TARGET).py
 
 clean::
 	rm -rf $(TARGET).vcd $(TARGET).v
+	rm -rf tree0_*.svg
 
 help:
 	@echo "all      Run simulation (default)"

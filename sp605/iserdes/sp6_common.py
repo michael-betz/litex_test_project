@@ -5,7 +5,7 @@ from migen.build.xilinx.common import xilinx_special_overrides
 from migen.genlib.misc import WaitTimer, timeline
 
 
-class IserdesSp6_common(Module):
+class Sp6Common(Module):
     def __init__(
         self, S, D, MIRROR_BITS, idelay_overrides={}, iserdes_overrides={}
     ):

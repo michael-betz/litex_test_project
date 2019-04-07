@@ -1,8 +1,9 @@
 localparam real SYS_CLK_PERIOD = 1e9 / 100e6;    // Simulated clock period in [ns]
 localparam real FR_CLK_PERIOD = 1e9 / 125e6; // SDR
 localparam real DCO_CLK_PERIOD = FR_CLK_PERIOD / 4.0; // DDR
+
 // Testpattern! LSB ends up on on LVDS lane B!
-localparam [15:0] TP = 16'b0011110111011010;
+reg [15:0] TP = 16'b0011110111011010;
 
 //------------------------------------------------------------------------
 // Clock and fake LVDS lanes generation
@@ -52,18 +53,37 @@ end
 // verify output data
 //------------------------------------------------------------------------
 integer cc = 0;
+always @(posedge sample_clk)
+    cc <= cc + 1;
 reg bitslip = 0;
 wire sample_clk;
 wire [7:0] data_outs;
 wire [7:0] clk_data_out;
-reg [7:0] tp_a = {TP[15], TP[13], TP[11], TP[9], TP[7], TP[5], TP[3], TP[1]};
-reg [7:0] tp_b = {TP[14], TP[12], TP[10], TP[8], TP[6], TP[4], TP[2], TP[0]};
-always @(posedge sample_clk) begin
-    cc <= cc + 1;
-    bitslip <= 0;
-    if (cc == 100) bitslip <= 1;
-    if (cc == 110) bitslip <= 1;
-    if (cc == 120) bitslip <= 1;
-    if ((cc > 150) && (data_outs != tp_a))
-        pass = 0;
+wire [7:0] tp_a = {TP[15], TP[13], TP[11], TP[9], TP[7], TP[5], TP[3], TP[1]};
+wire [7:0] tp_b = {TP[14], TP[12], TP[10], TP[8], TP[6], TP[4], TP[2], TP[0]};
+initial begin
+    wait (cc > 150);
+    @ (posedge sample_clk);
+    if (data_outs != tp_a) pass = 0;
+    TP = ~TP;
+    wait (cc > 160);
+    @ (posedge sample_clk);
+    if (data_outs != tp_a) pass = 0;
 end
+
+task bitslip_task;
+    // Fires N bitslip events after everything is ready
+    input [7:0] N;
+    begin
+        wait(cc > 100);
+        while (N > 0) begin
+            @ (posedge sample_clk);
+            bitslip = 1;
+            @ (posedge sample_clk);
+            bitslip = 0;
+            repeat (10)
+                @ (posedge sample_clk);
+            N = N - 1;
+        end
+    end
+endtask

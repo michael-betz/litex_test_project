@@ -20,11 +20,10 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi, frequency_meter
 from sp605_crg import SP605_CRG
-from sp6iserdes_lt.IserdesSp6 import LTCPhy
 from sys import argv, exit, path
-path.append("../dsp")
-from general import ltc_con
 from dsp.Acquisition import Acquisition
+path.append("iserdes")
+from ltc_phy import LTCPhy
 
 
 # create our soc (no cpu, only wishbone 2 serial)
@@ -70,7 +69,7 @@ class HelloLtc(SoCCore, AutoCSR):
         # ----------------------------
         #  FMC LPC connectivity
         # ----------------------------
-        platform.add_extension(ltc_con)
+        platform.add_extension(LTCPhy.pads)
 
         # ----------------------------
         #  SPI master

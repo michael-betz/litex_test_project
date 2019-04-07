@@ -27,12 +27,10 @@ from migen import *
 from migen.build.xilinx.common import *
 from litex.soc.interconnect.csr import *
 from migen.genlib.cdc import AsyncResetSynchronizer
-from IserdesSp6_common import IserdesSp6_common, genVerilog
-path.append("..")
-from general import *
+from sp6_common import Sp6Common, genVerilog
 
 
-class IserdesSp6_pll(IserdesSp6_common):
+class Sp6PLL(Sp6Common):
     def __init__(
         self, S=8, D=2, M=2, MIRROR_BITS=False, DCO_PERIOD=2.0, **kwargs
     ):
@@ -51,7 +49,7 @@ class IserdesSp6_pll(IserdesSp6_common):
             first bit of the serial stream clocked in ends up in the
             LSB of data_outs
 
-        See IserdesSp6_common.py for input output ports
+        See Sp6Common.py for input output ports
         """
 
         # Data recovered from the clock lane for frame alignment (in case of a divided clock)
@@ -63,7 +61,7 @@ class IserdesSp6_pll(IserdesSp6_common):
         ###
 
         # Add data lanes and control signals
-        IserdesSp6_common.__init__(
+        Sp6Common.__init__(
             self, S, D, MIRROR_BITS,
             {"p_DATA_RATE": "SDR"},
             {"p_DATA_RATE": "SDR"}
@@ -208,7 +206,7 @@ class IserdesSp6_pll(IserdesSp6_common):
 
     def getIOs(self):
         """ add this classes additional IOs to the set """
-        return IserdesSp6_common.getIOs(self) | {
+        return Sp6Common.getIOs(self) | {
             self.clk_data_out, self.pll_locked
         }
 
@@ -217,4 +215,4 @@ if __name__ == "__main__":
     if "build" not in argv:
         print(__doc__)
         exit(-1)
-    genVerilog(IserdesSp6_pll)
+    genVerilog(Sp6PLL)

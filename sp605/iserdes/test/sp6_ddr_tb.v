@@ -1,10 +1,10 @@
 `timescale 1 ns / 1 ps
 
 module IserdesSp6_tb;
-    `include "test/IserdesSp6_tb_common.v"
+    `include "test/sp6_tb_common.v"
     initial
         if ($test$plusargs("vcd")) begin
-            $dumpfile("IserdesSp6_pll.vcd");
+            $dumpfile("sp6_ddr.vcd");
             $dumpvars(5, IserdesSp6_tb);
         end
 
@@ -13,14 +13,13 @@ module IserdesSp6_tb;
     //------------------------------------------------------------------------
     top dut (
         .reset          (reset),
-        .dco_p          (fr_clk),
-        .dco_n          (~fr_clk),
+        .dco_p          (dco_clk_p),
+        .dco_n          (~dco_clk_p),
         // .lvds_data_p    ({out_b_p, out_a_p}),
         // .lvds_data_n    ({~out_b_p, ~out_a_p}),
         .lvds_data_p    (out_a_p),
         .lvds_data_n    (~out_a_p),
         .data_outs      (data_outs),
-        .clk_data_out   (clk_data_out),
         .bitslip        (bitslip),
         .sample_clk     (sample_clk),
         .pd_int_period  (32'd64),
@@ -29,9 +28,5 @@ module IserdesSp6_tb;
         .id_inc         (1'b0),
         .id_dec         (1'b0)
     );
-
-    always @(posedge sample_clk)
-        if ((cc > 150) && (clk_data_out != 8'h0F))
-            pass = 0;
 
 endmodule

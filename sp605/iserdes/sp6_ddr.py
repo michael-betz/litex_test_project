@@ -1,8 +1,7 @@
 """\
  Spartan6 ISERDES receiver for LVDS ADCs
 
- Needs a DDR clock signal, in phase with the data lanes,
- doing one transition for every bit
+ Needs a DDR clock signal, doing one transition for every bit
 
  This is basically a migen mash up of
  * serdes_1_to_n_clk_ddr_s8_diff.v
@@ -17,10 +16,10 @@
 from sys import argv
 from migen import *
 from migen.genlib.cdc import AsyncResetSynchronizer
-from IserdesSp6_common import IserdesSp6_common, genVerilog
+from sp6_common import Sp6Common, genVerilog
 
 
-class IserdesSp6_ddr(IserdesSp6_common):
+class Sp6DDR(Sp6Common):
     def __init__(
         self, S=8, D=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True, **kwargs
     ):
@@ -39,13 +38,13 @@ class IserdesSp6_ddr(IserdesSp6_common):
             Clock is 90 deg shifted to data
             (clock transitions in middle of data-eye)
 
-        See IserdesSp6_common.py for input output ports
+        See Sp6Common.py for input output ports
         """
 
         ###
 
         # Add data lanes and control signals
-        IserdesSp6_common.__init__(
+        Sp6Common.__init__(
             self, S, D, MIRROR_BITS,
             {"p_DATA_RATE": "DDR"},
             {"p_DATA_RATE": "DDR"}
@@ -115,4 +114,4 @@ if __name__ == "__main__":
     if "build" not in argv:
         print(__doc__)
         exit(-1)
-    genVerilog(IserdesSp6_ddr)
+    genVerilog(Sp6DDR)
