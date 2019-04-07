@@ -15,7 +15,7 @@ config: $(TARGET).py
 	iverilog $(SIM_INCLUDES) -o $@ $^
 
 %.vcd: %_tb
-	vvp -N $< +vcd
+	vvp -N $< +vcd +VCD_FILE=$@
 
 %_view: %.vcd %.gtkw
 	gtkwave $^

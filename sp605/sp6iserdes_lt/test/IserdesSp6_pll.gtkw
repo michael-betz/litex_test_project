@@ -1,9 +1,10 @@
 [timestart] 0
 [size] 1596 853
 [pos] -1 -1
-*-20.000000 1305000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-20.000000 1357000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] IserdesSp6_tb.
-[sst_width] 235
+[treeopen] IserdesSp6_tb.dut.
+[sst_width] 252
 [signals_width] 280
 [sst_expanded] 1
 [sst_vpaned_height] 232
@@ -20,13 +21,12 @@ IserdesSp6_tb.out_a_p
 IserdesSp6_tb.out_b_p
 @1401200
 -fake_lanes
-@800201
+@800200
 -dut_outputs
-@29
-IserdesSp6_tb.dut.pll_locked
+@28
 IserdesSp6_tb.sample_clk
 IserdesSp6_tb.bitslip
-@c00023
+@c00022
 IserdesSp6_tb.dut.data_outs[7:0]
 @28
 (0)IserdesSp6_tb.dut.data_outs[7:0]
@@ -37,9 +37,12 @@ IserdesSp6_tb.dut.data_outs[7:0]
 (5)IserdesSp6_tb.dut.data_outs[7:0]
 (6)IserdesSp6_tb.dut.data_outs[7:0]
 (7)IserdesSp6_tb.dut.data_outs[7:0]
-@1401201
+@1401200
 -group_end
-@c00023
+@22
+[color] 2
+IserdesSp6_tb.tp_a[7:0]
+@c00022
 IserdesSp6_tb.dut.clk_data_out[7:0]
 @28
 (0)IserdesSp6_tb.dut.clk_data_out[7:0]
@@ -50,22 +53,18 @@ IserdesSp6_tb.dut.clk_data_out[7:0]
 (5)IserdesSp6_tb.dut.clk_data_out[7:0]
 (6)IserdesSp6_tb.dut.clk_data_out[7:0]
 (7)IserdesSp6_tb.dut.clk_data_out[7:0]
-@1401201
+@1401200
 -group_end
-@1000201
+@1000200
 -dut_outputs
 @c00200
 -idelay_cal
 @28
-IserdesSp6_tb.dut.lvds_data
-IserdesSp6_tb.dut.lvds_data_m
-IserdesSp6_tb.dut.lvds_data_s
-IserdesSp6_tb.dut.ioclock_clk
-IserdesSp6_tb.dut.idelay_rst
 IserdesSp6_tb.dut.IODELAY2.BUSY
-IserdesSp6_tb.dut.idelay_cal_m
-IserdesSp6_tb.dut.idelay_cal_s
-IserdesSp6_tb.dut.initial_tl_done
+IserdesSp6_tb.dut.iserdessp6_pll_idelay_cal_m
+IserdesSp6_tb.dut.iserdessp6_pll_idelay_cal_s
+IserdesSp6_tb.dut.iserdessp6_pll_idelay_rst
+IserdesSp6_tb.dut.iserdessp6_pll_initial_tl_done
 @1401200
 -idelay_cal
 @800200
@@ -79,37 +78,32 @@ IserdesSp6_tb.dut.IODELAY2_2.idelay_val_pe_m_reg[7:0]
 IserdesSp6_tb.dut.IODELAY2_3.idelay_val_pe_m_reg[7:0]
 @1000200
 -idelay_state
-@c00200
+@800201
 -PHASE
-@200
+@201
 -Phase detector outputs
-@28
-IserdesSp6_tb.dut.pdInc
-IserdesSp6_tb.dut.pdValid
-@200
+@29
+IserdesSp6_tb.dut.ISERDES2.VALID
+IserdesSp6_tb.dut.ISERDES2.INCDEC
+@201
 -Integrated phase
-@24
+@25
 [color] 7
 IserdesSp6_tb.dut.pd_int_period[31:0]
-[color] 7
-IserdesSp6_tb.dut.pd_int_cnt[31:0]
-@420
-[color] 7
-IserdesSp6_tb.dut.pd_int_accus[31:0]
+@421
 [color] 3
 IserdesSp6_tb.dut.pd_int_phases[31:0]
-@200
+@201
 -IDELAY controls
-@28
-[color] 1
-IserdesSp6_tb.dut.id_CE
-IserdesSp6_tb.dut.id_INC
-@200
+@29
+IserdesSp6_tb.dut.IODELAY2.CE
+IserdesSp6_tb.dut.IODELAY2.INC
+@201
 -ISERDES sampling
-@28
-IserdesSp6_tb.dut.ISERDES2_2.clk_int
-IserdesSp6_tb.dut.ISERDES2_2.D_IN
-@1401200
+@29
+IserdesSp6_tb.dut.ISERDES2.clk_int
+IserdesSp6_tb.dut.ISERDES2.D_IN
+@1000201
 -PHASE
 [pattern_trace] 1
 [pattern_trace] 0

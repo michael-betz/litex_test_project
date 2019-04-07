@@ -80,7 +80,7 @@ input                   reset ;                 // Reset line
 input                   gclk ;                  // Global clock
 input                   bitslip ;               // Bitslip control line
 input   [1:0]           debug_in ;              // Debug Inputs
-output  [(8*D)-1:0]     data_out ;              // Output data
+output  [(D*S)-1:0]     data_out ;              // Output data
 output  [2*D+6:0]       debug ;                 // Debug bus, 2D+6 = 2 lines per input (from mux and ce) + 7, leave nc if debug not required
 
 wire    [D-1:0]         ddly_m;                 // Master output from IODELAY1
@@ -256,7 +256,7 @@ else begin
         end
         else begin
                 ce_data = all_ce ;
-                inc_data_int <= debug_in[1] ;
+                inc_data_int = debug_in[1] ;
         end
 end
 end
@@ -402,11 +402,10 @@ iserdes_s (
 
 // Assign received data bits to correct place in data word, and invert as necessary using information from the data mask
 
-// for (j = 7 ; j >= (8-S) ; j = j-1)                      // j is for serdes factor
-// begin : loop2
-// assign data_out[((D*(j+S-8))+i)] = mdataout[(8*i)+j] ;
-// end
-assign data_out = mdataout;
+for (j = 7 ; j >= (8-S) ; j = j-1)                      // j is for serdes factor
+begin : loop2
+assign data_out[((D*(j+S-8))+i)] = mdataout[(8*i)+j] ;
+end
 end
 endgenerate
 

@@ -91,7 +91,7 @@ assign iob_data_in_n = rx_clk_in_n ^ RX_SWAP_CLK ;              // Invert clock 
 IODELAY2 #(
         .DATA_RATE              ("SDR"),                        // <SDR>, DDR
         .SIM_TAPDELAY_VALUE     (49),                           // nominal tap delay (sim parameter only)
-        .IDELAY_VALUE           (5),                            // Set to zero if LVDS clk and data are in phase (edge aligned)
+        .IDELAY_VALUE           (0),                            // {0 ... 255}
         .IDELAY2_VALUE          (0),                            // {0 ... 255}
         .ODELAY_VALUE           (0),                            // {0 ... 255}
         .IDELAY_MODE            ("NORMAL"),                     // "NORMAL", "PCI"
@@ -119,7 +119,7 @@ iodelay_m (
 IODELAY2 #(
         .DATA_RATE              ("SDR"),                        // <SDR>, DDR
         .SIM_TAPDELAY_VALUE     (49),                           // nominal tap delay (sim parameter only)
-        .IDELAY_VALUE           (5),                            // Set to zero if LVDS clk and data are in phase (edge aligned)
+        .IDELAY_VALUE           (0),                            // {0 ... 255}
         .IDELAY2_VALUE          (0),                            // {0 ... 255}
         .ODELAY_VALUE           (0),                            // {0 ... 255}
         .IDELAY_MODE            ("NORMAL"),                     // "NORMAL", "PCI"
