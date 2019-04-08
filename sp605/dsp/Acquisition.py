@@ -32,7 +32,7 @@ class Acquisition(Module, AutoCSR):
         if mem is None:
             mem = Memory(16, 12)
         self.specials += mem
-        p1 = mem.get_port(write_capable=True)
+        p1 = mem.get_port(write_capable=True, clock_domain="sample")
         self.specials += p1
         self.comb += p1.dat_w.eq(self.data_in)
         self.submodules.fsm = ClockDomainsRenamer("sample")(FSM())
