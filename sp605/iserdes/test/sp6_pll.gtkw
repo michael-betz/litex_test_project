@@ -1,7 +1,7 @@
 [timestart] 0
 [size] 1596 853
 [pos] -1 -1
-*-20.000000 1357000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-20.000000 2154000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] IserdesSp6_tb.
 [treeopen] IserdesSp6_tb.dut.
 [sst_width] 252
@@ -26,7 +26,8 @@ IserdesSp6_tb.out_b_p
 @28
 IserdesSp6_tb.sample_clk
 IserdesSp6_tb.bitslip
-@c00022
+@c00023
+[color] 3
 IserdesSp6_tb.dut.data_outs[7:0]
 @28
 (0)IserdesSp6_tb.dut.data_outs[7:0]
@@ -37,12 +38,13 @@ IserdesSp6_tb.dut.data_outs[7:0]
 (5)IserdesSp6_tb.dut.data_outs[7:0]
 (6)IserdesSp6_tb.dut.data_outs[7:0]
 (7)IserdesSp6_tb.dut.data_outs[7:0]
-@1401200
+@1401201
 -group_end
 @22
 [color] 2
 IserdesSp6_tb.tp_a[7:0]
 @c00022
+[color] 3
 IserdesSp6_tb.dut.clk_data_out[7:0]
 @28
 (0)IserdesSp6_tb.dut.clk_data_out[7:0]
@@ -57,15 +59,14 @@ IserdesSp6_tb.dut.clk_data_out[7:0]
 -group_end
 @1000200
 -dut_outputs
-@c00200
+@800200
 -idelay_cal
 @28
 IserdesSp6_tb.dut.IODELAY2.BUSY
-IserdesSp6_tb.dut.iserdessp6_pll_idelay_cal_m
-IserdesSp6_tb.dut.iserdessp6_pll_idelay_cal_s
-IserdesSp6_tb.dut.iserdessp6_pll_idelay_rst
-IserdesSp6_tb.dut.iserdessp6_pll_initial_tl_done
-@1401200
+IserdesSp6_tb.dut.sp6pll_initial_tl_done
+IserdesSp6_tb.dut.sp6pll_idelay_cal_m
+IserdesSp6_tb.dut.sp6pll_idelay_cal_s
+@1000200
 -idelay_cal
 @800200
 -idelay_state
@@ -78,32 +79,32 @@ IserdesSp6_tb.dut.IODELAY2_2.idelay_val_pe_m_reg[7:0]
 IserdesSp6_tb.dut.IODELAY2_3.idelay_val_pe_m_reg[7:0]
 @1000200
 -idelay_state
-@800201
+@800200
 -PHASE
-@201
+@200
 -Phase detector outputs
-@29
+@28
 IserdesSp6_tb.dut.ISERDES2.VALID
 IserdesSp6_tb.dut.ISERDES2.INCDEC
-@201
+@200
 -Integrated phase
-@25
+@24
 [color] 7
 IserdesSp6_tb.dut.pd_int_period[31:0]
-@421
+@420
 [color] 3
 IserdesSp6_tb.dut.pd_int_phases[31:0]
-@201
+@200
 -IDELAY controls
-@29
+@28
 IserdesSp6_tb.dut.IODELAY2.CE
 IserdesSp6_tb.dut.IODELAY2.INC
-@201
+@200
 -ISERDES sampling
-@29
+@28
 IserdesSp6_tb.dut.ISERDES2.clk_int
 IserdesSp6_tb.dut.ISERDES2.D_IN
-@1000201
+@1000200
 -PHASE
 [pattern_trace] 1
 [pattern_trace] 0

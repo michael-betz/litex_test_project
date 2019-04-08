@@ -32,7 +32,8 @@ from sp6_common import Sp6Common, genVerilog
 
 class Sp6PLL(Sp6Common):
     def __init__(
-        self, S=8, D=2, M=2, MIRROR_BITS=False, DCO_PERIOD=2.0, **kwargs
+        self, S=8, D=2, M=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True,
+        DCO_PERIOD=2.0, **kwargs
     ):
         """
         Clock and data lanes must be in-phase (edge aligned)
@@ -51,7 +52,6 @@ class Sp6PLL(Sp6Common):
 
         See Sp6Common.py for input output ports
         """
-
         # Data recovered from the clock lane for frame alignment (in case of a divided clock)
         self.clk_data_out = Signal(8)
 
@@ -81,7 +81,7 @@ class Sp6PLL(Sp6Common):
         self.specials += Instance(
             "IODELAY2",
             p_SERDES_MODE="MASTER",
-            p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX",
+            p_IDELAY_TYPE="FIXED" if CLK_EDGE_ALIGNED else "VARIABLE_FROM_HALF_MAX",
             i_IDATAIN=self.dco,
             i_CAL=self.idelay_cal_m,
             i_CE=0,
@@ -92,9 +92,9 @@ class Sp6PLL(Sp6Common):
         self.specials += Instance(
             "IODELAY2",
             p_SERDES_MODE="SLAVE",
-            p_IDELAY_TYPE="FIXED",
+            p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX" if CLK_EDGE_ALIGNED else "FIXED",
             i_IDATAIN=self.dco,
-            i_CAL=0,
+            i_CAL=self.idelay_cal_s,
             i_CE=0,
             i_INC=0,
             o_DATAOUT=dco_s,
