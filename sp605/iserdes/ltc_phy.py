@@ -119,7 +119,8 @@ class LTCPhy(Sp6PLL, AutoCSR):
         print("DCO_PERIOD:", DCO_PERIOD)
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
         Sp6PLL.__init__(
-            self, S=S, D=D, M=M, MIRROR_BITS=True, DCO_PERIOD=DCO_PERIOD
+            self, S=S, D=D, M=M, MIRROR_BITS=True,
+            DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True
         )
 
         # pads_dco = platform.request("LTC_DCO")

@@ -21,13 +21,13 @@ class Acquisition(Module, AutoCSR):
         self.data_in = Signal(16)   # uint16
         self.trigger = Signal()
         self.busy = Signal()
+        self.clock_domains.sample = ClockDomain()
 
         ###
 
         trig = Signal()
         self.trig_csr = CSR()
         self.trig_level = CSRStorage(16, reset=(1 << 15))
-        self.clock_domains.sample = ClockDomain()
 
         if mem is None:
             mem = Memory(16, 12)

@@ -22,12 +22,12 @@ try `python3 IserdesSp6_pll.py build`
 or `make view`
 """
 
-from sys import path, argv
+from sys import argv
 from migen import *
-from migen.build.xilinx.common import *
-from litex.soc.interconnect.csr import *
+from migen.build.xilinx.common import \
+    xilinx_special_overrides, DifferentialInput
 from migen.genlib.cdc import AsyncResetSynchronizer
-from sp6_common import Sp6Common, genVerilog
+from sp6_common import Sp6Common
 
 
 class Sp6PLL(Sp6Common):
@@ -81,7 +81,7 @@ class Sp6PLL(Sp6Common):
         self.specials += Instance(
             "IODELAY2",
             p_SERDES_MODE="MASTER",
-            p_IDELAY_TYPE="FIXED" if CLK_EDGE_ALIGNED else "VARIABLE_FROM_HALF_MAX",
+            p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX" if CLK_EDGE_ALIGNED else "FIXED",
             i_IDATAIN=self.dco,
             i_CAL=self.idelay_cal_m,
             i_CE=0,
@@ -92,7 +92,7 @@ class Sp6PLL(Sp6Common):
         self.specials += Instance(
             "IODELAY2",
             p_SERDES_MODE="SLAVE",
-            p_IDELAY_TYPE="VARIABLE_FROM_HALF_MAX" if CLK_EDGE_ALIGNED else "FIXED",
+            p_IDELAY_TYPE="FIXED" if CLK_EDGE_ALIGNED else "VARIABLE_FROM_HALF_MAX",
             i_IDATAIN=self.dco,
             i_CAL=self.idelay_cal_s,
             i_CE=0,
@@ -212,7 +212,25 @@ class Sp6PLL(Sp6Common):
 
 
 if __name__ == "__main__":
+    """
+    for simulating with test/sp6_ddr_tb.v in Icarus
+    """
     if "build" not in argv:
         print(__doc__)
         exit(-1)
-    genVerilog(Sp6PLL)
+    from migen.fhdl.verilog import convert
+    f_enc = 125e6
+    S = 8
+    DCO_PERIOD = 1 / (f_enc) * 1e9
+    print("f_enc:", f_enc)
+    print("DCO_PERIOD:", DCO_PERIOD)
+    d = Sp6PLL(S=S, D=1, M=8, MIRROR_BITS=True,
+        DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True
+    )
+    convert(
+        d,
+        ios=d.getIOs(),
+        special_overrides=xilinx_special_overrides,
+        create_clock_domains=False
+    ).write(argv[0].replace(".py", ".v"))
+

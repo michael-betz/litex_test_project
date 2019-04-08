@@ -15,14 +15,13 @@
 
 from sys import argv
 from migen import *
+from migen.build.xilinx.common import xilinx_special_overrides
 from migen.genlib.cdc import AsyncResetSynchronizer
-from sp6_common import Sp6Common, genVerilog
+from sp6_common import Sp6Common
 
 
 class Sp6DDR(Sp6Common):
-    def __init__(
-        self, S=8, D=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True, **kwargs
-    ):
+    def __init__(self, S=8, D=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True):
         """
         S = serialization factor (bits per frame)
         D = number of parallel lanes
@@ -111,7 +110,18 @@ class Sp6DDR(Sp6Common):
 
 
 if __name__ == "__main__":
+    """
+    for simulating with test/sp6_ddr_tb.v in Icarus
+    """
     if "build" not in argv:
         print(__doc__)
         exit(-1)
-    genVerilog(Sp6DDR)
+    from migen.fhdl.verilog import convert
+    d = Sp6DDR(S=8, D=1, MIRROR_BITS=True, CLK_EDGE_ALIGNED=False)
+    convert(
+        d,
+        ios=d.getIOs(),
+        special_overrides=xilinx_special_overrides,
+        create_clock_domains=False
+    ).write(argv[0].replace(".py", ".v"))
+

@@ -251,27 +251,3 @@ class Sp6Common(Module):
             *self.pd_int_phases,
             *self.data_outs
         }
-
-
-def genVerilog(ClassUnderTest):
-    """
-    for simulating with IserdesSp6_tb.v in Icarus
-    ClassUnderTest = IserdesSp6_{ddr,pll}
-    """
-    from migen.fhdl.verilog import convert
-    f_enc = 125e6
-    S = 8
-    DCO_PERIOD = 1 / (f_enc) * 1e9
-    print("f_enc:", f_enc)
-    print("DCO_PERIOD:", DCO_PERIOD)
-    d = ClassUnderTest(
-        S=S, D=1, M=8, MIRROR_BITS=True,
-        DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=False
-    )
-    convert(
-        d,
-        ios=d.getIOs(),
-        special_overrides=xilinx_special_overrides,
-        create_clock_domains=False
-    ).write(argv[0].replace(".py", ".v"))
-
