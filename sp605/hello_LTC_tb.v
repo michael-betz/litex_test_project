@@ -46,15 +46,14 @@ module hello_LTC_tb;
         end
         repeat (3) @(posedge xtal_clk);
         reset <= 0;
-        #5000
+        #230
         $finish();
     end
-
 
     //------------------------------------------------------------------------
     //  DUT
     //------------------------------------------------------------------------
-    top dut (
+    hello_LTC dut (
         .serial_cts     (1'b0),
         .serial_rts     (1'b0),
         .serial_rx      (1'b0),
@@ -69,6 +68,7 @@ module hello_LTC_tb;
         .LTC_OUT2_a_p   (out_a_p),
         .LTC_OUT2_a_n   (~out_a_p),
         .LTC_OUT2_b_p   (1'b0),
-        .LTC_OUT2_b_n   (1'b1)
+        .LTC_OUT2_b_n   (1'b1),
+        .user_btn       (1'b0)
     );
 endmodule

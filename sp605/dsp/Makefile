@@ -1,6 +1,6 @@
-TARGET = Acquisition
-SRC_V = $(TARGET).v
-include ../rules.mk
+TARGETS = Acquisition
 
 $(TARGET).vcd: $(TARGET).py
 	python3 $< sim
+
+include ../rules.mk

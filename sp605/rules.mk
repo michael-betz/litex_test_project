@@ -1,27 +1,26 @@
 SIM_PATH = /opt/Xilinx/14.7/ISE_DS/ISE/verilog/src
 SIM_INCLUDES = -y $(SIM_PATH)/unisims
 
-all: $(TARGET).vcd
+%.vcd: %_tb
+	vvp -N $< +vcd +VCD_FILE=$@
 
-view: $(TARGET)_view
-
-config: $(TARGET).py
-	python3 $< config
+# -pfileline=1
+%_tb: %_tb.v %.v
+	iverilog $(SIM_INCLUDES) -o $@ $^
 
 %.v: %.py
 	python3 $< build
 
-%_tb: %_tb.v $(SRC_V) $(TARGET:=.v)
-	iverilog $(SIM_INCLUDES) -o $@ $^
-
-%.vcd: %_tb
-	vvp -N $< +vcd +VCD_FILE=$@
+%.bit: %.py
+	python3 $< synth
 
 %_view: %.vcd %.gtkw
 	gtkwave $^
 
+all: $(TARGETS:=.vcd)
+
 clean::
-	rm -rf $(TARGET).vcd $(TARGET).v
+	rm -rf $(TARGETS:=.vcd) $(TARGETS:=.v) $(TARGETS:=_tb)
 	rm -rf tree0_*.svg
 
 help:

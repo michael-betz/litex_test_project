@@ -1,11 +1,19 @@
-TARGET = hello_LTC
-SRC_V = build/gateware/top_synth.v
+TARGETS = hello_LTC
 include rules.mk
 
-# Run a post synthesis simulation with ISE and Icarus
-# ISE generates a bitfile as a side product
-build/gateware/top_synth.v: $(TARGET).py
-	python3 $< build
+# For post synth simulation:
+#  * make synth
+#  * comment the below line
+#  * make
+#  * make hello_LTC_view
+$(TARGETS)_tb: $(SIM_PATH)/glbl.v
+
+synth:
+	python3 $(TARGETS).py synth
+
+config:
+	python3 $(TARGETS).py config
 
 clean::
-	rm -rf build
+	rm -rf build mem.init
+

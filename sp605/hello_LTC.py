@@ -7,7 +7,8 @@ okay, this works, next step: connect to the LVDS FRAME(_P/N)
 signal and measure its frequency, which is sample rate / 2 due to DDR:
 f_frame = f_enc / 2
 
-python3 hello_LTC.py <build / config>
+try:
+ python3 hello_LTC.py <build / synth / config>
 """
 from migen import *
 from migen.genlib.io import DifferentialInput, DifferentialOutput
@@ -21,6 +22,7 @@ from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi, frequency_meter
 from sp605_crg import SP605_CRG
 from sys import argv, exit, path
+from shutil import copyfile
 from dsp.Acquisition import Acquisition
 path.append("iserdes")
 from ltc_phy import LTCPhy
@@ -118,14 +120,30 @@ class HelloLtc(SoCCore, AutoCSR):
 
 
 if __name__ == '__main__':
-    p = sp605.Platform()
-    soc = HelloLtc(p)
     if len(argv) < 2:
         print(__doc__)
         exit(-1)
+    tName = argv[0].replace(".py", "")
+    p = sp605.Platform()
+    soc = HelloLtc(p)
     if "build" in argv:
-        builder = Builder(soc, output_dir="build", csr_csv="build/csr.csv")
-        builder.build()
+        builder = Builder(
+            soc, output_dir="build", csr_csv=None,
+            compile_gateware=False, compile_software=False
+        )
+        builder.build(build_name=tName)
+        # Ugly workaround as I couldn't get vpath to work :(
+        tName += ".v"
+        copyfile("./build/gateware/" + tName, tName)
+        copyfile("./build/gateware/mem.init", "mem.init")
+    if "synth" in argv:
+        builder = Builder(
+            soc, output_dir="build", csr_csv="build/csr.csv",
+            compile_gateware=True, compile_software=True
+        )
+        builder.build(build_name=tName)
+        # Ugly workaround as I couldn't get vpath to work :(
+        copyfile("./build/gateware/" + tName + "_synth.v", tName + ".v")
     if "config" in argv:
         prog = p.create_programmer()
         prog.load_bitstream("build/gateware/top.bit")

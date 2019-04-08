@@ -1,8 +1,10 @@
 vpath %.v test
 vpath %.gtkw test
 
-TARGET = sp6_pll
-# TARGET = sp6_ddr
+TARGETS = sp6_pll sp6_ddr
+TARGET = $(word 1,$(TARGETS))
 
-SRC_V = $(SIM_PATH)/glbl.v
 include ../rules.mk
+
+sp6_pll_tb: $(SIM_PATH)/glbl.v
+sp6_ddr_tb: $(SIM_PATH)/glbl.v
