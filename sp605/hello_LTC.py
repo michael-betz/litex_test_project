@@ -147,4 +147,4 @@ if __name__ == '__main__':
         copyfile("./build/gateware/" + tName + "_synth.v", tName + ".v")
     if "config" in argv:
         prog = p.create_programmer()
-        prog.load_bitstream("build/gateware/top.bit")
+        prog.load_bitstream("build/gateware/{:}.bit".format(tName))

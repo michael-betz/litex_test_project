@@ -94,7 +94,8 @@ class Sp6PLL(Sp6Common):
             p_SERDES_MODE="SLAVE",
             p_IDELAY_TYPE="FIXED" if CLK_EDGE_ALIGNED else "VARIABLE_FROM_HALF_MAX",
             i_IDATAIN=self.dco,
-            i_CAL=self.idelay_cal_s,
+            # We don't want periodic calibration here, would lead to clock glitches
+            i_CAL=self.idelay_cal_m,
             i_CE=0,
             i_INC=0,
             o_DATAOUT=dco_s,
