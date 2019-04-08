@@ -1,11 +1,3 @@
-[timestart] 0
-[size] 1596 853
-[pos] -1 -1
-*-20.000000 1357000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
-[treeopen] IserdesSp6_tb.
-[treeopen] IserdesSp6_tb.dut.
-[treeopen] IserdesSp6_tb.dut.IODELAY2.
-[sst_width] 271
 [signals_width] 357
 [sst_expanded] 1
 [sst_vpaned_height] 274

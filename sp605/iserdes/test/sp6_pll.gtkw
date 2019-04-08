@@ -1,11 +1,3 @@
-[timestart] 0
-[size] 1596 853
-[pos] -1 -1
-*-20.000000 2154000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
-[treeopen] IserdesSp6_tb.
-[treeopen] IserdesSp6_tb.dut.
-[sst_width] 252
-[signals_width] 280
 [sst_expanded] 1
 [sst_vpaned_height] 232
 @420
