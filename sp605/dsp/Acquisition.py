@@ -18,10 +18,9 @@ class Acquisition(Module, AutoCSR):
           * rising edge on self.trigger
           * data_in crossing trig_level
         """
-        self.data_in = Signal(16)   # uint16
+        self.data_in = Signal(16)   # uint16, on `sample` clock domain
         self.trigger = Signal()
         self.busy = Signal()
-        self.clock_domains.sample = ClockDomain()
 
         ###
 

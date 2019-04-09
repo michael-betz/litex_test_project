@@ -1,3 +1,18 @@
+[*]
+[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
+[*] Tue Apr  9 00:21:17 2019
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/iserdes/sp6_pll.vcd"
+[dumpfile_mtime] "Tue Apr  9 00:20:11 2019"
+[dumpfile_size] 5969439
+[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/iserdes/test/sp6_pll.gtkw"
+[timestart] 0
+[size] 1916 1017
+[pos] -1 -1
+*-20.000000 1237000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] IserdesSp6_tb.
+[sst_width] 210
+[signals_width] 263
 [sst_expanded] 1
 [sst_vpaned_height] 232
 @420
@@ -18,7 +33,9 @@ IserdesSp6_tb.out_b_p
 @28
 IserdesSp6_tb.sample_clk
 IserdesSp6_tb.bitslip
-@c00023
+@29
+IserdesSp6_tb.dut.sp6pll_bitslip_initial
+@c00022
 [color] 3
 IserdesSp6_tb.dut.data_outs[7:0]
 @28
@@ -30,7 +47,7 @@ IserdesSp6_tb.dut.data_outs[7:0]
 (5)IserdesSp6_tb.dut.data_outs[7:0]
 (6)IserdesSp6_tb.dut.data_outs[7:0]
 (7)IserdesSp6_tb.dut.data_outs[7:0]
-@1401201
+@1401200
 -group_end
 @22
 [color] 2

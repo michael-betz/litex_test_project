@@ -23,21 +23,19 @@ class LedBlinker(Module):
         """
         for debugging clocks
         toggles output at 1 Hz
+        use ClockDomainsRenamer()!
         """
         self.out = Signal()
 
         ###
 
-        self.clock_domains.cd_led = ClockDomain(reset_less=True)
-        self.comb += self.cd_led.clk.eq(clk_in)
         max_cnt = int(f_clk // 2)
         cntr = Signal(max=max_cnt + 1)
-        self.sync.led += [
-            If(cntr == (max_cnt),
+        self.sync += [
+            cntr.eq(cntr + 1),
+            If(cntr == max_cnt,
                 cntr.eq(0),
                 self.out.eq(~self.out)
-            ).Else(
-                cntr.eq(cntr + 1)
             )
         ]
 
@@ -120,7 +118,8 @@ class LTCPhy(Sp6PLL, AutoCSR):
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
         Sp6PLL.__init__(
             self, S=S, D=D, M=M, MIRROR_BITS=True,
-            DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True
+            DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True,
+            BITSLIPS=2
         )
 
         # pads_dco = platform.request("LTC_DCO")
@@ -174,8 +173,9 @@ class LTCPhy(Sp6PLL, AutoCSR):
         self.submodules.f_sample = frequency_meter.FrequencyMeter(int(100e6))
 
         # Blinkies to see the clocks
-        self.submodules.blinky_frm = LedBlinker(self.dco, f_enc)
-        self.submodules.blinky_smpl = LedBlinker(ClockSignal("sample"), f_enc)
+        self.submodules.blinky_smpl = ClockDomainsRenamer("sample")(
+            LedBlinker(f_enc)
+        )
 
         self.comb += [
             self.f_sample.clk.eq(ClockSignal("sample")),
@@ -192,7 +192,6 @@ class LTCPhy(Sp6PLL, AutoCSR):
             self.reset.eq(ResetSignal("sys")),
             platform.request("user_led").eq(self.reset),
             platform.request("user_led").eq(self.pll_locked),
-            platform.request("user_led").eq(self.blinky_frm.out),
             platform.request("user_led").eq(self.blinky_smpl.out),
             self.idelay_inc_sync.i.eq(self.idelay_inc.re),
             self.idelay_dec_sync.i.eq(self.idelay_dec.re),

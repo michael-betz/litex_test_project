@@ -30,8 +30,8 @@ module IserdesSp6_tb;
         .id_dec         (1'b0)
     );
 
-    initial
-        bitslip_task(3);
+    // initial
+    //     bitslip_task(3);
 
     always @(posedge sample_clk)
         if ((cc > 150) && (clk_data_out != 8'h0F))

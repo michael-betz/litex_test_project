@@ -69,9 +69,11 @@ class HelloLtc(SoCCore, AutoCSR):
         self.submodules.dna = dna.DNA()
 
         # ----------------------------
-        #  FMC LPC connectivity
+        #  FMC LPC connectivity & LTC LVDS driver
         # ----------------------------
         platform.add_extension(LTCPhy.pads)
+        # LTCPhy drives `sample` clock domain
+        self.submodules.lvds = LTCPhy(platform, 800e6 / 7)
 
         # ----------------------------
         #  SPI master
@@ -80,12 +82,7 @@ class HelloLtc(SoCCore, AutoCSR):
         self.submodules.spi = spi.SPIMaster(spi_pads)
 
         # ----------------------------
-        #  LVDS phy
-        # ----------------------------
-        self.submodules.lvds = LTCPhy(platform, 800e6 / 7)
-
-        # ----------------------------
-        #  Shared memory for ADC data
+        #  Acquisition memory for ADC data
         # ----------------------------
         mem = Memory(16, 4096)
         self.specials += mem
@@ -98,7 +95,6 @@ class HelloLtc(SoCCore, AutoCSR):
         self.comb += [
             self.platform.request("user_led").eq(self.acq.busy),
             self.acq.data_in.eq(self.lvds.sample_out),
-            self.acq.sample.clk.eq(self.lvds.sample.clk)
         ]
 
         # ----------------------------

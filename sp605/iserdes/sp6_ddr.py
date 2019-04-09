@@ -21,7 +21,9 @@ from sp6_common import Sp6Common
 
 
 class Sp6DDR(Sp6Common):
-    def __init__(self, S=8, D=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True):
+    def __init__(
+        self, S=8, D=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True, BITSLIPS=0
+    ):
         """
         S = serialization factor (bits per frame)
         D = number of parallel lanes
@@ -37,6 +39,9 @@ class Sp6DDR(Sp6Common):
             Clock is 90 deg shifted to data
             (clock transitions in middle of data-eye)
 
+        BITSLIPS:
+            Number of bitslips to trigger after initialization
+
         See Sp6Common.py for input output ports
         """
 
@@ -44,7 +49,7 @@ class Sp6DDR(Sp6Common):
 
         # Add data lanes and control signals
         Sp6Common.__init__(
-            self, S, D, MIRROR_BITS,
+            self, S, D, MIRROR_BITS, BITSLIPS,
             {"p_DATA_RATE": "DDR"},
             {"p_DATA_RATE": "DDR"}
         )

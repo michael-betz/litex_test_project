@@ -1,6 +1,6 @@
 TARGETS = Acquisition
 
-$(TARGET).vcd: $(TARGET).py
+$(TARGETS).vcd: $(TARGETS).py
 	python3 $< sim
 
 include ../rules.mk

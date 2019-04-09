@@ -7,7 +7,8 @@ from migen.genlib.misc import WaitTimer, timeline
 
 class Sp6Common(Module):
     def __init__(
-        self, S, D, MIRROR_BITS, idelay_overrides={}, iserdes_overrides={}
+        self, S, D, MIRROR_BITS, BITSLIPS,
+        idelay_overrides={}, iserdes_overrides={}
     ):
         """
         Generates all logic necessary for the data lanes, calibration
@@ -48,7 +49,7 @@ class Sp6Common(Module):
         ###
 
         # Common internal signals which must be driven by child
-        self.clock_domains.sample = ClockDomain()   # ADC sample clock
+        self.clock_domains.sample = ClockDomain("sample")   # ADC sample clock
         self.ioclk_p = Signal()
         self.ioclk_n = Signal()
         self.serdesstrobe = Signal()
@@ -61,20 +62,26 @@ class Sp6Common(Module):
         self.idelay_cal_s = Signal()
         # High when IDELAY initialization complete
         self.initial_tl_done = Signal()
+        bitslip_initial = Signal()
         self.sync.sample += [
             self.idelay_cal_m.eq(0),
             self.idelay_cal_s.eq(0),
-            self.idelay_rst.eq(0)
+            self.idelay_rst.eq(0),
+            bitslip_initial.eq(0)
         ]
         # Initially calibrate and reset all IDELAY2s
-        self.sync.sample += timeline(
-            ~self.initial_tl_done,
-            [
-                (20, [self.idelay_cal_m.eq(1), self.idelay_cal_s.eq(1)]),
-                (40, [self.idelay_rst.eq(1)]),
-                (60, [self.initial_tl_done.eq(1)])
-            ]
-        )
+        tl = [
+            (20, [self.idelay_cal_m.eq(1), self.idelay_cal_s.eq(1)]),
+            (40, [self.idelay_rst.eq(1)]),
+            (60, [self.initial_tl_done.eq(1)]),
+            # Add initial bitslips starting from clk 100. Have I gone too far?
+            *zip(
+                [100 + i * 10 for i in range(BITSLIPS)],
+                [[bitslip_initial.eq(1)]] * BITSLIPS
+            )
+        ]
+        # print(tl)
+        self.sync.sample += timeline(~self.initial_tl_done, tl)
         # Periodically re-calibrate all slave IDELAY2s
         self.sync.sample += timeline(
             self.initial_tl_done,
@@ -123,7 +130,7 @@ class Sp6Common(Module):
             "i_IOCE": self.serdesstrobe,
             "i_RST": ~self.initial_tl_done,
             "i_CLKDIV": ClockSignal("sample"),
-            "i_BITSLIP": self.bitslip
+            "i_BITSLIP": self.bitslip | bitslip_initial
         }
         self.iserdes_default.update(iserdes_overrides)
 

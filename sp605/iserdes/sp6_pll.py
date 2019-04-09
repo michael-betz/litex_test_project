@@ -33,7 +33,7 @@ from sp6_common import Sp6Common
 class Sp6PLL(Sp6Common):
     def __init__(
         self, S=8, D=2, M=2, MIRROR_BITS=False, CLK_EDGE_ALIGNED=True,
-        DCO_PERIOD=2.0, **kwargs
+        BITSLIPS=0, DCO_PERIOD=2.0, **kwargs
     ):
         """
         Clock and data lanes must be in-phase (edge aligned)
@@ -43,6 +43,9 @@ class Sp6PLL(Sp6Common):
 
         M = clock multiplier (bits per DCO period)
             1 for sdr, 2 for ddr, higher for a divided clock
+
+        BITSLIPS:
+            Number of bitslips to trigger after initialization
 
         DCO_PERIOD = period of dco_p/n in [ns] for PLL_ADV
 
@@ -62,7 +65,7 @@ class Sp6PLL(Sp6Common):
 
         # Add data lanes and control signals
         Sp6Common.__init__(
-            self, S, D, MIRROR_BITS,
+            self, S, D, MIRROR_BITS, BITSLIPS,
             {"p_DATA_RATE": "SDR"},
             {"p_DATA_RATE": "SDR"}
         )
@@ -226,7 +229,8 @@ if __name__ == "__main__":
     print("f_enc:", f_enc)
     print("DCO_PERIOD:", DCO_PERIOD)
     d = Sp6PLL(S=S, D=1, M=8, MIRROR_BITS=True,
-        DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True
+        DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True,
+        BITSLIPS=3
     )
     convert(
         d,
