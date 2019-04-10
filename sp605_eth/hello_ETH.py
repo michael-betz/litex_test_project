@@ -21,6 +21,7 @@ from shutil import copyfile
 path.append("../sp605")
 path.append("../sp605/iserdes")
 from sp605_crg import SP605_CRG
+from iserdes.ltc_phy import LedBlinker
 
 
 # create our bare bones soc (no cpu, only wishbone 2 serial)
@@ -63,7 +64,7 @@ class BaseSoc(SoCCore):
 
 # Add ethernet support
 class HelloETH(BaseSoc):
-    csr_map = {"ethphy": 20} #, "ethmac": 21}
+    csr_map = {"ethphy": 20}  #, "ethmac": 21}
     csr_map.update(BaseSoc.csr_map)
     # interrupt_map = {"ethmac": 3}
     # interrupt_map.update(BaseSoc.interrupt_map)
@@ -104,6 +105,15 @@ class HelloETH_dbg(HelloETH):
     def __init__(self, **kwargs):
         from litescope import LiteScopeAnalyzer
         HelloETH.__init__(self, **kwargs)
+        p = self.platform
+        self.submodules.blink_rx = ClockDomainsRenamer("eth_rx")(LedBlinker(125e6))
+        self.submodules.blink_tx = ClockDomainsRenamer("eth_tx")(LedBlinker(125e6))
+        self.comb += [
+            p.request("user_led").eq(self.blink_rx.out),
+            p.request("user_led").eq(self.blink_tx.out),
+            p.request("user_led").eq(p.lookup_request("eth").tx_en)
+
+        ]
 
         self.core_icmp_rx_fsm_state = Signal(4)
         self.core_icmp_tx_fsm_state = Signal(4)

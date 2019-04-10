@@ -19,7 +19,7 @@ def myzip(*vals):
 
 
 class LedBlinker(Module):
-    def __init__(self, clk_in, f_clk=100e6):
+    def __init__(self, f_clk=100e6):
         """
         for debugging clocks
         toggles output at 1 Hz
