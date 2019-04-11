@@ -23,18 +23,22 @@ clean::
 	rm -rf $(TARGETS:=.vcd) $(TARGETS:=.v) $(TARGETS:=_tb)
 	rm -rf tree0_*.svg
 
-help:
+help::
 	@echo "all      Run simulation (default)"
 	@echo "view     Show sim. results in gtkwave"
 	@echo "config   Load bitstream into FPGA"
+
 
 #-------
 # xsim
 #-------
 # $(TARGET).vcd: $(TARGET)_tb
 # 	xsim -nolog -R $< -testplusarg vcd
-
 # $(TARGET)_tb: $(TARGET)_tb.v
 # 	xvlog -nolog $(filter %.v,$^)
-# 	#xvhdl -nolog $(filter %.vhd,$^)
 # 	xelab -nolog -L unisims_ver -L secureip $@ glbl -s $@ -timescale 1ns/1ns
+#
+# This worked (once upon a time):
+# xvlog hello_ETH_tb.v ./build/gateware/hello_ETH.v /opt/Xilinx/14.7/ISE_DS/ISE/verilog/src/glbl.v hello_ETH_tb.v
+# xelab -L unisims_ver hello_ETH_tb glbl
+# xsim -R hello_ETH_tb#work.glbl -testplusarg vcd

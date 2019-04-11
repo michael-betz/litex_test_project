@@ -223,6 +223,7 @@ if __name__ == "__main__":
         print(__doc__)
         exit(-1)
     from migen.fhdl.verilog import convert
+    tName = argv[0].replace(".py", "")
     f_enc = 125e6
     S = 8
     DCO_PERIOD = 1 / (f_enc) * 1e9
@@ -236,6 +237,7 @@ if __name__ == "__main__":
         d,
         ios=d.getIOs(),
         special_overrides=xilinx_special_overrides,
-        create_clock_domains=False
+        create_clock_domains=False,
+        name=tName
     ).write(argv[0].replace(".py", ".v"))
 

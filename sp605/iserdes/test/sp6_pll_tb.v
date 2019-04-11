@@ -1,17 +1,17 @@
 `timescale 1 ns / 1 ps
 
-module IserdesSp6_tb;
+module sp6_pll_tb;
     `include "test/sp6_tb_common.v"
     initial
         if ($test$plusargs("vcd")) begin
             $dumpfile("sp6_pll.vcd");
-            $dumpvars(5, IserdesSp6_tb);
+            $dumpvars(5, sp6_pll_tb);
         end
 
     //------------------------------------------------------------------------
     //  DUT
     //------------------------------------------------------------------------
-    top dut (
+    sp6_pll dut (
         .reset          (reset),
         .dco_p          (fr_clk),
         .dco_n          (~fr_clk),

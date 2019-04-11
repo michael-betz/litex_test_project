@@ -1,12 +1,12 @@
 TARGETS = hello_LTC
-include rules.mk
+include ../rules.mk
 
 # For post synth simulation:
 #  * make synth
 #  * comment the below line
 #  * make
 #  * make hello_LTC_view
-$(TARGETS)_tb: $(SIM_PATH)/glbl.v
+SRC_V += $(SIM_PATH)/glbl.v
 
 synth:
 	python3 $(TARGETS).py synth

@@ -122,11 +122,13 @@ if __name__ == "__main__":
         print(__doc__)
         exit(-1)
     from migen.fhdl.verilog import convert
+    tName = argv[0].replace(".py", "")
     d = Sp6DDR(S=8, D=1, MIRROR_BITS=True, CLK_EDGE_ALIGNED=False)
     convert(
         d,
         ios=d.getIOs(),
         special_overrides=xilinx_special_overrides,
-        create_clock_domains=False
-    ).write(argv[0].replace(".py", ".v"))
+        create_clock_domains=False,
+        name=tName
+    ).write(tName + ".v")
 

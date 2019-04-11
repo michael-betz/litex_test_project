@@ -130,8 +130,8 @@ if __name__ == '__main__':
         )
         builder.build(build_name=tName)
         # Ugly workaround as I couldn't get vpath to work :(
-        tName += ".v"
-        copyfile("./build/gateware/" + tName, tName)
+        # tName += ".v"
+        # copyfile("./build/gateware/" + tName, tName)
         copyfile("./build/gateware/mem.init", "mem.init")
     if "synth" in argv:
         builder = Builder(
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         )
         builder.build(build_name=tName)
         # Ugly workaround as I couldn't get vpath to work :(
-        copyfile("./build/gateware/" + tName + "_synth.v", tName + ".v")
+        # copyfile("./build/gateware/" + tName + "_synth.v", tName + ".v")
     if "config" in argv:
         prog = p.create_programmer()
         prog.load_bitstream("build/gateware/{:}.bit".format(tName))
