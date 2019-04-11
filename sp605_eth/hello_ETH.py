@@ -159,16 +159,16 @@ if __name__ == '__main__':
         exit(-1)
     tName = argv[0].replace(".py", "")
     # soc = BaseSoc()
-    soc = HelloETH()
-    # soc = HelloETH_dbg()
+    # soc = HelloETH()
+    soc = HelloETH_dbg()
     vns = None
     if "build" in argv:
         builder = Builder(
             soc, output_dir="build", csr_csv="build/csr.csv",
             compile_gateware=False, compile_software=False
         )
-        vns = builder.build(build_name=tName)
-        copyfile("./build/gateware/mem.init", "mem.init")
+        vns = builder.build(build_name=tName, regular_comb=False)
+        copyfile("./build/gateware/mem_1.init", "mem_1.init")
     if "synth" in argv:
         builder = Builder(
             soc, output_dir="build", csr_csv="build/csr.csv",

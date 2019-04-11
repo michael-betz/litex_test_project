@@ -15,7 +15,9 @@ all: $(TARGET).vcd
 
 basesoc_kc705.v:
 	# -Ob regular_comb False fixes the vvp hang
-	(cd $(LITE_ETH); python3 make.py -t base -s BaseSoC -p kc705 -Ob run False -Ob regular_comb False build-bitstream)
+	(cd $(LITE_ETH);\
+	python3 make.py -t base -s BaseSoC -p kc705\
+		-Ob run False -Ob regular_comb True build-bitstream)
 	cp $(LITE_ETH)/build/$@ .
 	cp $(LITE_ETH)/build/mem_1.init .
 

@@ -15,5 +15,5 @@ config:
 	python3 $(TARGETS).py config
 
 clean::
-	rm -rf build mem.init
+	rm -rf build mem_1.init
 

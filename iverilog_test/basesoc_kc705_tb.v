@@ -21,7 +21,7 @@ module basesoc_kc705_tb;
         $dumpvars(5, basesoc_kc705_tb);
         repeat (3) @(posedge xtal_clk);
         reset <= 0;
-        #2000  // Why does vvp hang ???
+        #10000
         $finish();
     end
 
