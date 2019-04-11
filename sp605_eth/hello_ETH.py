@@ -167,7 +167,9 @@ if __name__ == '__main__':
             soc, output_dir="build", csr_csv="build/csr.csv",
             compile_gateware=False, compile_software=False
         )
-        vns = builder.build(build_name=tName, regular_comb=False)
+        vns = builder.build(
+            build_name=tName, regular_comb=False, blocking_assign=True
+        )
         copyfile("./build/gateware/mem_1.init", "mem_1.init")
     if "synth" in argv:
         builder = Builder(
