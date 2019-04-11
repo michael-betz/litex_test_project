@@ -12,6 +12,7 @@ from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart
+from litex.soc.cores.frequency_meter import FrequencyMeter
 from liteeth.phy import LiteEthPHY
 from liteeth.core import LiteEthUDPIPCore
 from liteeth.common import convert_ip
@@ -26,10 +27,7 @@ from iserdes.ltc_phy import LedBlinker
 
 # create our bare bones soc (no cpu, only wishbone 2 serial)
 class BaseSoc(SoCCore):
-    csr_map = {
-        "dna": 10
-    }
-    csr_map.update(SoCCore.csr_map)
+    csr_map_update(SoCCore.csr_map, ["dna"])
 
     def __init__(self, **kwargs):
         self.platform = sp605.Platform()
@@ -64,8 +62,7 @@ class BaseSoc(SoCCore):
 
 # Add ethernet support
 class HelloETH(BaseSoc):
-    csr_map = {"ethphy": 20}  #, "ethmac": 21}
-    csr_map.update(BaseSoc.csr_map)
+    csr_map_update(SoCCore.csr_map, ["ethphy"])
     # interrupt_map = {"ethmac": 3}
     # interrupt_map.update(BaseSoc.interrupt_map)
     # mem_map = {"ethmac": 0x30000000}  # (shadow @0xb0000000)
@@ -99,8 +96,7 @@ class HelloETH(BaseSoc):
 
 
 class HelloETH_dbg(HelloETH):
-    csr_map = {"analyzer": 30}
-    csr_map.update(HelloETH.csr_map)
+    csr_map_update(SoCCore.csr_map, ["analyzer", "f_tx"])
 
     def __init__(self, **kwargs):
         from litescope import LiteScopeAnalyzer
@@ -108,24 +104,19 @@ class HelloETH_dbg(HelloETH):
         p = self.platform
         self.submodules.blink_rx = ClockDomainsRenamer("eth_rx")(LedBlinker(125e6))
         self.submodules.blink_tx = ClockDomainsRenamer("eth_tx")(LedBlinker(125e6))
+        self.submodules.f_tx = FrequencyMeter(int(100e6))
         self.comb += [
             p.request("user_led").eq(self.blink_rx.out),
             p.request("user_led").eq(self.blink_tx.out),
-            p.request("user_led").eq(p.lookup_request("eth").tx_en)
-
+            self.f_tx.clk.eq(ClockSignal("eth_tx"))
         ]
 
-        self.core_icmp_rx_fsm_state = Signal(4)
-        self.core_icmp_tx_fsm_state = Signal(4)
-        self.core_udp_rx_fsm_state = Signal(4)
-        self.core_udp_tx_fsm_state = Signal(4)
-        self.core_ip_rx_fsm_state = Signal(4)
-        self.core_ip_tx_fsm_state = Signal(4)
-        self.core_arp_rx_fsm_state = Signal(4)
-        self.core_arp_tx_fsm_state = Signal(4)
-        self.core_arp_table_fsm_state = Signal(4)
-
         debug = [
+            p.lookup_request("eth").tx_en,
+            p.lookup_request("eth").tx_er,
+            p.lookup_request("eth").tx_data,
+            p.lookup_request("eth").mdc,
+
             # MAC interface
             self.core.mac.core.sink.valid,
             self.core.mac.core.sink.last,
@@ -154,40 +145,9 @@ class HelloETH_dbg(HelloETH):
             self.core.ip.crossbar.master.sink.ready,
             self.core.ip.crossbar.master.sink.data,
             self.core.ip.crossbar.master.sink.ip_address,
-            self.core.ip.crossbar.master.sink.protocol,
-
-            # State machines
-            self.core_icmp_rx_fsm_state,
-            self.core_icmp_tx_fsm_state,
-
-            self.core_arp_rx_fsm_state,
-            self.core_arp_tx_fsm_state,
-            self.core_arp_table_fsm_state,
-
-            self.core_ip_rx_fsm_state,
-            self.core_ip_tx_fsm_state,
-
-            self.core_udp_rx_fsm_state,
-            self.core_udp_tx_fsm_state
+            self.core.ip.crossbar.master.sink.protocol
         ]
         self.submodules.analyzer = LiteScopeAnalyzer(debug, 4096)
-
-    def do_finalize(self):
-        HelloETH.do_finalize(self)
-        self.comb += [
-            self.core_icmp_rx_fsm_state.eq(self.core.icmp.rx.fsm.state),
-            self.core_icmp_tx_fsm_state.eq(self.core.icmp.tx.fsm.state),
-
-            self.core_arp_rx_fsm_state.eq(self.core.arp.rx.fsm.state),
-            self.core_arp_tx_fsm_state.eq(self.core.arp.tx.fsm.state),
-            self.core_arp_table_fsm_state.eq(self.core.arp.table.fsm.state),
-
-            self.core_ip_rx_fsm_state.eq(self.core.ip.rx.fsm.state),
-            self.core_ip_tx_fsm_state.eq(self.core.ip.tx.fsm.state),
-
-            self.core_udp_rx_fsm_state.eq(self.core.udp.rx.fsm.state),
-            self.core_udp_tx_fsm_state.eq(self.core.udp.tx.fsm.state)
-        ]
 
     def do_exit(self, vns):
         self.analyzer.export_csv(vns, "build/analyzer.csv")
@@ -198,7 +158,9 @@ if __name__ == '__main__':
         print(__doc__)
         exit(-1)
     tName = argv[0].replace(".py", "")
-    soc = HelloETH_dbg()
+    # soc = BaseSoc()
+    soc = HelloETH()
+    # soc = HelloETH_dbg()
     vns = None
     if "build" in argv:
         builder = Builder(

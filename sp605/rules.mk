@@ -1,12 +1,12 @@
 SIM_PATH = /opt/Xilinx/14.7/ISE_DS/ISE/verilog/src
-SIM_INCLUDES = -y $(SIM_PATH)/unisims
+SIM_INCLUDES = -y . -y ./build/gateware -y $(SIM_PATH)/unisims
 
 %.vcd: %_tb
 	vvp -N $< +vcd +VCD_FILE=$@
 
-# -pfileline=1
+#-pfileline=1
 %_tb: %_tb.v %.v
-	iverilog $(SIM_INCLUDES) -o $@ $^
+	iverilog $(SIM_INCLUDES) -o $@ $< $(SRC_V)
 
 %.v: %.py
 	python3 $< build
