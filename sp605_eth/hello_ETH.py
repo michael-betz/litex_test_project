@@ -77,7 +77,9 @@ class HelloETH(BaseSoc):
         self.submodules.ethphy = LiteEthPHY(
             self.platform.request("eth_clocks"),
             self.platform.request("eth"),
-            self.clk_freq
+            self.clk_freq,
+            # avoid huge reset delay in simulation
+            with_hw_init_reset="synth" in argv
         )
         self.submodules.core = LiteEthUDPIPCore(
             self.ethphy, mac_address, convert_ip(ip_address), self.clk_freq

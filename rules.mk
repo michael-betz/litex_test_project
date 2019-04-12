@@ -4,7 +4,7 @@ vpath %.v test
 vpath %.gtkw test
 
 %.vcd: %_tb
-	vvp -N $< +vcd +VCD_FILE=$@
+	vvp -N $< +vcd
 
 #-pfileline=1
 %_tb: %_tb.v %.v

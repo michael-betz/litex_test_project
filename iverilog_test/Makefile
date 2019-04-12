@@ -7,7 +7,7 @@ TARGET = basesoc_kc705
 all: $(TARGET).vcd
 
 %.vcd: %_tb
-	vvp -N $<
+	vvp -N $< +vcd
 
 %_tb: %_tb.v %.v
 	# Add -pfileline=1 for simulation tracing
@@ -17,7 +17,7 @@ basesoc_kc705.v:
 	# -Ob regular_comb False fixes the vvp hang
 	(cd $(LITE_ETH);\
 	python3 make.py -t base -s BaseSoC -p kc705\
-		-Ob run False -Ob regular_comb True build-bitstream)
+		-Ob run False -Ob regular_comb False build-bitstream)
 	cp $(LITE_ETH)/build/$@ .
 	cp $(LITE_ETH)/build/mem_1.init .
 

@@ -1,0 +1,35 @@
+[*]
+[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
+[*] Thu Apr 11 21:51:45 2019
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605_eth/hello_ETH.vcd"
+[dumpfile_mtime] "Thu Apr 11 21:31:38 2019"
+[dumpfile_size] 2270136
+[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605_eth/test/sp605_eth.gtkw"
+[timestart] 0
+[size] 1916 1037
+[pos] -1 -1
+*-20.000000 1934000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] hello_ETH_tb.
+[sst_width] 360
+[signals_width] 245
+[sst_expanded] 1
+[sst_vpaned_height] 307
+@420
+hello_ETH_tb.cc
+@200
+-
+@28
+hello_ETH_tb.eth_clocks_gtx
+@22
+hello_ETH_tb.eth_rx_data[7:0]
+@28
+hello_ETH_tb.eth_rx_dv
+@200
+-
+@22
+hello_ETH_tb.eth_tx_data[7:0]
+@28
+hello_ETH_tb.eth_tx_en
+[pattern_trace] 1
+[pattern_trace] 0
