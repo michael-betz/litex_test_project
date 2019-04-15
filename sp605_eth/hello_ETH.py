@@ -31,9 +31,9 @@ class BaseSoc(SoCCore):
 
     def __init__(self, **kwargs):
         self.platform = sp605.Platform()
-        self.sys_clk_freq = int(100e6)  # 100 MHz, 10 ns
         SoCCore.__init__(
-            self, self.platform, self.sys_clk_freq,
+            # cd_sys should be > 125 MHz for ethernet !!!
+            self, self.platform, int(125e6),
             cpu_type=None,
             csr_data_width=32,
             with_uart=False,
@@ -48,13 +48,13 @@ class BaseSoc(SoCCore):
         # Serial to Wishbone bridge
         self.add_cpu(uart.UARTWishboneBridge(
             self.platform.request("serial"),
-            self.sys_clk_freq,
+            self.clk_freq,
             baudrate=1152000
         ))
         self.add_wb_master(self.cpu.wishbone)
 
         # Clock Reset Generation
-        self.submodules.crg = SP605_CRG(self.platform, self.sys_clk_freq)
+        self.submodules.crg = SP605_CRG(self.platform, self.clk_freq)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
@@ -161,8 +161,8 @@ if __name__ == '__main__':
         exit(-1)
     tName = argv[0].replace(".py", "")
     # soc = BaseSoc()
-    # soc = HelloETH()
-    soc = HelloETH_dbg()
+    soc = HelloETH()
+    # soc = HelloETH_dbg()
     vns = None
     if "build" in argv:
         builder = Builder(
