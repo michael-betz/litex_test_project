@@ -16,7 +16,8 @@ from litex.soc.cores.frequency_meter import FrequencyMeter
 from liteeth.phy import LiteEthPHY
 from liteeth.core import LiteEthUDPIPCore
 from liteeth.common import convert_ip
-# from liteeth.core.mac import LiteEthMAC
+from liteeth.core.mac import LiteEthMAC
+from liteeth.frontend.etherbone import LiteEthEtherbone
 from sys import argv, exit, path
 from shutil import copyfile
 path.append("../sp605")
@@ -62,7 +63,7 @@ class BaseSoc(SoCCore):
 
 # Add ethernet support
 class HelloETH(BaseSoc):
-    csr_map_update(SoCCore.csr_map, ["ethphy"])
+    csr_map_update(SoCCore.csr_map, ["ethphy"])  #, "ethmac"])
     # interrupt_map = {"ethmac": 3}
     # interrupt_map.update(BaseSoc.interrupt_map)
     # mem_map = {"ethmac": 0x30000000}  # (shadow @0xb0000000)
@@ -85,6 +86,7 @@ class HelloETH(BaseSoc):
             self.ethphy, mac_address, convert_ip(ip_address), self.clk_freq
         )
 
+        # MAC = wishbone slave = to let the CPU talk over ethernet
         # self.submodules.ethmac = LiteEthMAC(
         #     phy=self.ethphy, dw=32, interface="wishbone",
         #     endianness="little", with_preamble_crc=False
@@ -95,6 +97,10 @@ class HelloETH(BaseSoc):
         # self.add_memory_region(
         #     "ethmac", self.mem_map["ethmac"] | self.shadow_base, 0x2000
         # )
+
+        # Etherbone = wishbone master = read and write registers remotely
+        self.submodules.etherbone = LiteEthEtherbone(self.core.udp, 1234, mode="master")
+        self.add_wb_master(self.etherbone.wishbone.bus)
 
 
 class HelloETH_dbg(HelloETH):
