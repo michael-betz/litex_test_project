@@ -10,18 +10,17 @@ from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_core import *
-from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart
 from litex.soc.cores.frequency_meter import FrequencyMeter
 from liteeth.phy import LiteEthPHY
 from liteeth.core import LiteEthUDPIPCore
 from liteeth.common import convert_ip
-from liteeth.core.mac import LiteEthMAC
 from liteeth.frontend.etherbone import LiteEthEtherbone
-from sys import argv, exit, path
-from shutil import copyfile
+from sys import argv, path
+path.append("..")
 path.append("../sp605")
 path.append("../sp605/iserdes")
+from common import main
 from sp605_crg import SP605_CRG
 from iserdes.ltc_phy import LedBlinker
 
@@ -31,10 +30,9 @@ class BaseSoc(SoCCore):
     csr_map_update(SoCCore.csr_map, ["dna"])
 
     def __init__(self, **kwargs):
-        self.platform = sp605.Platform()
+        print("hello_ETH BaseSoc: ", kwargs)
         SoCCore.__init__(
-            # cd_sys should be > 125 MHz for ethernet !!!
-            self, self.platform, int(125e6),
+            self,
             cpu_type=None,
             csr_data_width=32,
             with_uart=False,
@@ -162,34 +160,6 @@ class HelloETH_dbg(HelloETH):
 
 
 if __name__ == '__main__':
-    if len(argv) < 2:
-        print(__doc__)
-        exit(-1)
-    tName = argv[0].replace(".py", "")
-    # soc = BaseSoc()
-    soc = HelloETH()
-    # soc = HelloETH_dbg()
-    vns = None
-    if "build" in argv:
-        builder = Builder(
-            soc, output_dir="build", csr_csv="build/csr.csv",
-            compile_gateware=False, compile_software=False
-        )
-        vns = builder.build(
-            build_name=tName, regular_comb=False, blocking_assign=True
-        )
-        copyfile("./build/gateware/mem_1.init", "mem_1.init")
-    if "synth" in argv:
-        builder = Builder(
-            soc, output_dir="build", csr_csv="build/csr.csv",
-            compile_gateware=True, compile_software=True
-        )
-        vns = builder.build(build_name=tName)
-    if "config" in argv:
-        prog = soc.platform.create_programmer()
-        prog.load_bitstream("build/gateware/{:}.bit".format(tName))
-    print(vns)
-    try:
-        soc.do_exit(vns)
-    except:
-        pass
+    # clk_freq should be > 125 MHz for ethernet !!!
+    soc = HelloETH(platform=sp605.Platform(), clk_freq=int(125e6))
+    main(soc, doc=__doc__)

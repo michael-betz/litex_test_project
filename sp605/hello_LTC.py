@@ -11,20 +11,26 @@ try:
  python3 hello_LTC.py <build / synth / config>
 """
 from migen import *
-from migen.genlib.io import DifferentialInput, DifferentialOutput
+from migen.genlib.io import DifferentialOutput
 from migen.genlib.cdc import MultiReg
 from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.wishbone import SRAM
+from liteeth.phy import LiteEthPHY
+from liteeth.core import LiteEthUDPIPCore
+from liteeth.common import convert_ip
+from liteeth.frontend.etherbone import LiteEthEtherbone
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
-from litex.soc.cores import dna, uart, spi, frequency_meter
+from litex.soc.cores import dna, uart, spi
 from sp605_crg import SP605_CRG
 from sys import argv, exit, path
 from shutil import copyfile
 from dsp.Acquisition import Acquisition
+path.append("..")
 path.append("iserdes")
+from common import main
 from ltc_phy import LTCPhy
 
 
@@ -40,9 +46,8 @@ class HelloLtc(SoCCore, AutoCSR):
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
     def __init__(self, platform, **kwargs):
-        sys_clk_freq = int(100e6) # 100 MHz, 10 ns
         SoCCore.__init__(
-            self, platform, sys_clk_freq,
+            self, platform, int(150e6),  # 150 MHz sys clock
             cpu_type=None,
             csr_data_width=32,
             with_uart=False,
@@ -57,13 +62,13 @@ class HelloLtc(SoCCore, AutoCSR):
         # ----------------------------
         self.add_cpu(uart.UARTWishboneBridge(
             platform.request("serial"),
-            sys_clk_freq,
+            self.clk_freq,
             baudrate=1152000
         ))
         self.add_wb_master(self.cpu.wishbone)
 
         # Clock Reset Generation
-        self.submodules.crg = SP605_CRG(platform, sys_clk_freq)
+        self.submodules.crg = SP605_CRG(platform, self.clk_freq)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
@@ -114,33 +119,33 @@ class HelloLtc(SoCCore, AutoCSR):
         self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
 
 
+# Add etherbone support
+class HelloLtcEth(HelloLtc):
+    csr_map_update(SoCCore.csr_map, ["ethphy"])
+
+    def __init__(self, **kwargs):
+        HelloLtc.__init__(self, **kwargs)
+        # ethernet PHY and UDP/IP stack
+        mac_address = 0x01E625688D7C
+        ip_address = "192.168.1.50"
+        self.submodules.ethphy = LiteEthPHY(
+            self.platform.request("eth_clocks"),
+            self.platform.request("eth"),
+            self.clk_freq,
+            # avoid huge reset delay in simulation
+            with_hw_init_reset="synth" in argv
+        )
+        self.submodules.core = LiteEthUDPIPCore(
+            self.ethphy, mac_address, convert_ip(ip_address), self.clk_freq
+        )
+        # Etherbone = wishbone master = read and write registers remotely
+        self.submodules.etherbone = LiteEthEtherbone(
+            self.core.udp, 1234, mode="master"
+        )
+        self.add_wb_master(self.etherbone.wishbone.bus)
 
 
 if __name__ == '__main__':
-    if len(argv) < 2:
-        print(__doc__)
-        exit(-1)
-    tName = argv[0].replace(".py", "")
-    p = sp605.Platform()
-    soc = HelloLtc(p)
-    if "build" in argv:
-        builder = Builder(
-            soc, output_dir="build", csr_csv=None,
-            compile_gateware=False, compile_software=False
-        )
-        builder.build(build_name=tName)
-        # Ugly workaround as I couldn't get vpath to work :(
-        # tName += ".v"
-        # copyfile("./build/gateware/" + tName, tName)
-        copyfile("./build/gateware/mem.init", "mem.init")
-    if "synth" in argv:
-        builder = Builder(
-            soc, output_dir="build", csr_csv="build/csr.csv",
-            compile_gateware=True, compile_software=True
-        )
-        builder.build(build_name=tName)
-        # Ugly workaround as I couldn't get vpath to work :(
-        # copyfile("./build/gateware/" + tName + "_synth.v", tName + ".v")
-    if "config" in argv:
-        prog = p.create_programmer()
-        prog.load_bitstream("build/gateware/{:}.bit".format(tName))
+    # clk_freq should be > 125 MHz for ethernet !!!
+    soc = HelloLtcEth(platform=sp605.Platform(), clk_freq=int(125e6))
+    main(soc, doc=__doc__)
