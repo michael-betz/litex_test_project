@@ -45,9 +45,10 @@ class HelloLtc(SoCCore, AutoCSR):
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
-    def __init__(self, platform, **kwargs):
+    def __init__(self, **kwargs):
+        print("HelloLtc: ", kwargs)
         SoCCore.__init__(
-            self, platform, int(150e6),  # 150 MHz sys clock
+            self,
             cpu_type=None,
             csr_data_width=32,
             with_uart=False,
@@ -55,20 +56,21 @@ class HelloLtc(SoCCore, AutoCSR):
             integrated_rom_size=0,
             integrated_main_ram_size=0,
             integrated_sram_size=0,
-            ident="LTC2175 demonstrator", ident_version=True
+            ident="LTC2175 demonstrator", ident_version=True,
+            **kwargs
         )
         # ----------------------------
         #  Serial to Wishbone bridge
         # ----------------------------
         self.add_cpu(uart.UARTWishboneBridge(
-            platform.request("serial"),
+            self.platform.request("serial"),
             self.clk_freq,
             baudrate=1152000
         ))
         self.add_wb_master(self.cpu.wishbone)
 
         # Clock Reset Generation
-        self.submodules.crg = SP605_CRG(platform, self.clk_freq)
+        self.submodules.crg = SP605_CRG(self.platform, self.clk_freq)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
@@ -76,14 +78,14 @@ class HelloLtc(SoCCore, AutoCSR):
         # ----------------------------
         #  FMC LPC connectivity & LTC LVDS driver
         # ----------------------------
-        platform.add_extension(LTCPhy.pads)
+        self.platform.add_extension(LTCPhy.pads)
         # LTCPhy drives `sample` clock domain
-        self.submodules.lvds = LTCPhy(platform, 800e6 / 7)
+        self.submodules.lvds = LTCPhy(self.platform, 800e6 / 7)
 
         # ----------------------------
         #  SPI master
         # ----------------------------
-        spi_pads = platform.request("LTC_SPI")
+        spi_pads = self.platform.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
 
         # ----------------------------
@@ -115,7 +117,7 @@ class HelloLtc(SoCCore, AutoCSR):
             i_D0=1,
             i_D1=0
         )
-        gpio_pads = platform.request("ENC_CLK")
+        gpio_pads = self.platform.request("ENC_CLK")
         self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
 
 

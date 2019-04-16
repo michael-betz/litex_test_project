@@ -1,0 +1,43 @@
+[*]
+[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
+[*] Tue Apr 16 02:25:51 2019
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/dsp/cordic_test.vcd"
+[dumpfile_mtime] "Tue Apr 16 02:25:47 2019"
+[dumpfile_size] 25067
+[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/dsp/cordic_test.gtkw"
+[timestart] 0
+[size] 1916 1037
+[pos] -1 -1
+*-8.000000 682 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 210
+[signals_width] 177
+[sst_expanded] 1
+[sst_vpaned_height] 307
+@28
+sys_clk
+@420
+xi0[7:0]
+yi0[7:0]
+@8420
+zi0[7:0]
+@20000
+-
+-
+@8420
+xo[7:0]
+@20000
+-
+-
+@8420
+yo[7:0]
+@20000
+-
+-
+@8420
+zo[7:0]
+@20000
+-
+-
+[pattern_trace] 1
+[pattern_trace] 0
