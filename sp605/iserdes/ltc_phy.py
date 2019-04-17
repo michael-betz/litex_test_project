@@ -113,8 +113,7 @@ class LTCPhy(Sp6PLL, AutoCSR):
         M = 8  # 8 DCO ticks during one frame tick
         D = 2
         DCO_PERIOD = 1 / (f_enc) * 1e9
-        print("f_enc:", f_enc)
-        print("DCO_PERIOD:", DCO_PERIOD)
+        print("f_enc:", f_enc, "DCO_PERIOD:", DCO_PERIOD)
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
         Sp6PLL.__init__(
             self, S=S, D=D, M=M, MIRROR_BITS=True,
@@ -169,7 +168,7 @@ class LTCPhy(Sp6PLL, AutoCSR):
         )
         self.specials += MultiReg(self.idelay_mux.storage, self.id_mux)
 
-        # Frequency counter for sample clock
+        # Frequency counter for received sample clock
         self.submodules.f_sample = frequency_meter.FrequencyMeter(int(100e6))
 
         # Blinkies to see the clocks

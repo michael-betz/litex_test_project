@@ -24,7 +24,8 @@ from liteeth.frontend.etherbone import LiteEthEtherbone
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi
-from sp605_crg import SP605_CRG
+from litex.soc.cores.clock import S6PLL
+# from sp605_crg import SP605_CRG
 from sys import argv, exit, path
 from shutil import copyfile
 from dsp.acquisition import Acquisition
@@ -32,6 +33,35 @@ path.append("..")
 path.append("iserdes")
 from common import main
 from ltc_phy import LTCPhy
+
+
+class _CRG(Module):
+    def __init__(self, p, sys_clk_freq, f_sample_tx):
+        # ----------------------------
+        #  Clock and Reset Generation
+        # ----------------------------
+        self.clock_domains.cd_sys = ClockDomain()
+        self.clock_domains.cd_sample_tx = ClockDomain()
+        self.submodules.pll = pll = S6PLL(speedgrade=-3)
+        self.comb += pll.reset.eq(p.request("cpu_reset"))
+        f0 = 1e9 / p.default_clk_period
+        pll.register_clkin(p.request(p.default_clk_name), f0)
+        pll.create_clkout(self.cd_sys, sys_clk_freq)
+        pll.create_clkout(self.cd_sample_tx, f_sample_tx)
+
+        # Provide a ENC clock signal on SMA_GPIO
+        enc_out = Signal()
+        self.specials += Instance(
+            "ODDR2",
+            o_Q=enc_out,
+            i_C0=ClockSignal("sample_tx"),
+            i_C1=~ClockSignal("sample_tx"),
+            i_CE=1,
+            i_D0=1,
+            i_D1=0
+        )
+        gpio_pads = p.request("ENC_CLK")
+        self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
 
 
 # create our soc (no cpu, only wishbone 2 serial)
@@ -59,18 +89,20 @@ class HelloLtc(SoCCore, AutoCSR):
             ident="LTC2175 demonstrator", ident_version=True,
             **kwargs
         )
+        p = self.platform
+        p.add_extension(LTCPhy.pads)
+        f_sample_tx = self.clk_freq
+        self.submodules.crg = _CRG(p, self.clk_freq, f_sample_tx)
+
         # ----------------------------
         #  Serial to Wishbone bridge
         # ----------------------------
         self.add_cpu(uart.UARTWishboneBridge(
-            self.platform.request("serial"),
+            p.request("serial"),
             self.clk_freq,
             baudrate=1152000
         ))
         self.add_wb_master(self.cpu.wishbone)
-
-        # Clock Reset Generation
-        self.submodules.crg = SP605_CRG(self.platform, self.clk_freq)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
@@ -78,14 +110,13 @@ class HelloLtc(SoCCore, AutoCSR):
         # ----------------------------
         #  FMC LPC connectivity & LTC LVDS driver
         # ----------------------------
-        self.platform.add_extension(LTCPhy.pads)
-        # LTCPhy drives `sample` clock domain
-        self.submodules.lvds = LTCPhy(self.platform, 120e6)
+        # LTCPhy will recover ADC clock and drive `sample` clock domain
+        self.submodules.lvds = LTCPhy(p, f_sample_tx)
 
         # ----------------------------
         #  SPI master
         # ----------------------------
-        spi_pads = self.platform.request("LTC_SPI")
+        spi_pads = p.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
 
         # ----------------------------
@@ -97,28 +128,12 @@ class HelloLtc(SoCCore, AutoCSR):
         self.register_mem("sample", 0x50000000, self.sample_ram.bus, 4096)
         self.submodules.acq = Acquisition(mem)
         self.specials += MultiReg(
-            self.platform.request("user_btn"), self.acq.trigger
+            p.request("user_btn"), self.acq.trigger
         )
         self.comb += [
-            self.platform.request("user_led").eq(self.acq.busy),
+            p.request("user_led").eq(self.acq.busy),
             self.acq.data_in.eq(self.lvds.sample_out),
         ]
-
-        # ----------------------------
-        #  Provide a 114 MHz ENC clock signal on SMA_GPIO
-        # ----------------------------
-        enc_out = Signal()
-        self.specials += Instance(
-            "ODDR2",
-            o_Q=enc_out,
-            i_C0=ClockSignal("clk_114"),
-            i_C1=~ClockSignal("clk_114"),
-            i_CE=1,
-            i_D0=1,
-            i_D1=0
-        )
-        gpio_pads = self.platform.request("ENC_CLK")
-        self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
 
 
 # Add etherbone support
@@ -127,12 +142,13 @@ class HelloLtcEth(HelloLtc):
 
     def __init__(self, **kwargs):
         HelloLtc.__init__(self, **kwargs)
+        p = self.platform
         # ethernet PHY and UDP/IP stack
         mac_address = 0x01E625688D7C
         ip_address = "192.168.1.50"
         self.submodules.ethphy = LiteEthPHY(
-            self.platform.request("eth_clocks"),
-            self.platform.request("eth"),
+            p.request("eth_clocks"),
+            p.request("eth"),
             self.clk_freq,
             # avoid huge reset delay in simulation
             with_hw_init_reset="synth" in argv

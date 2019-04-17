@@ -49,7 +49,7 @@ class Sp6Common(Module):
         ###
 
         # Common internal signals which must be driven by child
-        self.clock_domains.sample = ClockDomain("sample")   # ADC sample clock
+        self.clock_domains.sample = ClockDomain("sample")   # received ADC sample clock
         self.ioclk_p = Signal()
         self.ioclk_n = Signal()
         self.serdesstrobe = Signal()

@@ -46,8 +46,7 @@ module hello_LTC_tb;
         end
         repeat (3) @(posedge xtal_clk);
         reset <= 0;
-        // #2000  // Why does vvp hang ???
-        #230
+        #2000
         $finish();
     end
 
