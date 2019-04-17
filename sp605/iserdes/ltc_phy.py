@@ -29,7 +29,7 @@ class LedBlinker(Module):
 
         ###
 
-        max_cnt = int(f_clk // 2)
+        max_cnt = int(f_clk / 2)
         cntr = Signal(max=max_cnt + 1)
         self.sync += [
             cntr.eq(cntr + 1),
@@ -169,7 +169,7 @@ class LTCPhy(Sp6PLL, AutoCSR):
         self.specials += MultiReg(self.idelay_mux.storage, self.id_mux)
 
         # Frequency counter for received sample clock
-        self.submodules.f_sample = frequency_meter.FrequencyMeter(int(100e6))
+        self.submodules.f_sample = frequency_meter.FrequencyMeter(int(f_enc))
 
         # Blinkies to see the clocks
         self.submodules.blinky_smpl = ClockDomainsRenamer("sample")(

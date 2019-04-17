@@ -91,7 +91,7 @@ class HelloLtc(SoCCore, AutoCSR):
         )
         p = self.platform
         p.add_extension(LTCPhy.pads)
-        f_sample_tx = self.clk_freq
+        f_sample_tx = 120e6
         self.submodules.crg = _CRG(p, self.clk_freq, f_sample_tx)
 
         # ----------------------------
@@ -164,6 +164,6 @@ class HelloLtcEth(HelloLtc):
 
 
 if __name__ == '__main__':
-    # clk_freq should be > 125 MHz for ethernet !!!
-    soc = HelloLtcEth(platform=sp605.Platform(), clk_freq=int(150e6))
+    # clk_freq should be >= 125 MHz for ethernet !!!
+    soc = HelloLtcEth(platform=sp605.Platform(), clk_freq=int(125e6))
     main(soc, doc=__doc__)
