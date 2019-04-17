@@ -169,7 +169,7 @@ class LTCPhy(Sp6PLL, AutoCSR):
         self.specials += MultiReg(self.idelay_mux.storage, self.id_mux)
 
         # Frequency counter for received sample clock
-        self.submodules.f_sample = frequency_meter.FrequencyMeter(int(f_enc))
+        self.submodules.f_sample = frequency_meter.FrequencyMeter(int(125e6))
 
         # Blinkies to see the clocks
         self.submodules.blinky_smpl = ClockDomainsRenamer("sample")(
