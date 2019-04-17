@@ -27,7 +27,7 @@ from litex.soc.cores import dna, uart, spi
 from sp605_crg import SP605_CRG
 from sys import argv, exit, path
 from shutil import copyfile
-from dsp.Acquisition import Acquisition
+from dsp.acquisition import Acquisition
 path.append("..")
 path.append("iserdes")
 from common import main
@@ -80,7 +80,7 @@ class HelloLtc(SoCCore, AutoCSR):
         # ----------------------------
         self.platform.add_extension(LTCPhy.pads)
         # LTCPhy drives `sample` clock domain
-        self.submodules.lvds = LTCPhy(self.platform, 800e6 / 7)
+        self.submodules.lvds = LTCPhy(self.platform, 120e6)
 
         # ----------------------------
         #  SPI master
@@ -149,5 +149,5 @@ class HelloLtcEth(HelloLtc):
 
 if __name__ == '__main__':
     # clk_freq should be > 125 MHz for ethernet !!!
-    soc = HelloLtcEth(platform=sp605.Platform(), clk_freq=int(125e6))
+    soc = HelloLtcEth(platform=sp605.Platform(), clk_freq=int(150e6))
     main(soc, doc=__doc__)
