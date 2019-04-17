@@ -11,7 +11,7 @@ try:
  python3 hello_LTC.py <build / synth / config>
 """
 from migen import *
-from migen.genlib.io import DifferentialOutput
+from migen.genlib.io import DifferentialOutput, DifferentialInput
 from migen.genlib.cdc import MultiReg
 from litex.boards.platforms import sp605
 from litex.build.generic_platform import *
@@ -24,7 +24,7 @@ from liteeth.frontend.etherbone import LiteEthEtherbone
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi
-from litex.soc.cores.clock import S6PLL
+from litex.soc.cores.clock import S6DCM
 # from sp605_crg import SP605_CRG
 from sys import argv, exit, path
 from shutil import copyfile
@@ -40,14 +40,21 @@ class _CRG(Module):
         # ----------------------------
         #  Clock and Reset Generation
         # ----------------------------
-        self.clock_domains.cd_sys = ClockDomain()
-        self.clock_domains.cd_sample_tx = ClockDomain()
-        self.submodules.pll = pll = S6PLL(speedgrade=-3)
-        self.comb += pll.reset.eq(p.request("cpu_reset"))
-        f0 = 1e9 / p.default_clk_period
-        pll.register_clkin(p.request(p.default_clk_name), f0)
-        pll.create_clkout(self.cd_sys, sys_clk_freq)
-        pll.create_clkout(self.cd_sample_tx, f_sample_tx)
+        xtal_pads = p.request(p.default_clk_name)
+        xtal = Signal()
+        self.specials += DifferentialInput(xtal_pads.p, xtal_pads.n, xtal)
+        xtal_f = 1e9 / p.default_clk_period
+        rst = p.request("cpu_reset")
+        for cd, f in (
+            ("cd_sys", sys_clk_freq),
+            ("cd_sample_tx", f_sample_tx)
+        ):
+            setattr(self.clock_domains, cd, ClockDomain(cd))
+            dcm = S6DCM(speedgrade=-3)
+            self.comb += dcm.reset.eq(rst)
+            dcm.register_clkin(xtal, xtal_f)
+            dcm.create_clkout(getattr(self, cd), f)
+            self.submodules += dcm
 
         # Provide a ENC clock signal on SMA_GPIO
         enc_out = Signal()
