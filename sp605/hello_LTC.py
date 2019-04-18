@@ -24,7 +24,7 @@ from liteeth.frontend.etherbone import LiteEthEtherbone
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi
-from litex.soc.cores.clock import S6DCM
+from litex.soc.cores.clock import S6PLL
 # from sp605_crg import SP605_CRG
 from sys import argv, exit, path
 from shutil import copyfile
@@ -36,7 +36,7 @@ from ltc_phy import LTCPhy
 
 
 class _CRG(Module):
-    def __init__(self, p, sys_clk_freq, f_sample_tx):
+    def __init__(self, p, sys_clk_freq, f_sample_tx=None):
         # ----------------------------
         #  Clock and Reset Generation
         # ----------------------------
@@ -45,30 +45,30 @@ class _CRG(Module):
         self.specials += DifferentialInput(xtal_pads.p, xtal_pads.n, xtal)
         xtal_f = 1e9 / p.default_clk_period
         rst = p.request("cpu_reset")
-        for cd, f in (
-            ("cd_sys", sys_clk_freq),
-            ("cd_sample_tx", f_sample_tx)
-        ):
+        cds = [("cd_sys", sys_clk_freq)]
+        if f_sample_tx is not None:
+            cds.append(("cd_sample_tx", f_sample_tx))
+        for cd, f in cds:
             setattr(self.clock_domains, cd, ClockDomain(cd))
-            dcm = S6DCM(speedgrade=-3)
-            self.comb += dcm.reset.eq(rst)
-            dcm.register_clkin(xtal, xtal_f)
-            dcm.create_clkout(getattr(self, cd), f)
-            self.submodules += dcm
-
-        # Provide a ENC clock signal on SMA_GPIO
-        enc_out = Signal()
-        self.specials += Instance(
-            "ODDR2",
-            o_Q=enc_out,
-            i_C0=ClockSignal("sample_tx"),
-            i_C1=~ClockSignal("sample_tx"),
-            i_CE=1,
-            i_D0=1,
-            i_D1=0
-        )
-        gpio_pads = p.request("ENC_CLK")
-        self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
+            pll = S6PLL(speedgrade=-3)
+            self.comb += pll.reset.eq(rst)
+            pll.register_clkin(xtal, xtal_f)
+            pll.create_clkout(getattr(self, cd), f)
+            self.submodules += pll
+        if f_sample_tx is not None:
+            # Provide a ENC clock signal on SMA_GPIO
+            enc_out = Signal()
+            self.specials += Instance(
+                "ODDR2",
+                o_Q=enc_out,
+                i_C0=ClockSignal("sample_tx"),
+                i_C1=~ClockSignal("sample_tx"),
+                i_CE=1,
+                i_D0=1,
+                i_D1=0
+            )
+            gpio_pads = p.request("ENC_CLK")
+            self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
 
 
 # create our soc (no cpu, only wishbone 2 serial)

@@ -1,8 +1,12 @@
 from sys import argv, exit
 from litex.soc.integration.builder import Builder
+from litex.soc.tools.remote import RemoteClient
 from os import system
+from struct import pack, unpack
+
 
 def main(soc, doc=''):
+    """ generic main function for litex modules """
     if len(argv) < 2:
         print(doc)
         exit(-1)
@@ -32,3 +36,118 @@ def main(soc, doc=''):
         soc.do_exit(vns)
     except:
         pass
+
+
+#-----------------------
+# litex_server stuff
+#-----------------------
+def getId(r):
+    s = ""
+    for i in range(64):
+        temp = r.read(r.bases.identifier_mem + i * 4)
+        if temp == 0:
+            break
+        s += chr(temp & 0xFF)
+    return s
+
+
+def conLitexServer(csr_csv="build/csr.csv", port=1234):
+    for i in range(32):
+        try:
+            r = RemoteClient(csr_csv=csr_csv, debug=False, port=port + i)
+            r.open()
+            print("Connected to Port", 1234 + i)
+            break
+        except ConnectionRefusedError:
+            r = None
+    if r:
+        print(getId(r))
+    else:
+        print("Could not connect to RemoteClient")
+    return r
+
+
+class LTC_SPI:
+    # config bits
+    OFFLINE = 0  # all pins high-z (reset=1)
+    CS_POLARITY = 3  # active level of chip select (reset=0)
+    CLK_POLARITY = 4  # idle level of clk (reset=0)
+    CLK_PHASE = 5  # first edge after cs assertion to sample data on (reset=0)
+    LSB_FIRST = 6  # LSB is the first bit on the wire (reset=0)
+    HALF_DUPLEX = 7  # 3-wire SPI, in/out on mosi (reset=0)
+    DIV_READ = 16  # SPI read clk divider (reset=0)
+    DIV_WRITE = 24  # f_clk / f_spi_write == div_write + 2
+    # xfer bits
+    CS_MASK = 0  # Active high bit mask of chip selects to assert (reset=0)
+    WRITE_LENGTH = 16  # How many bits to write and ...
+    READ_LENGTH = 24  # when to switch over in half duplex mode
+
+    def __init__(self, r):
+        self.r = r
+        r.regs.spi_config.write(
+            (0xFF << LTC_SPI.DIV_WRITE) |
+            (0xFF << LTC_SPI.DIV_READ)
+        )
+        # 16 bit write transfer (includes read as is 4 wire)
+        r.regs.spi_xfer.write(
+            (0 << LTC_SPI.READ_LENGTH) |
+            (0x10 << LTC_SPI.WRITE_LENGTH) |
+            (0xFFFF << LTC_SPI.CS_MASK)
+        )
+
+    def set_ltc_reg(self, adr, val):
+        word = (0 << 15) | ((adr & 0x7F) << 8) | (val & 0xFF)
+        word <<= 16
+        self.r.regs.spi_mosi_data.write(word)
+        self.r.regs.spi_start.write(1)
+
+    def get_ltc_reg(self, adr):
+        word = (1 << 15) | ((adr & 0x7F) << 8)
+        word <<= 16
+        self.r.regs.spi_mosi_data.write(word)
+        self.r.regs.spi_start.write(1)
+        return self.r.regs.spi_miso_data.read() & 0xFF
+
+    def setTp(self, tpValue):
+        # Test pattern on + value MSB
+        self.set_ltc_reg(3, (1 << 7) | tpValue >> 8)
+        # Test pattern value LSB
+        self.set_ltc_reg(4, tpValue & 0xFF)
+
+
+def myzip(*vals):
+    """
+    interleave elements in a flattened list
+
+    >>> myzip([1,2,3], ['a', 'b', 'c'])
+    [1, 'a', 2, 'b', 3, 'c']
+    """
+    return [i for t in zip(*vals) for i in t]
+
+
+def getInt32(I):
+    """
+    recover sign from twos complement integer
+    >>> getInt32(0xFFFFFFFF)
+    -1
+    """
+    return unpack("i", pack("I", I))[0]
+
+
+def getNyquist(f, fs):
+    """ where does a undersampled tone end up? """
+    f_n = f / fs
+    f_fract = f_n % 1
+    if f_fract <= 0.5:
+        return f_fract * fs
+    else:
+        return (1 - f_fract) * fs
+
+
+def printPd(r):
+    """ read iserdes phase detectors, -1 < val < 1 """
+    integr = r.regs.lvds_pd_period_csr.read()
+    val0 = getInt32(r.regs.lvds_pd_phase_0.read()) / integr
+    val1 = getInt32(r.regs.lvds_pd_phase_1.read()) / integr
+    print("\r{:0.3f}  {:0.3f}          ".format(val0, val1), end="")
+    return val0, val1

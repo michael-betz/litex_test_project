@@ -21,7 +21,7 @@ path.append("..")
 path.append("../sp605")
 path.append("../sp605/iserdes")
 from common import main
-from sp605_crg import SP605_CRG
+from hello_LTC import _CRG
 from iserdes.ltc_phy import LedBlinker
 
 
@@ -53,7 +53,7 @@ class BaseSoc(SoCCore):
         self.add_wb_master(self.cpu.wishbone)
 
         # Clock Reset Generation
-        self.submodules.crg = SP605_CRG(self.platform, self.clk_freq)
+        self.submodules.crg = _CRG(self.platform, self.clk_freq)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
