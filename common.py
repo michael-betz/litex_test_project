@@ -3,6 +3,9 @@ from litex.soc.integration.builder import Builder
 from litex.soc.tools.remote import RemoteClient
 from os import system
 from struct import pack, unpack
+from numpy import *
+from matplotlib.pyplot import *
+from scipy.signal import *
 
 
 def main(soc, doc=''):
@@ -151,3 +154,28 @@ def printPd(r):
     val1 = getInt32(r.regs.lvds_pd_phase_1.read()) / integr
     print("\r{:0.3f}  {:0.3f}          ".format(val0, val1), end="")
     return val0, val1
+
+
+def plotNpz(fNames, labels=None, ax=None, fs=120e6, *args, **kwargs):
+    """
+    plot a .npz dump from scope_app.py
+    args, kwargs are passed to plot()
+    """
+    if ax is None:
+        fig, ax = subplots(figsize=(9, 5))
+    else:
+        fig = gcf()
+    if labels is None:
+        labels = fNames
+    for fName, label in zip(fNames, labels):
+        if fName == "fullscale":
+            d = sin(arange(4095))
+            dat = vstack([d, d])
+        else:
+            dat = load(fName)["dat"]
+        f, Pxx = periodogram(dat, fs, window='hanning', scaling='spectrum', nfft=2**15)
+        plot(f / 1e6, 10*log10(mean(Pxx, 0)) + 3, label=label, *args, **kwargs)
+    ax.legend()
+    ax.set_xlabel("Frequency [MHz]")
+    ax.set_ylabel("[db_fs]")
+    fig.tight_layout()
