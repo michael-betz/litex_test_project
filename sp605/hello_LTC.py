@@ -82,10 +82,11 @@ class HelloLtc(SoCCore, AutoCSR):
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
-    def __init__(self, **kwargs):
+    def __init__(self, clk_freq, sample_tx_freq, **kwargs):
         print("HelloLtc: ", kwargs)
         SoCCore.__init__(
             self,
+            clk_freq=clk_freq,
             cpu_type=None,
             csr_data_width=32,
             with_uart=False,
@@ -98,15 +99,14 @@ class HelloLtc(SoCCore, AutoCSR):
         )
         p = self.platform
         p.add_extension(LTCPhy.pads)
-        f_sample_tx = 120e6
-        self.submodules.crg = _CRG(p, self.clk_freq, f_sample_tx)
+        self.submodules.crg = _CRG(p, clk_freq, sample_tx_freq)
 
         # ----------------------------
         #  Serial to Wishbone bridge
         # ----------------------------
         self.add_cpu(uart.UARTWishboneBridge(
             p.request("serial"),
-            self.clk_freq,
+            clk_freq,
             baudrate=1152000
         ))
         self.add_wb_master(self.cpu.wishbone)
@@ -118,7 +118,7 @@ class HelloLtc(SoCCore, AutoCSR):
         #  FMC LPC connectivity & LTC LVDS driver
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
-        self.submodules.lvds = LTCPhy(p, f_sample_tx)
+        self.submodules.lvds = LTCPhy(p, sample_tx_freq)
 
         # ----------------------------
         #  SPI master
@@ -172,5 +172,9 @@ class HelloLtcEth(HelloLtc):
 
 if __name__ == '__main__':
     # clk_freq should be >= 125 MHz for ethernet !!!
-    soc = HelloLtcEth(platform=sp605.Platform(), clk_freq=int(125e6))
+    soc = HelloLtcEth(
+        platform=sp605.Platform(),
+        clk_freq=int(125e6),
+        sample_tx_freq=int(120e6)
+    )
     main(soc, doc=__doc__)
