@@ -22,8 +22,8 @@
     make menuconfig
     make -j4 uImage LOADADDR=0x00008000
     make zynq-zed.dtb
-    cp arch/arm/boot/uImage ../../BOOT/
-    cp arch/arm/boot/dts/zynq-zed.dtb ../../BOOT/devicetree.dtb
+    cp arch/arm/boot/uImage /media/sdcard/
+    cp arch/arm/boot/dts/zynq-zed.dtb /media/sdcard
 
 # debian rootfs (on host)
     mkdir rootfs
@@ -79,7 +79,7 @@ kernel_addr=0x8000
 kernel_load=load mmc 0 ${kernel_addr} uImage
 
 dtr_addr=0x100
-dtr_load=load mmc 0 ${dtr_addr} devicetree.dtb
+dtr_load=load mmc 0 ${dtr_addr} zynq-zed.dtb
 
 kernel_boot=setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rw rootwait; bootm ${kernel_addr} - ${dtr_addr}
 
