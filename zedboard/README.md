@@ -88,7 +88,7 @@ bootcmd=run kernel_load; run dtr_load; setenv ethaddr 00:0a:35:00:01:87; run ker
 ```
 
 # Load bitfile in linux
-prepare zed_wrapper.bit.bin with bootgen
+prepare `zed_wrapper.bit.bin` with bootgen. Unfortunately needs xilinx SDK. [zynq-mkbootimage](https://github.com/antmicro/zynq-mkbootimage/issues/10) seems to be an -- not quite yet fully implemented -- alternative.
 
 ```bash
     cat zed_wrapper.bif
@@ -98,7 +98,6 @@ all:
         zed_wrapper.bit
 }
 
-    vivado -mode tcl
     bootgen -image zed_wrapper.bif -arch zynq -process_bitstream bin
 ```
 
