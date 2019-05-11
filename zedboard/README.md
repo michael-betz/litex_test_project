@@ -1,4 +1,5 @@
 # Steps to get debian running on zedboard
+mostly based on (https://github.com/PyHDI/zynq-linux).
 
 ```bash
 # Cross compiler
