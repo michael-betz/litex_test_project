@@ -1,4 +1,5 @@
-SIM_PATH = /opt/Xilinx/14.7/ISE_DS/ISE/verilog/src
+# SIM_PATH = /opt/Xilinx/14.7/ISE_DS/ISE/verilog/src
+SIM_PATH = /opt/Xilinx/Vivado/2018.2/data/verilog/src
 SIM_INCLUDES = -y . -y ./build/gateware -y $(SIM_PATH)/unisims
 vpath %.v test
 vpath %.gtkw test
