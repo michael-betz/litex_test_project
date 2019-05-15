@@ -1,11 +1,34 @@
 from sys import argv, exit
 from litex.soc.integration.builder import Builder
-from litex.soc.tools.remote import RemoteClient
+from litex import RemoteClient
 from os import system
 from struct import pack, unpack
 from numpy import *
 from matplotlib.pyplot import *
 from scipy.signal import *
+from migen import *
+
+
+class LedBlinker(Module):
+    def __init__(self, f_clk=100e6):
+        """
+        for debugging clocks
+        toggles output at 1 Hz
+        use ClockDomainsRenamer()!
+        """
+        self.out = Signal()
+
+        ###
+
+        max_cnt = int(f_clk / 2)
+        cntr = Signal(max=max_cnt + 1)
+        self.sync += [
+            cntr.eq(cntr + 1),
+            If(cntr == max_cnt,
+                cntr.eq(0),
+                self.out.eq(~self.out)
+            )
+        ]
 
 
 def main(soc, doc=''):

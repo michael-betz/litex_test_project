@@ -34,6 +34,7 @@ class S7_iserdes(Module):
         # Add data lanes and control signals
         data_nodelay = Signal()
         self.data_delayed = data_delayed = Signal()
+        data_deserialized = Signal(8)
         self.specials += [
             DifferentialInput(self.rx_p, self.rx_n, data_nodelay),
             Instance("IDELAYE2",

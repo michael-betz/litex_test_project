@@ -52,11 +52,11 @@ end
 //------------------------------------------------------------------------
 // verify output data
 //------------------------------------------------------------------------
+wire sample_clk;
 integer cc = 0;
 always @(posedge sample_clk)
     cc <= cc + 1;
 reg bitslip = 0;
-wire sample_clk;
 wire [7:0] data_outs;
 wire [7:0] clk_data_out;
 wire [7:0] tp_a = {TP[15], TP[13], TP[11], TP[9], TP[7], TP[5], TP[3], TP[1]};
