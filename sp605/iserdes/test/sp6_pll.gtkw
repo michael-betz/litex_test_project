@@ -1,119 +1,35 @@
-[*]
-[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
-[*] Tue Apr  9 00:21:17 2019
-[*]
-[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/iserdes/sp6_pll.vcd"
-[dumpfile_mtime] "Tue Apr  9 00:20:11 2019"
-[dumpfile_size] 5969439
-[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/iserdes/test/sp6_pll.gtkw"
+[dumpfile] "sp6_pll.vcd"
 [timestart] 0
-[size] 1916 1017
+[size] 1020 541
 [pos] -1 -1
 *-20.000000 1237000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
-[treeopen] IserdesSp6_tb.
-[sst_width] 210
-[signals_width] 263
+[sst_width] 229
+[signals_width] 294
 [sst_expanded] 1
-[sst_vpaned_height] 232
-@420
-IserdesSp6_tb.cc
-@c00200
--fake_lanes
-@28
-IserdesSp6_tb.dco_clk_p
-IserdesSp6_tb.fr_clk
-[color] 2
-IserdesSp6_tb.out_a_p
-[color] 2
-IserdesSp6_tb.out_b_p
-@1401200
--fake_lanes
-@800200
--dut_outputs
-@28
-IserdesSp6_tb.sample_clk
-IserdesSp6_tb.bitslip
-@29
-IserdesSp6_tb.dut.sp6pll_bitslip_initial
-@c00022
-[color] 3
-IserdesSp6_tb.dut.data_outs[7:0]
-@28
-(0)IserdesSp6_tb.dut.data_outs[7:0]
-(1)IserdesSp6_tb.dut.data_outs[7:0]
-(2)IserdesSp6_tb.dut.data_outs[7:0]
-(3)IserdesSp6_tb.dut.data_outs[7:0]
-(4)IserdesSp6_tb.dut.data_outs[7:0]
-(5)IserdesSp6_tb.dut.data_outs[7:0]
-(6)IserdesSp6_tb.dut.data_outs[7:0]
-(7)IserdesSp6_tb.dut.data_outs[7:0]
-@1401200
--group_end
+[sst_vpaned_height] 110
 @22
-[color] 2
-IserdesSp6_tb.tp_a[7:0]
-@c00022
-[color] 3
-IserdesSp6_tb.dut.clk_data_out[7:0]
+sp6_pll_tb.TP[15:0]
 @28
-(0)IserdesSp6_tb.dut.clk_data_out[7:0]
-(1)IserdesSp6_tb.dut.clk_data_out[7:0]
-(2)IserdesSp6_tb.dut.clk_data_out[7:0]
-(3)IserdesSp6_tb.dut.clk_data_out[7:0]
-(4)IserdesSp6_tb.dut.clk_data_out[7:0]
-(5)IserdesSp6_tb.dut.clk_data_out[7:0]
-(6)IserdesSp6_tb.dut.clk_data_out[7:0]
-(7)IserdesSp6_tb.dut.clk_data_out[7:0]
-@1401200
--group_end
-@1000200
--dut_outputs
-@800200
--idelay_cal
-@28
-IserdesSp6_tb.dut.IODELAY2.BUSY
-IserdesSp6_tb.dut.sp6pll_initial_tl_done
-IserdesSp6_tb.dut.sp6pll_idelay_cal_m
-IserdesSp6_tb.dut.sp6pll_idelay_cal_s
-@1000200
--idelay_cal
-@800200
--idelay_state
-@24
-[color] 6
-IserdesSp6_tb.dut.IODELAY2.max_delay[7:0]
-IserdesSp6_tb.dut.IODELAY2.idelay_val_pe_m_reg[7:0]
-IserdesSp6_tb.dut.IODELAY2_1.idelay_val_pe_m_reg[7:0]
-IserdesSp6_tb.dut.IODELAY2_2.idelay_val_pe_m_reg[7:0]
-IserdesSp6_tb.dut.IODELAY2_3.idelay_val_pe_m_reg[7:0]
-@1000200
--idelay_state
-@800200
--PHASE
-@200
--Phase detector outputs
-@28
-IserdesSp6_tb.dut.ISERDES2.VALID
-IserdesSp6_tb.dut.ISERDES2.INCDEC
-@200
--Integrated phase
-@24
-[color] 7
-IserdesSp6_tb.dut.pd_int_period[31:0]
+sp6_pll_tb.bitslip
 @420
-[color] 3
-IserdesSp6_tb.dut.pd_int_phases[31:0]
-@200
--IDELAY controls
+sp6_pll_tb.cc
+@22
+sp6_pll_tb.clk_data_out[7:0]
+sp6_pll_tb.data_outs[7:0]
 @28
-IserdesSp6_tb.dut.IODELAY2.CE
-IserdesSp6_tb.dut.IODELAY2.INC
-@200
--ISERDES sampling
+sp6_pll_tb.dco_clk_p
+sp6_pll_tb.fr_clk
+sp6_pll_tb.out_a_p
+sp6_pll_tb.out_b_p
+@420
+sp6_pll_tb.pass
 @28
-IserdesSp6_tb.dut.ISERDES2.clk_int
-IserdesSp6_tb.dut.ISERDES2.D_IN
-@1000200
--PHASE
+sp6_pll_tb.reset
+sp6_pll_tb.sample_clk
+sp6_pll_tb.sys_clk
+@22
+sp6_pll_tb.temp[15:0]
+sp6_pll_tb.tp_a[7:0]
+sp6_pll_tb.tp_b[7:0]
 [pattern_trace] 1
 [pattern_trace] 0

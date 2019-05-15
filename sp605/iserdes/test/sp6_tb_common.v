@@ -38,7 +38,7 @@ end
 reg reset = 1;
 integer pass=1;
 initial begin
-    repeat (3) @(posedge sys_clk);
+    repeat (15) @(posedge sys_clk);
     reset <= 0;
     #4000
     if(pass)

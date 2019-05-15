@@ -12,11 +12,18 @@ module s7_iserdes_tb;
     //  DUT
     //------------------------------------------------------------------------
     s7_iserdes dut (
-        .rx_p           (dco_clk_p),
-        .rx_n           (~dco_clk_p),
-        .data_delayed   (),
+        .dco_p          (dco_clk_p),
+        .dco_n          (~dco_clk_p),
+        .lvds_data_p    (out_a_p),
+        .lvds_data_n    (~out_a_p),
         .sys_clk        (sys_clk),
-        .sys_rst        (1'b0)
+        .sys_rst        (reset),
+        .id_inc         (1'b0),
+        .id_dec         (1'b0),
+        .id_value       (),
+        .bitslip        (1'b0),
+        .clk_data       (),
+        .data_outs      ()
     );
 
 endmodule

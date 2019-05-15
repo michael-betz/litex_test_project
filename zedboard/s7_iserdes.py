@@ -1,9 +1,8 @@
 """\
  7-series ISERDES receiver for LVDS ADCs
 
- Needs a DDR clock signal, doing one transition for every bit
-
- Untested so far
+ DCO is a DDR clock signal, doing one transition for every bit.
+ This transition happens when data is stable (90 deg phase shift)
 
  try `python3 s7_iserdes.py build`
  """
@@ -22,55 +21,136 @@ class S7_iserdes(Module):
         D = number of parallel lanes
         """
 
-        self.rx_p = Signal()
-        self.rx_n = Signal()
+        # LVDS DDR bit clock
+        self.dco_p = Signal()
+        self.dco_n = Signal()
 
-        # Control
-        self.delay_rst = Signal()
-        self.delay_inc = Signal()
+        # data (+frame) lanes
+        self.lvds_data_p = Signal(D)
+        self.lvds_data_n = Signal(D)
+
+        self.bitslip = Signal()        # Pulse to rotate
+
+        # Idelay control input (on sys clock domain)
+        # Only the dco_clock is adjustable
+        self.id_inc = Signal()
+        self.id_dec = Signal()
+        self.id_value = Signal(5)
+        # data is sampled in the middle of the eye, when
+        # clk_data is sampled on the edge (appears jittery)
+        self.clk_data = clk_data = Signal(8)
+
+        # parallel data out, S-bit serdes on D-lanes (on sample clock domain)
+        self.data_outs = [Signal(S) for i in range(D)]
 
         ###
 
-        # Add data lanes and control signals
-        data_nodelay = Signal()
-        self.data_delayed = data_delayed = Signal()
-        data_deserialized = Signal(8)
+        self.clock_domains.sample = ClockDomain("sample")   # recovered ADC sample clock
+        self.io_clk = Signal()
+
+        self.iserdes_default = {
+            "p_DATA_WIDTH": S,
+            "p_DATA_RATE": "DDR",
+            "p_SERDES_MODE": "MASTER",
+            "p_INTERFACE_TYPE": "NETWORKING",
+            "p_NUM_CE": 1,
+
+            "i_DDLY": 0,
+            "i_CLK": self.io_clk,
+            "i_CLKB": ~self.io_clk,
+            "i_CLKDIV": ClockSignal("sample"),
+            "i_CE1": 1,
+            "i_CE2": 1,
+            "i_DYNCLKDIVSEL": 0,
+            "i_DYNCLKSEL": 0,
+            "i_RST": ResetSignal("sys"),
+            "i_BITSLIP": self.bitslip,
+        }
+
+        dco = Signal()
+        dco_delay = Signal()
+        id_CE = Signal()
+        self.sync += id_CE.eq(self.id_inc ^ self.id_dec)
         self.specials += [
-            DifferentialInput(self.rx_p, self.rx_n, data_nodelay),
+            DifferentialInput(self.dco_p, self.dco_n, dco),
             Instance("IDELAYE2",
-                p_DELAY_SRC="IDATAIN", p_SIGNAL_PATTERN="DATA",
-                p_CINVCTRL_SEL="FALSE", p_HIGH_PERFORMANCE_MODE="TRUE",
-                p_REFCLK_FREQUENCY=200.0, p_PIPE_SEL="FALSE",
-                p_IDELAY_TYPE="VARIABLE", p_IDELAY_VALUE=0,
+                p_DELAY_SRC="IDATAIN",
+                p_HIGH_PERFORMANCE_MODE="TRUE",
+                p_REFCLK_FREQUENCY=200.0,
+                p_IDELAY_TYPE="VARIABLE",
+                p_IDELAY_VALUE=6,
 
-                i_C=ClockSignal(),
-                i_LD=self.delay_rst,
-                i_CE=self.delay_inc,
-                i_LDPIPEEN=0, i_INC=1,
+                i_C=ClockSignal("sys"),
+                i_LD=ResetSignal("sys"),
+                i_INC=self.id_inc,
+                i_CE=id_CE,
+                i_LDPIPEEN=0,
+                i_CINVCTRL=0,
+                i_CNTVALUEIN=Constant(0, 5),
+                i_DATAIN=0,
+                i_REGRST=0,
+                i_IDATAIN=dco,
 
-                i_IDATAIN=data_nodelay, o_DATAOUT=data_delayed
+                o_DATAOUT=dco_delay,
+                o_CNTVALUEOUT=self.id_value
             ),
             Instance("ISERDESE2",
-                p_DATA_WIDTH=8, p_DATA_RATE="DDR",
-                p_SERDES_MODE="MASTER", p_INTERFACE_TYPE="NETWORKING",
-                p_NUM_CE=1, p_IOBDELAY="IFD",
-
-                i_DDLY=data_delayed,
-                i_CE1=1,
-                i_RST=ResetSignal("sys"),
-                i_CLK=ClockSignal("sys4x"), i_CLKB=~ClockSignal("sys4x"),
-                i_CLKDIV=ClockSignal("sys"),
-                i_BITSLIP=0,
-                o_Q8=data_deserialized[0], o_Q7=data_deserialized[1],
-                o_Q6=data_deserialized[2], o_Q5=data_deserialized[3],
-                o_Q4=data_deserialized[4], o_Q3=data_deserialized[5],
-                o_Q2=data_deserialized[6], o_Q1=data_deserialized[7]
+                **self.iserdes_default,
+                i_D=dco,
+                o_Q1=clk_data[0],
+                o_Q2=clk_data[1],
+                o_Q3=clk_data[2],
+                o_Q4=clk_data[3],
+                o_Q5=clk_data[4],
+                o_Q6=clk_data[5],
+                o_Q7=clk_data[6],
+                o_Q8=clk_data[7]
+            ),
+            Instance("BUFIO",
+                i_I=dco_delay,
+                o_O=self.io_clk
+            ),
+            Instance("BUFR",
+                p_BUFR_DIVIDE=str(S),
+                i_I=dco_delay,
+                i_CE=1,
+                i_CLR=0,
+                o_O=ClockSignal("sample")
             )
         ]
+        for i in range(D):
+            dat = Signal()
+            self.specials += DifferentialInput(
+                self.lvds_data_p[i], self.lvds_data_n[i], dat
+            )
+            self.specials += Instance("ISERDESE2",
+                **self.iserdes_default,
+                i_D=dat,
+                o_Q1=self.data_outs[i][0],
+                o_Q2=self.data_outs[i][1],
+                o_Q3=self.data_outs[i][2],
+                o_Q4=self.data_outs[i][3],
+                o_Q5=self.data_outs[i][4],
+                o_Q6=self.data_outs[i][5],
+                o_Q7=self.data_outs[i][6],
+                o_Q8=self.data_outs[i][7]
+            )
+
 
     def getIOs(self):
         """ for easier interfacing to testbench """
-        return {self.rx_p, self.rx_n, self.data_delayed}
+        return {
+            self.dco_p,
+            self.dco_n,
+            self.lvds_data_p,
+            self.lvds_data_n,
+            self.bitslip,
+            self.id_inc,
+            self.id_dec,
+            self.id_value,
+            self.clk_data,
+            *self.data_outs
+        }
 
 
 if __name__ == "__main__":
