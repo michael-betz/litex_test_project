@@ -6,39 +6,9 @@ from migen.genlib.cdc import MultiReg, PulseSynchronizer
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 from sp6_pll import Sp6PLL
 # from sp6_ddr import Sp6DDR
-
-
-def myzip(*vals):
-    """
-    interleave elements in a flattened list
-
-    >>> myzip([1,2,3], ['a', 'b', 'c'])
-    [1, 'a', 2, 'b', 3, 'c']
-    """
-    return [i for t in zip(*vals) for i in t]
-
-
-class LedBlinker(Module):
-    def __init__(self, f_clk=100e6):
-        """
-        for debugging clocks
-        toggles output at 1 Hz
-        use ClockDomainsRenamer()!
-        """
-        self.out = Signal()
-
-        ###
-
-        max_cnt = int(f_clk / 2)
-        cntr = Signal(max=max_cnt + 1)
-        self.sync += [
-            cntr.eq(cntr + 1),
-            If(cntr == max_cnt,
-                cntr.eq(0),
-                self.out.eq(~self.out)
-            )
-        ]
-
+from sys import path
+path.append("..")
+from common import LedBlinker, myzip
 
 class LTCPhy(Sp6PLL, AutoCSR):
     """

@@ -5,11 +5,12 @@ from litex.soc.cores import frequency_meter
 from migen.genlib.cdc import MultiReg, PulseSynchronizer
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 from sys import path
+from s7_iserdes import S7_iserdes
 path.append("..")
-from common import LedBlinker
+from common import LedBlinker, myzip
 
 
-class LTCPhy(Module, AutoCSR):
+class LTCPhy(S7_iserdes, AutoCSR):
     """
     wire things up to CSRs
     this is done here to keep sp6_* more or less simulate-able
@@ -70,75 +71,55 @@ class LTCPhy(Module, AutoCSR):
 
     def __init__(self, platform, f_enc):
         S = 8
-        M = 8  # 8 DCO ticks during one frame tick
-        D = 2
+        D = 3
         DCO_PERIOD = 1 / (f_enc) * 1e9
         print("f_enc:", f_enc, "DCO_PERIOD:", DCO_PERIOD)
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
-        # Sp6PLL.__init__(
-        #     self, S=S, D=D, M=M, MIRROR_BITS=True,
-        #     DCO_PERIOD=DCO_PERIOD, CLK_EDGE_ALIGNED=True,
-        #     BITSLIPS=2
-        # )
+        S7_iserdes.__init__(self, S=S, D=D)
 
-        # pads_dco = platform.request("LTC_DCO")
-        pads_frm = platform.request("LTC_FR")
-        # pads_chx = platform.request("LTC_OUT", 2)
-
-        # CSRs for peeking at clock / data patterns
-        # self.sample_out = Signal(16)
-        # LVDS_B (data_outs[1]) has the LSB and needs to come first!
-        # self.comb += self.sample_out.eq(
-        #     Cat(myzip(self.data_outs[1], self.data_outs[0]))
-        # )
-        # self.data_peek = CSRStatus(16)
-        # self.specials += MultiReg(
-        #     self.sample_out,
-        #     self.data_peek.status
-        # )
-        # self.clk_peek = CSRStatus(8)
-        # self.specials += MultiReg(self.clk_data_out, self.clk_peek.status)
-
-        # CSR for triggering bit-slip
-        # self.bitslip_csr = CSR(1)
-        # self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
-
-        # CSR to read phase detectors
-        # for i, phase_sample in enumerate(self.pd_int_phases):
-        #     pd_phase_x = CSRStatus(32, name="pd_phase_{:d}".format(i))
-        #     self.specials += MultiReg(phase_sample, pd_phase_x.status)
-        #     setattr(self, "pd_phase_{:d}".format(i), pd_phase_x)
-
-        # CSR for setting PD integration cycles
-        # self.pd_period_csr = CSRStorage(32, reset=2**20)
-        # Not sure if MultiReg is really needed here?
-        # self.specials += MultiReg(
-        #     self.pd_period_csr.storage, self.pd_int_period
-        # )
-
-        # CSR for moving a IDELAY2 up / down
-        # self.idelay_auto = CSRStorage(1)
-        # self.idelay_mux = CSRStorage(8)
-        # self.idelay_inc = CSR(1)
-        # self.idelay_dec = CSR(1)
-        # self.submodules.idelay_inc_sync = PulseSynchronizer("sys", "sample")
-        # self.submodules.idelay_dec_sync = PulseSynchronizer("sys", "sample")
-        # self.specials += MultiReg(
-        #     self.idelay_auto.storage, self.id_auto_control
-        # )
-        # self.specials += MultiReg(self.idelay_mux.storage, self.id_mux)
-
-        # Frequency counter / blinkie for received sample clock
-        self.submodules.f_frame = frequency_meter.FrequencyMeter(int(125e6))
-        self.specials += DifferentialInput(
-            pads_frm.p, pads_frm.n, self.f_frame.clk
-        )
-        # Blinkies to see the clocks
-        self.clock_domains.frame = ClockDomain("frame")
-        self.submodules.blinky_frame = ClockDomainsRenamer("frame")(
-            LedBlinker(f_enc)
-        )
+        pads_dco = platform.request("LTC_DCO")
         self.comb += [
-            ClockSignal("frame").eq(self.f_frame.clk),
-            platform.request("user_led").eq(self.blinky_frame.out)
+            self.dco_p.eq(pads_dco.p),
+            self.dco_n.eq(pads_dco.n)
+        ]
+
+        pads_out = platform.request("LTC_OUT", 0)
+        pads_frm = platform.request("LTC_FR")
+        self.comb += [
+            self.lvds_data_p.eq(Cat(pads_out.a_p, pads_out.b_p, pads_frm.p)),
+            self.lvds_data_n.eq(Cat(pads_out.a_n, pads_out.b_n, pads_frm.n))
+        ]
+
+        # CSRs for peeking at data pattern
+        self.sample_out = Signal(S * 2)
+        # LVDS_B (data_outs[1]) has the LSB and needs to come first!
+        self.comb += self.sample_out.eq(
+            Cat(myzip(self.data_outs[1], self.data_outs[0]))
+        )
+        self.data_peek = CSRStatus(S * 2)
+        self.specials += MultiReg(
+            self.sample_out,
+            self.data_peek.status
+        )
+
+        # CSRs for peeking at frame pattern
+        self.data_peek = CSRStatus(S)
+        self.specials += MultiReg(
+            self.data_outs[2],
+            self.data_peek.status
+        )
+
+        # CSR for moving a IDELAY2 up / down, doing a bitslip
+        self.idelay_inc = CSR(1)
+        self.idelay_dec = CSR(1)
+        self.idelay_value = CSR(5)
+        self.bitslip_csr = CSR(1)
+        # Bitslip pulse needs to cross clock domains!
+        self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
+        self.comb += [
+            self.id_inc.eq(self.idelay_inc.re),
+            self.id_dec.eq(self.idelay_dec.re),
+            self.idelay_value.w.eq(self.id_value),
+            self.bs_sync.i.eq(self.bitslip_csr.re),
+            self.bitslip.eq(self.bs_sync.o)
         ]

@@ -15,7 +15,7 @@ from migen.genlib.io import DifferentialInput
 
 
 class S7_iserdes(Module):
-    def __init__(self, S=8, D=2):
+    def __init__(self, S=8, D=2, INITIAL_IDELAY=9):
         """
         S = serialization factor (bits per frame)
         D = number of parallel lanes
@@ -29,16 +29,13 @@ class S7_iserdes(Module):
         self.lvds_data_p = Signal(D)
         self.lvds_data_n = Signal(D)
 
-        self.bitslip = Signal()        # Pulse to rotate
+        self.bitslip = Signal()  # Pulse to rotate (sample clock domain)
 
         # Idelay control input (on sys clock domain)
         # Only the dco_clock is adjustable
         self.id_inc = Signal()
         self.id_dec = Signal()
         self.id_value = Signal(5)
-        # data is sampled in the middle of the eye, when
-        # clk_data is sampled on the edge (appears jittery)
-        self.clk_data = clk_data = Signal(8)
 
         # parallel data out, S-bit serdes on D-lanes (on sample clock domain)
         self.data_outs = [Signal(S) for i in range(D)]
@@ -54,6 +51,7 @@ class S7_iserdes(Module):
             "p_SERDES_MODE": "MASTER",
             "p_INTERFACE_TYPE": "NETWORKING",
             "p_NUM_CE": 1,
+            "p_IOBDELAY": "NONE",
 
             "i_DDLY": 0,
             "i_CLK": self.io_clk,
@@ -64,13 +62,14 @@ class S7_iserdes(Module):
             "i_DYNCLKDIVSEL": 0,
             "i_DYNCLKSEL": 0,
             "i_RST": ResetSignal("sys"),
-            "i_BITSLIP": self.bitslip,
+            "i_BITSLIP": self.bitslip
         }
 
         dco = Signal()
         dco_delay = Signal()
+        dco_delay_2 = Signal()
         id_CE = Signal()
-        self.sync += id_CE.eq(self.id_inc ^ self.id_dec)
+        self.comb += id_CE.eq(self.id_inc ^ self.id_dec)
         self.specials += [
             DifferentialInput(self.dco_p, self.dco_n, dco),
             Instance("IDELAYE2",
@@ -78,7 +77,7 @@ class S7_iserdes(Module):
                 p_HIGH_PERFORMANCE_MODE="TRUE",
                 p_REFCLK_FREQUENCY=200.0,
                 p_IDELAY_TYPE="VARIABLE",
-                p_IDELAY_VALUE=6,
+                p_IDELAY_VALUE=INITIAL_IDELAY,
 
                 i_C=ClockSignal("sys"),
                 i_LD=ResetSignal("sys"),
@@ -94,18 +93,10 @@ class S7_iserdes(Module):
                 o_DATAOUT=dco_delay,
                 o_CNTVALUEOUT=self.id_value
             ),
-            Instance("ISERDESE2",
-                **self.iserdes_default,
-                i_D=dco,
-                o_Q1=clk_data[0],
-                o_Q2=clk_data[1],
-                o_Q3=clk_data[2],
-                o_Q4=clk_data[3],
-                o_Q5=clk_data[4],
-                o_Q6=clk_data[5],
-                o_Q7=clk_data[6],
-                o_Q8=clk_data[7]
-            ),
+            # Instance("BUFMRCE",
+            #     i_I=dco_delay,
+            #     o_O=dco_delay_2
+            # ),
             Instance("BUFIO",
                 i_I=dco_delay,
                 o_O=self.io_clk
@@ -118,8 +109,10 @@ class S7_iserdes(Module):
                 o_O=ClockSignal("sample")
             )
         ]
+        self.dats = []
         for i in range(D):
             dat = Signal()
+            self.dats.append(dat)
             self.specials += DifferentialInput(
                 self.lvds_data_p[i], self.lvds_data_n[i], dat
             )
