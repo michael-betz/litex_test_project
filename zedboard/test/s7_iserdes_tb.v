@@ -22,7 +22,6 @@ module s7_iserdes_tb;
         .id_dec         (1'b0),
         .id_value       (),
         .bitslip        (1'b0),
-        .clk_data       (),
         .data_outs      ()
     );
 

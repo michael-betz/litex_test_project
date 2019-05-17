@@ -190,7 +190,6 @@ class S7_iserdes(Module):
             self.id_inc,
             self.id_dec,
             self.id_value,
-            self.clk_data,
             *self.data_outs
         }
 
@@ -204,7 +203,7 @@ if __name__ == "__main__":
         exit(-1)
     from migen.fhdl.verilog import convert
     tName = argv[0].replace(".py", "")
-    d = S7_iserdes(S=8, D=1)
+    d = S7_iserdes(S=8, D=1, clock_regions=[0])
     convert(
         d,
         ios=d.getIOs(),
