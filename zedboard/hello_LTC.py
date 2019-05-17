@@ -20,7 +20,7 @@ from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
 from sys import path
 path.append("..")
-from common import main
+from common import main, ltc_pads
 from ltc_phy import LTCPhy
 
 
@@ -46,12 +46,12 @@ class _CRG(Module):
 # create our soc (no cpu, only wishbone 2 serial)
 class HelloLtc(SoCCore, AutoCSR):
     # Peripherals CSR declaration
-    csr_map = {
-        "dna": 0x0,
-        "spi": 0x8,
-        "lvds": 0x10
-    }
-    csr_map.update(SoCCore.csr_map)
+    csr_peripherals = [
+        "dna",
+        "spi",
+        "lvds"
+    ]
+    csr_map_update(SoCCore.csr_map, csr_peripherals)
 
     def __init__(self, clk_freq, sample_tx_freq, **kwargs):
         print("HelloLtc: ", kwargs)
@@ -69,7 +69,7 @@ class HelloLtc(SoCCore, AutoCSR):
             **kwargs
         )
         p = self.platform
-        p.add_extension(LTCPhy.pads)
+        p.add_extension(ltc_pads)
         self.submodules.crg = _CRG(p, clk_freq)
 
         # ----------------------------
@@ -91,15 +91,15 @@ class HelloLtc(SoCCore, AutoCSR):
         # FPGA identification
         self.submodules.dna = dna.DNA()
 
-        # # ----------------------------
-        # #  FMC LPC connectivity & LTC LVDS driver
-        # # ----------------------------
-        # # LTCPhy will recover ADC clock and drive `sample` clock domain
+        # ----------------------------
+        #  LTC LVDS driver on FMC LPC
+        # ----------------------------
+        # LTCPhy will recover ADC clock and drive `sample` clock domain
         self.submodules.lvds = LTCPhy(p, sample_tx_freq)
 
-        # # ----------------------------
-        # #  SPI master
-        # # ----------------------------
+        # ----------------------------
+        #  SPI master
+        # ----------------------------
         spi_pads = p.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
 

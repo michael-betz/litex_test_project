@@ -31,7 +31,7 @@ from shutil import copyfile
 from dsp.acquisition import Acquisition
 path.append("..")
 path.append("iserdes")
-from common import main
+from common import main, ltc_pads
 from ltc_phy import LTCPhy
 
 
@@ -67,6 +67,16 @@ class _CRG(Module):
                 i_D0=1,
                 i_D1=0
             )
+            p.add_extension(
+                # Connect GPIO_SMA on SP605 with CLK input on 1525A
+                [("ENC_CLK", 0,
+                    Subsignal("p", Pins("SMA_GPIO:P")),
+                    Subsignal("n", Pins("SMA_GPIO:N")),
+                    # Note: the LTC eval board needs to be modded
+                    # to accept a differential clock
+                    IOStandard("LVDS_25")
+                )]
+            )
             gpio_pads = p.request("ENC_CLK")
             self.specials += DifferentialOutput(enc_out, gpio_pads.p, gpio_pads.n)
 
@@ -98,7 +108,6 @@ class HelloLtc(SoCCore, AutoCSR):
             **kwargs
         )
         p = self.platform
-        p.add_extension(LTCPhy.pads)
         self.submodules.crg = _CRG(p, clk_freq, sample_tx_freq)
 
         # ----------------------------
@@ -118,6 +127,7 @@ class HelloLtc(SoCCore, AutoCSR):
         #  FMC LPC connectivity & LTC LVDS driver
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
+        p.add_extension(ltc_pads)
         self.submodules.lvds = LTCPhy(p, sample_tx_freq)
 
         # ----------------------------

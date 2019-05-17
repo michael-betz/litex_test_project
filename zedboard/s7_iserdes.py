@@ -21,7 +21,7 @@ class S7_iserdes(Module):
         S = serialization factor (bits per frame)
         D = number of parallel lanes
         clock_regions:
-            must be list of D elements
+            must be list of D integers
             indicates which clock region the input signal belongs to
             each clock_region will have its own BUFR and BUFIOs, driving the ISERDES's
             example for 3 signals, where the last one is in a separate clock region:

@@ -7,7 +7,62 @@ from numpy import *
 from matplotlib.pyplot import *
 from scipy.signal import *
 from migen import *
+from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 
+
+ltc_pads = [
+    ("LTC_SPI", 0,
+        Subsignal("cs_n", Pins("LPC:LA14_P")),
+        Subsignal("miso", Pins("LPC:LA14_N"), Misc("PULLUP")),
+        Subsignal("mosi", Pins("LPC:LA27_P")),
+        Subsignal("clk",  Pins("LPC:LA27_N")),
+        IOStandard("LVCMOS25")
+    ),
+    ("LTC_OUT", 0,  # Bank 0
+        Subsignal("a_p", Pins("LPC:LA03_P")),
+        Subsignal("a_n", Pins("LPC:LA03_N")),
+        Subsignal("b_p", Pins("LPC:LA08_P")),
+        Subsignal("b_n", Pins("LPC:LA08_N")),
+        IOStandard("LVDS_25"),
+        Misc("DIFF_TERM=TRUE")
+    ),
+    ("LTC_OUT", 1,  # Bank 0
+        Subsignal("a_p", Pins("LPC:LA12_P")),
+        Subsignal("a_n", Pins("LPC:LA12_N")),
+        Subsignal("b_p", Pins("LPC:LA16_P")),
+        Subsignal("b_n", Pins("LPC:LA16_N")),
+        IOStandard("LVDS_25"),
+        Misc("DIFF_TERM=TRUE")
+    ),
+    ("LTC_OUT", 2,  # Bank 2
+        Subsignal("a_p", Pins("LPC:LA22_P")),
+        Subsignal("a_n", Pins("LPC:LA22_N")),
+        Subsignal("b_p", Pins("LPC:LA25_P")),
+        Subsignal("b_n", Pins("LPC:LA25_N")),
+        IOStandard("LVDS_25"),
+        Misc("DIFF_TERM=TRUE")
+    ),
+    ("LTC_OUT", 3,  # Bank 2
+        Subsignal("a_p", Pins("LPC:LA29_P")),
+        Subsignal("a_n", Pins("LPC:LA29_N")),
+        Subsignal("b_p", Pins("LPC:LA31_P")),
+        Subsignal("b_n", Pins("LPC:LA31_N")),
+        IOStandard("LVDS_25"),
+        Misc("DIFF_TERM=TRUE")
+    ),
+    ("LTC_FR", 0,  # Bank 2
+        Subsignal("p", Pins("LPC:LA18_CC_P")),
+        Subsignal("n", Pins("LPC:LA18_CC_N")),
+        IOStandard("LVDS_25"),
+        Misc("DIFF_TERM=TRUE")
+    ),
+    ("LTC_DCO", 0,  # Bank 2
+        Subsignal("p", Pins("LPC:LA17_CC_P")),
+        Subsignal("n", Pins("LPC:LA17_CC_N")),
+        IOStandard("LVDS_25"),
+        Misc("DIFF_TERM=TRUE")
+    )
+]
 
 class LedBlinker(Module):
     def __init__(self, f_clk=100e6):
