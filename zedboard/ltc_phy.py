@@ -70,12 +70,22 @@ class LTCPhy(S7_iserdes, AutoCSR):
     ]
 
     def __init__(self, platform, f_enc):
+        N_CHANNELS = 4
         S = 8
-        D = 3
-        DCO_PERIOD = 1 / (f_enc) * 1e9
-        print("f_enc:", f_enc, "DCO_PERIOD:", DCO_PERIOD)
+        D = N_CHANNELS * 2 + 1
+
+        self.sample_outs = [Signal(S * 2)] * N_CHANNELS
+
+        ###
+
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
-        S7_iserdes.__init__(self, S=S, D=D)
+        S7_iserdes.__init__(
+            self,
+            S=S,
+            D=D,
+            # OUT0_A / _B and OUT1_A / _B are in a different clock region!
+            clock_regions=[0, 0, 0, 0, 1, 1, 1, 1, 1]
+        )
 
         pads_dco = platform.request("LTC_DCO")
         self.comb += [
@@ -83,30 +93,44 @@ class LTCPhy(S7_iserdes, AutoCSR):
             self.dco_n.eq(pads_dco.n)
         ]
 
-        pads_out = platform.request("LTC_OUT", 0)
+        dat_p = []
+        dat_n = []
+        for i in range(N_CHANNELS):  # For each ADC channel
+            pads_out = platform.request("LTC_OUT", i)
+            # Wire up the input pads to the serial serdes inputs
+            dat_p.append(pads_out.a_p)
+            dat_p.append(pads_out.b_p)
+            dat_n.append(pads_out.a_n)
+            dat_n.append(pads_out.b_n)
+            # re-arrange parallel serdes outputs to form samples
+            sample_out = self.sample_outs[i]
+            self.comb += sample_out.eq(
+                Cat(myzip(self.data_outs[2 * i + 1], self.data_outs[2 * i]))
+            )
+            # CSRs for peeking at data patterns
+            # LVDS_B (data_outs[1]) has the LSB and needs to come first!
+            n = 'data_peek{:d}'.format(i)
+            data_peek = CSRStatus(S * 2, name=n)
+            setattr(self, n, data_peek)
+            self.specials += MultiReg(
+                sample_out,
+                data_peek.status
+            )
+
+        # Add frame signal to serial inputs
         pads_frm = platform.request("LTC_FR")
+        dat_p.append(pads_frm.p)
+        dat_n.append(pads_frm.n)
         self.comb += [
-            self.lvds_data_p.eq(Cat(pads_out.a_p, pads_out.b_p, pads_frm.p)),
-            self.lvds_data_n.eq(Cat(pads_out.a_n, pads_out.b_n, pads_frm.n))
+            self.lvds_data_p.eq(Cat(dat_p)),
+            self.lvds_data_n.eq(Cat(dat_n))
         ]
 
-        # CSRs for peeking at data pattern
-        self.sample_out = Signal(S * 2)
-        # LVDS_B (data_outs[1]) has the LSB and needs to come first!
-        self.comb += self.sample_out.eq(
-            Cat(myzip(self.data_outs[1], self.data_outs[0]))
-        )
-        self.data_peek = CSRStatus(S * 2)
+        # CSRs for peeking at parallelized frame pattern
+        self.frame_peek = CSRStatus(S)
         self.specials += MultiReg(
-            self.sample_out,
-            self.data_peek.status
-        )
-
-        # CSRs for peeking at frame pattern
-        self.data_peek = CSRStatus(S)
-        self.specials += MultiReg(
-            self.data_outs[2],
-            self.data_peek.status
+            self.data_outs[-1],
+            self.frame_peek.status
         )
 
         # CSR for moving a IDELAY2 up / down, doing a bitslip
