@@ -23,9 +23,10 @@ from litex.soc.cores import dna, uart, spi
 from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
 from sys import path
+path.append("iserdes")
+from ltc_phy import LTCPhy
 path.append("..")
 from common import main, ltc_pads
-from ltc_phy import LTCPhy
 
 
 class _CRG(Module):
@@ -40,6 +41,7 @@ class _CRG(Module):
         self.submodules.pll = pll = S7MMCM(speedgrade=-2)
         self.comb += pll.reset.eq(platform.request("user_btn_c"))
         pll.register_clkin(platform.request("clk100"), 100e6)
+        # sys_clk is provided by FCLK_CLK0 from PS7
         # pll.create_clkout(self.cd_sys, sys_clk_freq)
         pll.create_clkout(self.cd_clk200, 200e6)
         self.comb += platform.request("user_led").eq(pll.locked)

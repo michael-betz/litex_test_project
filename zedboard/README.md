@@ -100,12 +100,7 @@ bootcmd=run kernel_load; run dtr_load; setenv ethaddr 00:0a:35:00:01:87; run ker
 ```
 
 # Load bitfile in linux
-prepare `zed_wrapper.bit.bin` with bootgen. Unfortunately needs xilinx SDK. [zynq-mkbootimage](https://github.com/antmicro/zynq-mkbootimage/issues/10) seems to be an -- not quite yet fully implemented -- alternative.
-
-Update: this one might do the job, haven't tested it yet:
-[bitstream_fix.py](https://github.com/peteut/migen-axi/blob/master/src/tools/bitstream_fix.py)
-
-Update Update: the above python script works perfectly fine! No need for .bif or to install xilinx SDK!
+prepare `zed_wrapper.bit.bin` with bootgen. Unfortunately needs xilinx SDK.
 
 ```bash
     cat zed_wrapper.bif
@@ -118,7 +113,11 @@ all:
     bootgen -image zed_wrapper.bif -arch zynq -process_bitstream bin
 ```
 
-copy it on the zedboard, then
+[zynq-mkbootimage](https://github.com/antmicro/zynq-mkbootimage/issues/10) seems to be an -- not quite yet fully implemented -- alternative.
+
+Update: this one does the job just fine: [bitstream_fix.py](https://github.com/peteut/migen-axi/blob/master/src/tools/bitstream_fix.py) No need for .bif or to install xilinx SDK!
+
+copy `.bit.bin` on the zedboard, then
 
 ```bash
     sudo -i
@@ -129,6 +128,8 @@ copy it on the zedboard, then
 
 [ 1667.020520] fpga_manager fpga0: writing zed_wrapper.bit.bin to Xilinx Zynq FPGA Manager
 ```
+
+`make upload` automates all these steps.
 
 # how to get `ip/processing_system7_0.xci`
   1. open vivado, new RTL project `zed`, don't add source files, next, next next ..
