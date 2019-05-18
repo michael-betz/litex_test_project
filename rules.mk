@@ -21,17 +21,9 @@ vpath %.gtkw test
 %_view: %.vcd %.gtkw
 	gtkwave $^
 
-all: $(TARGETS:=.vcd)
-
 clean::
 	rm -rf $(TARGETS:=.vcd) $(TARGETS:=.v) $(TARGETS:=_tb)
 	rm -rf tree0_*.svg
-
-help::
-	@echo "all      Run simulation (default)"
-	@echo "view     Show sim. results in gtkwave"
-	@echo "config   Load bitstream into FPGA"
-
 
 #-------
 # xsim

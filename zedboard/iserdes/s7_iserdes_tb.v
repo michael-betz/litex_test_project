@@ -1,7 +1,7 @@
 `timescale 1 ns / 1 ps
 
 module s7_iserdes_tb;
-    `include "../sp605/iserdes/test/sp6_tb_common.v"
+    `include "../../sp605/iserdes/test/sp6_tb_common.v"
     initial
         if ($test$plusargs("vcd")) begin
             $dumpfile("s7_iserdes.vcd");

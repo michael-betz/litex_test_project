@@ -11,7 +11,7 @@ from common import LedBlinker, myzip
 
 
 class LTCPhy(S7_iserdes, AutoCSR):
-    def __init__(self, platform, f_enc):
+    def __init__(self, platform):
         N_CHANNELS = 4
         S = 8
         D = N_CHANNELS * 2 + 1

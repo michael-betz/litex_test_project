@@ -1,11 +1,14 @@
 """
-Trying to communicate with the LTC2175 chip on a
-FMC board trough SPI over UartWishbone Bridge
-... wish me luck :p
+Runs on a Zedboard (Zynq)
 
-okay, this works, next step: connect to the LVDS FRAME(_P/N)
-signal and measure its frequency, which is sample rate / 2 due to DDR:
-f_frame = f_enc / 2
+The Programmable Logic (PL) interfaces to an LTC2175 through 8 LVDS lanes.
+It uses the UARTWishboneBridge and a FTDI cable to make its litex
+CSR's accessible.
+
+The Processing System (PS) runs debian and can re-program the PL with a
+.bit.bin file
+
+So far they don't speak to each other.
 
 try:
  python3 hello_LTC.py <build / synth / config>
@@ -13,7 +16,8 @@ try:
 from migen import *
 from litex.build.generic_platform import *
 from litex.soc.interconnect.csr import *
-from litex.soc.integration.soc_core import *
+# from litex.soc.integration.soc_core import *
+from litex.soc.integration.soc_zynq import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import dna, uart, spi
 from litex.boards.platforms import zedboard
@@ -36,7 +40,7 @@ class _CRG(Module):
         self.submodules.pll = pll = S7MMCM(speedgrade=-2)
         self.comb += pll.reset.eq(platform.request("user_btn_c"))
         pll.register_clkin(platform.request("clk100"), 100e6)
-        pll.create_clkout(self.cd_sys, sys_clk_freq)
+        # pll.create_clkout(self.cd_sys, sys_clk_freq)
         pll.create_clkout(self.cd_clk200, 200e6)
         self.comb += platform.request("user_led").eq(pll.locked)
 
@@ -44,7 +48,7 @@ class _CRG(Module):
 
 
 # create our soc (no cpu, only wishbone 2 serial)
-class HelloLtc(SoCCore, AutoCSR):
+class HelloLtc(SoCZynq, AutoCSR):
     # Peripherals CSR declaration
     csr_peripherals = [
         "dna",
@@ -53,12 +57,13 @@ class HelloLtc(SoCCore, AutoCSR):
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
-    def __init__(self, clk_freq, sample_tx_freq, **kwargs):
+    def __init__(self, clk_freq, **kwargs):
         print("HelloLtc: ", kwargs)
-        SoCCore.__init__(
+        SoCZynq.__init__(
             self,
             clk_freq=clk_freq,
-            cpu_type=None,
+            ps7_name="processing_system7_0",
+            # cpu_type=None,
             csr_data_width=32,
             with_uart=False,
             with_timer=False,
@@ -68,6 +73,9 @@ class HelloLtc(SoCCore, AutoCSR):
             ident="LTC2175 demonstrator", ident_version=True,
             **kwargs
         )
+        self.add_gp0()
+        self.add_axi_to_wishbone(self.axi_gp0, base_address=0x43c00000)
+
         p = self.platform
         p.add_extension(ltc_pads)
         self.submodules.crg = _CRG(p, clk_freq)
@@ -75,6 +83,7 @@ class HelloLtc(SoCCore, AutoCSR):
         # ----------------------------
         #  Serial to Wishbone bridge
         # ----------------------------
+        # connect FTDI cable to PMOD JA1
         p.add_extension([(
             "serial", 0,
             Subsignal("tx", Pins("pmoda:0")),
@@ -95,7 +104,7 @@ class HelloLtc(SoCCore, AutoCSR):
         #  LTC LVDS driver on FMC LPC
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
-        self.submodules.lvds = LTCPhy(p, sample_tx_freq)
+        self.submodules.lvds = LTCPhy(p)
 
         # ----------------------------
         #  SPI master
@@ -122,10 +131,10 @@ class HelloLtc(SoCCore, AutoCSR):
 
 
 if __name__ == '__main__':
-    # clk_freq should be >= 125 MHz for ethernet !!!
     soc = HelloLtc(
         platform=zedboard.Platform(),
-        clk_freq=int(125e6),
-        sample_tx_freq=int(100e6)
+        # Needs to match Vivado IP, Clock Configuration --> PL Fabrick Clocks --> FCLK_CLK0
+        clk_freq=int(100e6)
     )
     main(soc, doc=__doc__)
+    # soc.generate_software_header("csr.h")

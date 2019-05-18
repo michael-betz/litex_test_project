@@ -46,11 +46,11 @@ deb http://deb.debian.org/debian stretch-updates main
     apt install locales dialog
     passwd
     apt upgrade
-    adduser michael
+    adduser <user_name>
     editor=nano visudo
 
-root    ALL=(ALL:ALL) ALL
-michael ALL=(ALL:ALL) ALL
+root        ALL=(ALL:ALL) ALL
+<user_name> ALL=(ALL:ALL) ALL
 
     dpkg-reconfigure locales
 
@@ -61,6 +61,17 @@ C.UTF8
 
 allow-hotplug eth0
 iface eth0 inet dhcp
+
+    nano /etc/hostname
+
+<hostname>
+
+    nano /etc/hosts
+
+127.0.0.1   localhost <hostname>
+::1     localhost ip6-localhost ip6-loopback
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
 
 # Mount fat32 boot partition for kernel updates / uboot config
     mkdir boot
@@ -91,6 +102,11 @@ bootcmd=run kernel_load; run dtr_load; setenv ethaddr 00:0a:35:00:01:87; run ker
 # Load bitfile in linux
 prepare `zed_wrapper.bit.bin` with bootgen. Unfortunately needs xilinx SDK. [zynq-mkbootimage](https://github.com/antmicro/zynq-mkbootimage/issues/10) seems to be an -- not quite yet fully implemented -- alternative.
 
+Update: this one might do the job, haven't tested it yet:
+[bitstream_fix.py](https://github.com/peteut/migen-axi/blob/master/src/tools/bitstream_fix.py)
+
+Update Update: the above python script works perfectly fine! No need for .bif or to install xilinx SDK!
+
 ```bash
     cat zed_wrapper.bif
 
@@ -113,3 +129,10 @@ copy it on the zedboard, then
 
 [ 1667.020520] fpga_manager fpga0: writing zed_wrapper.bit.bin to Xilinx Zynq FPGA Manager
 ```
+
+# how to get `ip/processing_system7_0.xci`
+  1. open vivado, new RTL project `zed`, don't add source files, next, next next ..
+  2. open IP manager, add Zynq Processing system 7 IP
+  3. configure it in GUI, Bank0 / 1 voltage = 2.5 V, clock0 100 MHz
+  4. Save and close
+  5. `zed/zed.srcs/sources_1/ip/processing_system7_0/processing_system7_0.xci`

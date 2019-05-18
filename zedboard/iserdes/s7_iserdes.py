@@ -16,7 +16,7 @@ from migen.genlib.misc import timeline
 
 
 class S7_iserdes(Module):
-    def __init__(self, S=8, D=2, INITIAL_IDELAY=9, clock_regions=[0, 1]):
+    def __init__(self, S=8, D=2, INITIAL_IDELAY=15, clock_regions=[0, 1]):
         """
         S = serialization factor (bits per frame)
         D = number of parallel lanes

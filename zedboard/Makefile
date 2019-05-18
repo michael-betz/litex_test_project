@@ -1,21 +1,16 @@
-vpath %.v test
-vpath %.gtkw test
-TARGETS = s7_iserdes
+vpath %.bit build/gateware/
+vpath %.bit.bin build/gateware/
+TARGETS = hello_LTC
+
+# Upload to the zedboard via scp and program the PL
+upload: $(TARGETS).bit.bin
+	./config_remote.sh $<
+
+%.bit.bin: %.bit
+	python3 bitstream_fix.py $<
+
 include ../rules.mk
 
-SRC_V += $(SIM_PATH)/glbl.v
-SRC_V += $(TARGETS).v
-SRC_V += $(TARGETS)_tb.v
-
-#-------
-# xsim, due to secure ip :(
-#-------
-$(TARGETS).vcd: $(TARGETS)_tb
-	xsim -nolog -R $< -testplusarg vcd
-
-$(TARGETS)_tb: $(SRC_V)
-	xvlog -nolog $(filter %.v,$^)
-	xelab -nolog -L unisims_ver -L secureip $@ glbl -s $@ -timescale 1ns/1ns
-
 clean::
-	rm -rf webtalk* vivado.* xsim.dir .Xil *.pb *.jou
+	# in ip, delete everything except .xci
+	find ip ! -name 'processing_system7_0.xci' -type f -exec rm -f {} +
