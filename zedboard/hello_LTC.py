@@ -139,4 +139,4 @@ if __name__ == '__main__':
         clk_freq=int(100e6)
     )
     main(soc, doc=__doc__)
-    # soc.generate_software_header("csr.h")
+    soc.generate_software_header("build/csr.h")

@@ -140,3 +140,6 @@ copy `.bit.bin` on the zedboard, then
   3. configure it in GUI, Bank0 / 1 voltage = 2.5 V, clock0 100 MHz
   4. Save and close
   5. `zed/zed.srcs/sources_1/ip/processing_system7_0/processing_system7_0.xci`
+
+# remote litex_server
+`./litex_server` contains a minimal version of which can run on the zedboard. It only requires python3 installed. It needs sudo to open `/dev/mem`, so it is dangerous! It then connects to the general purpose AXI master (gp0) at address 0x43c00000. On the PL side, this is connected to an AXI to Wishbone converter to read and write the CSRs.
