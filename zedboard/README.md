@@ -14,7 +14,7 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
     make zynq_zed_defconfig
     make menuconfig
     make
-    export PATH=$PATH:~/zed_linux/zed_debian/sw/u-boot-xlnx/tools/
+    export PATH=$PATH:/<..>/u-boot-xlnx/tools/
 
 # compile Kernel
     git clone https://github.com/Xilinx/linux-xlnx.git --recursive
@@ -36,7 +36,7 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
     distro=stretch
     export LANG=C
     debootstrap/debootstrap --second-stage
-    nano /etc/apt/sources.list
+    vim /etc/apt/sources.list
 
 deb http://deb.debian.org/debian stretch main
 deb http://deb.debian.org/debian-security/ stretch/updates main
@@ -47,7 +47,7 @@ deb http://deb.debian.org/debian stretch-updates main
     passwd
     apt upgrade
     adduser <user_name>
-    editor=nano visudo
+    visudo
 
 root        ALL=(ALL:ALL) ALL
 <user_name> ALL=(ALL:ALL) ALL
@@ -57,16 +57,16 @@ root        ALL=(ALL:ALL) ALL
 C.UTF8
 
     apt install openssh-server ntp sudo python3
-    nano /etc/network/interfaces
+    vim /etc/network/interfaces
 
 allow-hotplug eth0
 iface eth0 inet dhcp
 
-    nano /etc/hostname
+    vim /etc/hostname
 
 <hostname>
 
-    nano /etc/hosts
+    vim /etc/hosts
 
 127.0.0.1   localhost <hostname>
 ::1     localhost ip6-localhost ip6-loopback
@@ -75,9 +75,12 @@ ff02::2     ip6-allrouters
 
 # Mount fat32 boot partition for kernel updates / uboot config
     mkdir boot
-    nano /etc/fstab
+    vim /etc/fstab
 
 /dev/mmcblk0p1 /boot auto defaults 0 0
+
+# I needed that to get cross-compiled binaries to run
+    sudo ln -s /lib/arm-linux-gnueabihf/ld-2.24.so /lib/ld-linux.so.3
 ```
 
 # uEnv.txt
