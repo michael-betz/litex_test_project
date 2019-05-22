@@ -71,7 +71,7 @@ class HelloLtc(SoCZynq, AutoCSR):
             ps7_name="processing_system7_0",
             # cpu_type=None,
             csr_data_width=32,
-            csr_address_width=16,
+            # csr_address_width=16,
             with_uart=False,
             with_timer=False,
             integrated_rom_size=0,
@@ -125,7 +125,8 @@ class HelloLtc(SoCZynq, AutoCSR):
         mem = Memory(16, 4096)
         self.specials += mem
         self.submodules.sample_ram = SRAM(mem, read_only=True)
-        self.register_mem("sample", 0x0000E000, self.sample_ram.bus, 4096)
+        # Adding the below line makes all AXI reads return 0 :(
+        # self.register_mem("sample", 0x00100000, self.sample_ram.bus, 4096)
         self.submodules.acq = Acquisition(mem)
         self.specials += MultiReg(
             p.request("user_btn_d"), self.acq.trigger
@@ -134,7 +135,6 @@ class HelloLtc(SoCZynq, AutoCSR):
             p.request("user_led").eq(self.acq.busy),
             self.acq.data_in.eq(self.lvds.sample_outs[0]),
         ]
-
 
 
 if __name__ == '__main__':
