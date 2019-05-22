@@ -11,7 +11,7 @@ from common import LedBlinker, myzip
 
 
 class LTCPhy(S7_iserdes, AutoCSR):
-    def __init__(self, platform):
+    def __init__(self, platform, clk_freq):
         N_CHANNELS = 4
         S = 8
         D = N_CHANNELS * 2 + 1
@@ -75,6 +75,9 @@ class LTCPhy(S7_iserdes, AutoCSR):
             self.frame_peek.status
         )
 
+        # Frequency counter for received sample clock
+        self.submodules.f_sample = frequency_meter.FrequencyMeter(clk_freq)
+
         # CSR for moving a IDELAY2 up / down, doing a bitslip
         self.idelay_inc = CSR(1)
         self.idelay_dec = CSR(1)
@@ -83,6 +86,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
         # Bitslip pulse needs to cross clock domains!
         self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
         self.comb += [
+            self.f_sample.clk.eq(ClockSignal("sample")),
             self.id_inc.eq(self.idelay_inc.re),
             self.id_dec.eq(self.idelay_dec.re),
             self.idelay_value.w.eq(self.id_value),

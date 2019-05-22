@@ -16,17 +16,20 @@ try:
 from migen import *
 from litex.build.generic_platform import *
 from litex.soc.interconnect.csr import *
-# from litex.soc.integration.soc_core import *
 from litex.soc.integration.soc_zynq import *
 from litex.soc.integration.builder import *
+from migen.genlib.cdc import MultiReg
 from litex.soc.cores import dna, uart, spi
 from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
+from litex.soc.interconnect.wishbone import SRAM
 from sys import path
 path.append("iserdes")
 from ltc_phy import LTCPhy
 path.append("..")
 from common import main, ltc_pads
+path.append("../sp605/dsp")
+from acquisition import Acquisition
 
 
 class _CRG(Module):
@@ -55,7 +58,8 @@ class HelloLtc(SoCZynq, AutoCSR):
     csr_peripherals = [
         "dna",
         "spi",
-        "lvds"
+        "lvds",
+        "acq"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -67,6 +71,7 @@ class HelloLtc(SoCZynq, AutoCSR):
             ps7_name="processing_system7_0",
             # cpu_type=None,
             csr_data_width=32,
+            csr_address_width=16,
             with_uart=False,
             with_timer=False,
             integrated_rom_size=0,
@@ -86,18 +91,18 @@ class HelloLtc(SoCZynq, AutoCSR):
         #  Serial to Wishbone bridge
         # ----------------------------
         # connect FTDI cable to PMOD JA1
-        p.add_extension([(
-            "serial", 0,
-            Subsignal("tx", Pins("pmoda:0")),
-            Subsignal("rx", Pins("pmoda:4")),
-            IOStandard("LVCMOS33")
-        )])
-        self.add_cpu(uart.UARTWishboneBridge(
-            p.request("serial"),
-            clk_freq,
-            baudrate=1152000
-        ))
-        self.add_wb_master(self.cpu.wishbone)
+        # p.add_extension([(
+        #     "serial", 0,
+        #     Subsignal("tx", Pins("pmoda:0")),
+        #     Subsignal("rx", Pins("pmoda:4")),
+        #     IOStandard("LVCMOS33")
+        # )])
+        # self.add_cpu(uart.UARTWishboneBridge(
+        #     p.request("serial"),
+        #     clk_freq,
+        #     baudrate=1152000
+        # ))
+        # self.add_wb_master(self.cpu.wishbone)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
@@ -106,7 +111,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         #  LTC LVDS driver on FMC LPC
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
-        self.submodules.lvds = LTCPhy(p)
+        self.submodules.lvds = LTCPhy(p, clk_freq)
 
         # ----------------------------
         #  SPI master
@@ -114,29 +119,29 @@ class HelloLtc(SoCZynq, AutoCSR):
         spi_pads = p.request("LTC_SPI")
         self.submodules.spi = spi.SPIMaster(spi_pads)
 
-        # # ----------------------------
-        # #  Acquisition memory for ADC data
-        # # ----------------------------
-        # mem = Memory(16, 4096)
-        # self.specials += mem
-        # self.submodules.sample_ram = SRAM(mem, read_only=True)
-        # self.register_mem("sample", 0x50000000, self.sample_ram.bus, 4096)
-        # self.submodules.acq = Acquisition(mem)
-        # self.specials += MultiReg(
-        #     p.request("user_btn"), self.acq.trigger
-        # )
-        # self.comb += [
-        #     p.request("user_led").eq(self.acq.busy),
-        #     self.acq.data_in.eq(self.lvds.sample_out),
-        # ]
+        # ----------------------------
+        #  Acquisition memory for ADC data
+        # ----------------------------
+        mem = Memory(16, 4096)
+        self.specials += mem
+        self.submodules.sample_ram = SRAM(mem, read_only=True)
+        self.register_mem("sample", 0x0000E000, self.sample_ram.bus, 4096)
+        self.submodules.acq = Acquisition(mem)
+        self.specials += MultiReg(
+            p.request("user_btn_d"), self.acq.trigger
+        )
+        self.comb += [
+            p.request("user_led").eq(self.acq.busy),
+            self.acq.data_in.eq(self.lvds.sample_outs[0]),
+        ]
 
 
 
 if __name__ == '__main__':
     soc = HelloLtc(
         platform=zedboard.Platform(),
-        # Needs to match Vivado IP, Clock Configuration --> PL Fabrick Clocks --> FCLK_CLK0
-        clk_freq=int(100e6)
+        # Needs to match Vivado IP, Clock Configuration --> PL Fabric Clocks --> FCLK_CLK0
+        clk_freq=int(125e6)
     )
     main(soc, doc=__doc__)
     soc.generate_software_header("build/csr.h")

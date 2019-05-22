@@ -3,10 +3,10 @@ TARGETS = hello_LTC
 
 # Upload to the zedboard via scp and program the PL
 upload: $(TARGETS).bit.bin
-	./config_remote.sh $<
+	util/remote_config_fpga.sh $<
 
 %.bit.bin: %.bit
-	python3 bitstream_fix.py $<
+	python3 util/bitstream_fix.py $<
 	mv $<.bin .
 
 include ../rules.mk
