@@ -78,6 +78,10 @@ class LTCPhy(S7_iserdes, AutoCSR):
         # Frequency counter for received sample clock
         self.submodules.f_sample = frequency_meter.FrequencyMeter(clk_freq)
 
+        # Led blinker for fSample
+        self.submodules.f_sample_blink = \
+            ClockDomainsRenamer("sample")(LedBlinker(125e6))
+
         # CSR for moving a IDELAY2 up / down, doing a bitslip
         self.idelay_inc = CSR(1)
         self.idelay_dec = CSR(1)
@@ -86,6 +90,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
         # Bitslip pulse needs to cross clock domains!
         self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
         self.comb += [
+            platform.request("user_led").eq(self.f_sample_blink.out),
             self.f_sample.clk.eq(ClockSignal("sample")),
             self.id_inc.eq(self.idelay_inc.re),
             self.id_dec.eq(self.idelay_dec.re),

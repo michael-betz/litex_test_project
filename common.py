@@ -117,6 +117,7 @@ def main(soc, doc=''):
         soc.do_exit(vns)
     except:
         pass
+    return vns
 
 
 #-----------------------
