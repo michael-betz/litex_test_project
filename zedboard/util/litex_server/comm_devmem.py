@@ -39,7 +39,7 @@ class CommDevmem:
         drop_privileges()
         self.sysfs.flush()
         self.mmap = mmap.mmap(
-            self.sysfs.fileno(), 0x10000, offset=self.adr_offset
+            self.sysfs.fileno(), 0x38000000, offset=self.adr_offset
         )
 
     def close(self):

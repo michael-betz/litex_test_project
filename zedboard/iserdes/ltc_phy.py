@@ -34,6 +34,10 @@ class LTCPhy(S7_iserdes, AutoCSR):
             self.dco_p.eq(pads_dco.p),
             self.dco_n.eq(pads_dco.n)
         ]
+        f_sample_clk = 125e6
+        f_dco_clk = f_sample_clk * 4
+        platform.add_period_constraint(self.cd_sample.clk, 1e9 / f_sample_clk)
+        platform.add_period_constraint(self.cd_dco.clk, 1e9 / f_dco_clk)
 
         dat_p = []
         dat_n = []

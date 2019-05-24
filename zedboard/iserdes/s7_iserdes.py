@@ -51,7 +51,7 @@ class S7_iserdes(Module):
         ###
         self.initial_tl_done = Signal()
 
-        self.clock_domains.sample = ClockDomain("sample", reset_less=True)   # recovered ADC sample clock
+        self.clock_domains.cd_sample = ClockDomain("sample", reset_less=True)   # recovered ADC sample clock
 
         self.iserdes_default = {
             "p_DATA_WIDTH": S,
@@ -73,12 +73,12 @@ class S7_iserdes(Module):
         # -------------------------------------------------
         #  DCO input clock --> IDELAYE2 --> BUFMRCE
         # -------------------------------------------------
-        dco = Signal()
+        self.clock_domains.cd_dco = ClockDomain("dco", reset_less=True)
         dco_delay = Signal()
         dco_delay_2 = Signal()
         id_CE = Signal()
         self.comb += id_CE.eq(self.id_inc ^ self.id_dec)
-        self.specials += DifferentialInput(self.dco_p, self.dco_n, dco)
+        self.specials += DifferentialInput(self.dco_p, self.dco_n, ClockSignal("dco"))
         self.specials += Instance("IDELAYE2",
             p_DELAY_SRC="IDATAIN",
             p_HIGH_PERFORMANCE_MODE="TRUE",
@@ -95,7 +95,7 @@ class S7_iserdes(Module):
             i_CNTVALUEIN=Constant(0, 5),
             i_DATAIN=0,
             i_REGRST=0,
-            i_IDATAIN=dco,
+            i_IDATAIN=ClockSignal("dco"),
 
             o_DATAOUT=dco_delay,
             o_CNTVALUEOUT=self.id_value
@@ -146,11 +146,12 @@ class S7_iserdes(Module):
             sample_clks.append(sample_clk)
 
         # Make `sample` clock globally available
-        self.specials += Instance(
-            "BUFG",
-            i_I=sample_clk[0],
-            o_O=ClockSignal("sample")
-        )
+        # self.specials += Instance(
+        #     "BUFG",
+        #     i_I=sample_clk,
+        #     o_O=ClockSignal("sample")
+        # )
+        self.comb += ClockSignal("sample").eq(sample_clk)
 
         # -------------------------------------------------
         #  Generate an IDERDES for each data lane

@@ -109,8 +109,8 @@ def main():
     # Devmem arguments
     parser.add_argument("--devmem", action="store_true",
                         help="Select /dev/mem interface")
-    parser.add_argument("--devmem-offset", default=0, type=lambda x: int(x, 0),
-                        help="/dev/mem address offset, gp0 is at 0x43c00000")
+    parser.add_argument("--devmem-offset", default=0x40000000, type=lambda x: int(x, 0),
+                        help="/dev/mem address offset, gp0 is at 0x4000_0000")
 
     args = parser.parse_args()
 

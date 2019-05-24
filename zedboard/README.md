@@ -143,3 +143,24 @@ copy `.bit.bin` on the zedboard, then
 
 # remote litex_server
 `./litex_server` contains a minimal version of which can run on the zedboard. It only requires python3 installed. It needs sudo to open `/dev/mem`, so it is dangerous! It then connects to the general purpose AXI master (gp0) at address 0x43c00000. On the PL side, this is connected to an AXI to Wishbone converter to read and write the CSRs.
+
+## GP0 address range
+The Zynq general purpose AXI master interfaces are mapped to these addresses in memory
+
+| Start     | End      | Size               | Interface |
+| --------- | -------- | ------------------ | --------- |
+| 4000_0000 | 7FFF_FFF | 3800_0000 (896 MB) | M_AXI_GP0 |
+| 8000_0000 | BFFF_FFF | 3800_0000 (896 MB) | M_AXI_GP1 |
+
+The AXI to wishbone adapter subtracts an offset (base_address) and removes the 2 LSB bits so we get word addresses.
+See mapping below.
+
+```python
+self.add_axi_to_wishbone(self.axi_gp0, base_address=0x4000_0000)
+```
+
+| AXI (devmem) | WB           | WB << 2     |
+| ------------ | ------------ | ----------- |
+| 0x4000_0000  | 0x0000_0000  | 0x0000_0000 |
+| 0x4000_0004  | 0x0000_0001  | 0x0000_0004 |
+| 0x7FFF_FFFC  | 0x0FFF_FFFF  | 0x3FFF_FFFC |
