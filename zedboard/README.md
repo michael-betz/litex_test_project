@@ -208,8 +208,8 @@ See mapping below.
 self.add_axi_to_wishbone(self.axi_gp0, base_address=0x4000_0000)
 ```
 
-| AXI (devmem) | WB           | WB << 2     |
-| ------------ | ------------ | ----------- |
-| 0x4000_0000  | 0x0000_0000  | 0x0000_0000 |
-| 0x4000_0004  | 0x0000_0001  | 0x0000_0004 |
-| 0x7FFF_FFFC  | 0x0FFF_FFFF  | 0x3FFF_FFFC |
+| AXI (devmem) | WB << 2     | WB           |
+| ------------ | ----------- | ------------ |
+| 0x4000_0000  | 0x0000_0000 | 0x0000_0000  |
+| 0x4000_0004  | 0x0000_0004 | 0x0000_0001  |
+| 0x7FFF_FFFC  | 0x3FFF_FFFC | 0x0FFF_FFFF  |
