@@ -4,7 +4,7 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
 ```bash
 # Cross compiler
     sudo apt install libc6-armel-cross libc6-dev-armel-cross binutils-arm-linux-gnueabi libncurses-dev
-    sudo apt-get install gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+    sudo apt-get install gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libssl-dev
     export CROSS_COMPILE=arm-linux-gnueabi-
     export ARCH=arm
 
@@ -16,6 +16,15 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
     make
     export PATH=$PATH:/<..>/u-boot-xlnx/tools/
 
+# Create a ~ 64 MB FAT32 partition on the SD card, I used gparted.
+# here it's mounted as /media/sdcard
+
+# Copy first stage bootloader and u-boot image to SD card
+    cp u-boot-xlnx/spl/boot.bin /media/sdcard
+    cp u-boot-xlnx/u-boot.img /media/sdcard
+
+# Now try it on the Zedboard, you should see u-boot starting up on the UART
+
 # compile Kernel
     git clone https://github.com/Xilinx/linux-xlnx.git --recursive
     cd linux-xlnx/
@@ -23,8 +32,15 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
     make menuconfig
     make -j4 uImage LOADADDR=0x00008000
     make zynq-zed.dtb
+
+# Copy kernel image and device-tree to SD card
     cp arch/arm/boot/uImage /media/sdcard/
     cp arch/arm/boot/dts/zynq-zed.dtb /media/sdcard
+
+# to configure u-boot, create a uEnv.txt as shown below and copy it to SD card
+
+# Try it on Zedboard, the linux kernel should boot and panic
+# because of the missing root filesystem
 
 # debian rootfs (on host)
     mkdir rootfs
@@ -81,6 +97,16 @@ ff02::2     ip6-allrouters
 
 # I needed that to get cross-compiled binaries to run
     sudo ln -s /lib/arm-linux-gnueabihf/ld-2.24.so /lib/ld-linux.so.3
+
+# Exit the chroot shell
+
+# Create a large ext4 partition on the SD card (gparted)
+# in this example it is mounted as /media/rootfs
+# now copy the rootfs files to SD card
+    sudo cp -r rootfs/* /media/rootfs
+
+# Now the zedboard should boot into linux
+# and there should be a login prompt on the UART
 ```
 
 # uEnv.txt
