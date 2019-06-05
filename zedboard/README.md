@@ -1,6 +1,7 @@
 # Steps to get debian running on zedboard
 mostly based on (https://github.com/PyHDI/zynq-linux).
 
+## Bootloaders
 ```bash
 # Cross compiler
     sudo apt install libc6-armel-cross libc6-dev-armel-cross binutils-arm-linux-gnueabi libncurses-dev
@@ -16,14 +17,15 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
     make
     export PATH=$PATH:/<..>/u-boot-xlnx/tools/
 
-# Create a ~ 64 MB FAT32 partition on the SD card, I used gparted.
-# here it's mounted as /media/sdcard
+# Create a ~ 32 MB FAT16 partition on the SD card,
+# follow the guide below or use gparted
+# in this example it's mounted as /media/sdcard
 
 # Copy first stage bootloader and u-boot image to SD card
     cp u-boot-xlnx/spl/boot.bin /media/sdcard
     cp u-boot-xlnx/u-boot.img /media/sdcard
 
-# Now try it on the Zedboard, you should see u-boot starting up on the UART
+# Now try it on the Zedboard, you should see u-boot starting on the UART
 
 # compile Kernel
     git clone https://github.com/Xilinx/linux-xlnx.git --recursive
@@ -41,8 +43,13 @@ mostly based on (https://github.com/PyHDI/zynq-linux).
 
 # Try it on Zedboard, the linux kernel should boot and panic
 # because of the missing root filesystem
+```
 
+## Debian `rootfs`
+setup your initial bare-bones debian environment using chroot on the host.
+```bash
 # debian rootfs (on host)
+    sudo apt install debootstrap qemu-user-static
     mkdir rootfs
     sudo debootstrap --arch=armhf --foreign stretch rootfs
     sudo cp /usr/bin/qemu-arm-static rootfs/usr/bin/
@@ -59,20 +66,15 @@ deb http://deb.debian.org/debian-security/ stretch/updates main
 deb http://deb.debian.org/debian stretch-updates main
 
     apt update
-    apt install locales dialog
-    passwd
     apt upgrade
+    apt install locales dialog openssh-server ntp sudo
+    passwd
     adduser <user_name>
     visudo
 
 root        ALL=(ALL:ALL) ALL
 <user_name> ALL=(ALL:ALL) ALL
 
-    dpkg-reconfigure locales
-
-C.UTF8
-
-    apt install openssh-server ntp sudo python3
     vim /etc/network/interfaces
 
 allow-hotplug eth0
@@ -89,25 +91,46 @@ iface eth0 inet dhcp
 ff02::1     ip6-allnodes
 ff02::2     ip6-allrouters
 
-# Mount fat32 boot partition for kernel updates / uboot config
-    mkdir boot
+# Mount fat16 boot partition for kernel updates / uboot config
+    mkdir /boot  # only if it does not exist already
     vim /etc/fstab
 
 /dev/mmcblk0p1 /boot auto defaults 0 0
 
-# I needed that to get cross-compiled binaries to run
+# Optional Hack to get cross-compiled binaries to run
     sudo ln -s /lib/arm-linux-gnueabihf/ld-2.24.so /lib/ld-linux.so.3
 
 # Exit the chroot shell
 
-# Create a large ext4 partition on the SD card (gparted)
+# Create a large ext4 partition on the SD card (see below)
 # in this example it is mounted as /media/rootfs
-# now copy the rootfs files to SD card
-    sudo cp -r rootfs/* /media/rootfs
+    sudo cp -rp rootfs/* /media/rootfs
 
-# Now the zedboard should boot into linux
+# The zedboard should boot into linux
 # and there should be a login prompt on the UART
 ```
+
+# Partitioning the SD card
+What we need
+
+  * FAT16 partition of size 32 MB
+  * Linux (ext4) over the remaining available space
+
+Using `fdisk` on a 2 GB SD card, it should look like this:
+```
+Device     Boot Start     End Sectors  Size Id Type
+/dev/sdd1        2048   67583   65536   32M  b W95 FAT16
+/dev/sdd2       67584 3842047 3774464  1.8G 83 Linux
+```
+
+then format the partitions as FAT16 and ext4:
+
+```bash
+sudo mkfs.vfat -F16 -v /dev/sdd1 -n boot
+sudo mkfs.ext4 -v /dev/sdd2 -L rootfs
+```
+
+__make sure to replace `sdd1` and `sdd2` with the actual partition names__
 
 # uEnv.txt
 U-Boot startup script to boot and load bitfile. Make sure `ethaddr` is unique on network.
