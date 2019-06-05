@@ -67,7 +67,7 @@ deb http://deb.debian.org/debian stretch-updates main
 
     apt update
     apt upgrade
-    apt install locales dialog openssh-server ntp sudo
+    apt install openssh-server ntp sudo
     passwd
     adduser <user_name>
     visudo
