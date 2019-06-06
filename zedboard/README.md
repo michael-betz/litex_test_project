@@ -121,7 +121,7 @@ What we need
 Using `fdisk` on a 2 GB SD card, it should look like this:
 ```
 Device     Boot Start     End Sectors  Size Id Type
-/dev/sdd1        2048   67583   65536   32M  b W95 FAT16
+/dev/sdd1        2048   67583   65536   32M  e W95 FAT16
 /dev/sdd2       67584 3842047 3774464  1.8G 83 Linux
 ```
 
