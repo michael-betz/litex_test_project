@@ -153,41 +153,49 @@ bootcmd=run kernel_load; run dtr_load; setenv ethaddr 00:0a:35:00:01:87; run ker
 ```
 
 # Load bitfile in linux
-prepare `zed_wrapper.bit.bin` with bootgen. Unfortunately needs xilinx SDK.
+Bitfiles are loaded trough the [Linux FPGA Manager](https://www.kernel.org/doc/html/v4.18/driver-api/fpga/fpga-mgr.html).
+For this to work, the .bit file needs its header removed and its bytes swapped. There's two ways to do that:
+
+## bootgen
+prepare `<bitfile>.bit.bin` with bootgen. Unfortunately needs xilinx SDK.
 
 ```bash
-    cat zed_wrapper.bif
+    cat <bitfile>.bif
 
 all:
 {
-        zed_wrapper.bit
+        <bitfile>.bit
 }
 
-    bootgen -image zed_wrapper.bif -arch zynq -process_bitstream bin
+    bootgen -image <bitfile>.bif -arch zynq -process_bitstream bin
 ```
 
-[zynq-mkbootimage](https://github.com/antmicro/zynq-mkbootimage/issues/10) seems to be an -- not quite yet fully implemented -- alternative.
+## alternatively: bitstream_fix.py
+does not need xilinx SDK
+```bash
+python3 util/bitstream_fix.py <bitfile>.bit
+```
 
-Update: this one does the job just fine: [bitstream_fix.py](https://github.com/peteut/migen-axi/blob/master/src/tools/bitstream_fix.py) No need for .bif or to install xilinx SDK!
-
-copy `.bit.bin` on the zedboard, then
+copy the resulting `<bitfile>.bit.bin` on the zedboard, then
 
 ```bash
     sudo -i
-    cp zed_wrapper.bit.bin /lib/firmware/
+    cp <bitfile>.bit.bin /lib/firmware/
     echo 0 > /sys/class/fpga_manager/fpga0/flags
-    echo zed_wrapper.bit.bin > /sys/class/fpga_manager/fpga0/firmware
+    echo <bitfile>.bit.bin > /sys/class/fpga_manager/fpga0/firmware
     dmesg
 
-[ 1667.020520] fpga_manager fpga0: writing zed_wrapper.bit.bin to Xilinx Zynq FPGA Manager
+[ 1667.020520] fpga_manager fpga0: writing <bitfile>.bit.bin to Xilinx Zynq FPGA Manager
 ```
 
 `make upload` automates all these steps.
 
 # how to get `ip/processing_system7_0.xci`
-  1. open vivado, new RTL project `zed`, don't add source files, next, next next ..
+This Xilinx IP file contains the PS7 block describing the connectivity between PS and PL and is required by the Litex `SoCZynq()` class. If the PS7 block is not included in the PL design, the CPU will freeze as soon as the the resulting bitfile is loaded on the zedboard. However, except for the CPU freezing issue, the PL part of the design seems to work fine.
+
+  1. open vivado, new RTL project, `zedboard` hardware platform, don't add source files, next, next next ..
   2. open IP manager, add Zynq Processing system 7 IP
-  3. configure it in GUI, Bank0 / 1 voltage = 2.5 V, clock0 100 MHz
+  3. configure it in GUI, Bank0 / 1 voltage = 2.5 V, clock0 100 MHz. By default, clock0 is connected to litex `sysclk`.
   4. Save and close
   5. `zed/zed.srcs/sources_1/ip/processing_system7_0/processing_system7_0.xci`
 
