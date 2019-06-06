@@ -133,11 +133,11 @@ sudo mkfs.ext4 -v /dev/sdd2 -L rootfs
 __make sure to replace `sdd1` and `sdd2` with the actual partition names__
 
 # uEnv.txt
-U-Boot startup script to boot and load bitfile. Make sure `ethaddr` is unique on network.
+U-Boot startup script to boot and optionally load a bitfile. Make sure `ethaddr` is unique on network.
 ```bash
-fpga_addr=0x10000000
-fpga_load=load mmc 0 ${fpga_addr} zed_wrapper.bit
-fpga_boot=fpga loadb 0 ${fpga_addr} $filesize
+# fpga_addr=0x10000000
+# fpga_load=load mmc 0 ${fpga_addr} zed_wrapper.bit
+# fpga_boot=fpga loadb 0 ${fpga_addr} $filesize
 
 kernel_addr=0x8000
 kernel_load=load mmc 0 ${kernel_addr} uImage
@@ -147,7 +147,8 @@ dtr_load=load mmc 0 ${dtr_addr} zynq-zed.dtb
 
 kernel_boot=setenv bootargs console=ttyPS0,115200 root=/dev/mmcblk0p2 rw rootwait; bootm ${kernel_addr} - ${dtr_addr}
 
-# to load bitfile before boot, add this to beginning: run fpga_load; run fpga_boot;
+# to load bitfile before boot, uncomment the above 3 lies
+# and add this to beginning: run fpga_load; run fpga_boot;
 bootcmd=run kernel_load; run dtr_load; setenv ethaddr 00:0a:35:00:01:87; run kernel_boot
 ```
 
