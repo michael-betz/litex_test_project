@@ -8,7 +8,9 @@ CSR's accessible.
 The Processing System (PS) runs debian and can re-program the PL with a
 .bit.bin file
 
-So far they don't speak to each other.
+They do speak to each other through litex CSRs.
+
+Couldn't get memory access to work yet.
 
 try:
  python3 hello_LTC.py <build / synth / config>
@@ -22,7 +24,7 @@ from migen.genlib.cdc import MultiReg
 from litex.soc.cores import dna, uart, spi
 from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
-from litex.soc.interconnect.wishbone import SRAM
+from litex.soc.interconnect import wishbone
 from litescope import LiteScopeAnalyzer
 from sys import path
 path.append("iserdes")
@@ -124,56 +126,56 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         #  Acquisition memory for ADC data
         # ----------------------------
-        mem = Memory(16, 4096)
-        # self.specials += mem
-        self.submodules.sample_ram = SRAM(mem, read_only=True)
-        # # Adding the below line makes all AXI reads return 0 :(
+        mem = Memory(16, 4096, init=[0xDEAD, 0xC0FE, 0xB00B])
+        self.specials += mem
+        self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
+        # Adding the below line makes all AXI reads return 0 :(
         self.register_mem(
-            "sample", 0x0100_0000, self.sample_ram.bus, mem.depth
+            "sample", 0x10000000, self.sample_ram.bus, 4096 # mem.depth
         )
-        # self.submodules.acq = Acquisition(mem)
-        # self.specials += MultiReg(
-        #     p.request("user_btn_d"), self.acq.trigger
-        # )
+        self.submodules.acq = Acquisition(mem)
+        self.specials += MultiReg(
+            p.request("user_btn_d"), self.acq.trigger
+        )
         btn_up = p.request("user_btn_u")
-        # self.comb += [
-        #     p.request("user_led").eq(self.acq.trigger),
-        #     p.request("user_led").eq(self.acq.busy),
-        #     self.acq.data_in.eq(self.lvds.sample_outs[0]),
-        #     p.request("user_led").eq(btn_up)
-        # ]
+        self.comb += [
+            p.request("user_led").eq(self.acq.trigger),
+            p.request("user_led").eq(self.acq.busy),
+            self.acq.data_in.eq(self.lvds.sample_outs[0]),
+            p.request("user_led").eq(btn_up)
+        ]
 
         # ----------------------------
         #  AXI Analyzer
         # ----------------------------
-        w = self._wb_masters[0]
-        analyzer_signals = [
-            btn_up,
+        # w = self._wb_masters[0]
+        # analyzer_signals = [
+        #     btn_up,
 
-            # # axi master
-            # self.axi_gp0.aw,
-            # self.axi_gp0.ar,
-            # self.axi_gp0.w,
-            # self.axi_gp0.b,
-            # self.axi_gp0.r,
+        #     # # axi master
+        #     # self.axi_gp0.aw,
+        #     # self.axi_gp0.ar,
+        #     # self.axi_gp0.w,
+        #     # self.axi_gp0.b,
+        #     # self.axi_gp0.r,
 
-            # wishbone conversion
-            w.dat_w,
-            w.dat_r,
-            w.adr,
-            w.sel,
-            w.cyc,
-            w.stb,
-            w.ack,
-            w.we,
-            w.cti,
-            w.bte,
-            w.err
-        ]
-        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 512)
+        #     # wishbone conversion
+        #     w.dat_w,
+        #     w.dat_r,
+        #     w.adr,
+        #     w.sel,
+        #     w.cyc,
+        #     w.stb,
+        #     w.ack,
+        #     w.we,
+        #     w.cti,
+        #     w.bte,
+        #     w.err
+        # ]
+        # self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 512)
 
     def do_exit(self, vns):
-        soc.analyzer.export_csv(vns, "build/analyzer.csv")
+        # soc.analyzer.export_csv(vns, "build/analyzer.csv")
         soc.generate_software_header("build/csr.h")
 
 

@@ -84,7 +84,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
 
         # Led blinker for fSample
         self.submodules.f_sample_blink = \
-            ClockDomainsRenamer("sample")(LedBlinker(125e6))
+            ClockDomainsRenamer("sample")(LedBlinker(f_sample_clk))
 
         # CSR for moving a IDELAY2 up / down, doing a bitslip
         self.idelay_inc = CSR(1)
