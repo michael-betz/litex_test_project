@@ -143,13 +143,13 @@ class HelloLtc(SoCCore, AutoCSR):
         self.specials += mem
         self.submodules.sample_ram = SRAM(mem, read_only=True)
         self.register_mem("sample", 0x50000000, self.sample_ram.bus, 4096)
-        self.submodules.acq = Acquisition(mem)
+        self.submodules.acq = Acquisition([mem])
         self.specials += MultiReg(
             p.request("user_btn"), self.acq.trigger
         )
         self.comb += [
             p.request("user_led").eq(self.acq.busy),
-            self.acq.data_in.eq(self.lvds.sample_out),
+            self.acq.data_ins[0].eq(self.lvds.sample_out),
         ]
 
 

@@ -1,15 +1,14 @@
-vpath %.bit build/gateware/
 TARGETS = hello_LTC
+
+all: $(TARGETS).bit.bin
+
+%.bit.bin: build/gateware/%.bit
+	python3 util/bitstream_fix.py $<
+	mv $<.bin .
 
 # Upload to the zedboard via scp and program the PL
 upload: $(TARGETS).bit.bin
 	util/remote_config_fpga.sh $<
-
-%.bit.bin: %.bit
-	python3 util/bitstream_fix.py $<
-	mv $<.bin .
-
-include ../rules.mk
 
 clean::
 	rm -f $(TARGETS).bit.bin
@@ -18,3 +17,5 @@ clean::
 	mv ip/processing_system7_0.xci .
 	rm -rf ip/*
 	mv processing_system7_0.xci ip
+
+include ../rules.mk

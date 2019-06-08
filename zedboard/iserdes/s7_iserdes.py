@@ -51,7 +51,7 @@ class S7_iserdes(Module):
         ###
         self.initial_tl_done = Signal()
 
-        self.clock_domains.cd_sample = ClockDomain("sample", reset_less=True)   # recovered ADC sample clock
+        self.clock_domains.cd_sample = ClockDomain("sample", reset_less=True)  # recovered ADC sample clock
 
         self.iserdes_default = {
             "p_DATA_WIDTH": S,

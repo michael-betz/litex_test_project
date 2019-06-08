@@ -12,69 +12,98 @@ from migen.genlib.cdc import PulseSynchronizer
 
 
 class Acquisition(Module, AutoCSR):
-    def __init__(self, mem=None):
+    def __init__(self, mems=None, data_ins=None, N_CHANNELS=1, N_BITS=16):
         """
+        mems
+            list of memory objects of length N_CHANNELS
         acquisition starts after
           * rising edge on self.trigger
-          * data_in crossing trig_level
+          * data_in of the selected channel crossing trig_level
         """
-        self.data_in = Signal(16)   # uint16, on `sample` clock domain
+        # uint16, on `sample` clock domain
+        if data_ins:
+            self.data_ins = data_ins
+            N_CHANNELS = len(data_ins)
+        else:
+            self.data_ins = [Signal(N_BITS) for i in range(N_CHANNELS)]
         self.trigger = Signal()
         self.busy = Signal()
 
         ###
 
+        if mems is None:
+            mems = [Memory(N_BITS, 12) for i in range(N_CHANNELS)]
+
         trig = Signal()
         self.trig_csr = CSR()
+        # select the trigger level
         self.trig_level = CSRStorage(16, reset=(1 << 15))
+        # select the channel to trigger on
+        self.trig_channel = CSRStorage(8)
 
-        if mem is None:
-            mem = Memory(16, 12)
-        self.specials += mem
-        p1 = mem.get_port(write_capable=True, clock_domain="sample")
-        self.specials += p1
-        self.comb += p1.dat_w.eq(self.data_in)
-        self.submodules.fsm = ClockDomainsRenamer("sample")(FSM())
-        trig_d = Signal()
-        data_in_d = Signal.like(self.data_in)
-        self.sync.sample += [
-            trig_d.eq(trig),
-            data_in_d.eq(self.data_in)
+        self.submodules.trig_sync = PulseSynchronizer("sys", "sample")
+        self.comb += [
+            self.trig_sync.i.eq(self.trig_csr.re),
+            trig.eq(self.trigger | self.trig_sync.o)
         ]
-        self.fsm.act("WAIT_TRIGGER",
-            If(trig & ~trig_d,
-                NextState("WAIT_LEVEL")
+
+        # data stream of the channel to trigger on
+        data_trigger = Signal(N_BITS)
+        data_trigger_d = Signal(N_BITS)
+
+        is_trigger = Signal()
+        self.comb += [
+            # select one of the channels to trigger on
+            Case(
+                self.trig_channel.storage,
+                {k: data_trigger.eq(v) for k, v in enumerate(self.data_ins)}
+            ),
+            # Pulse `is_trigger` high when sample passes the trigger threshold
+            is_trigger.eq(
+                (data_trigger_d < self.trig_level.storage) &
+                (data_trigger >= self.trig_level.storage)
             )
+        ]
+        self.sync.sample += data_trigger_d.eq(data_trigger)
+
+        mem_we = Signal()
+        mem_addr = Signal(max=mems[0].depth)
+        self.submodules.fsm = ClockDomainsRenamer("sample")(FSM())
+        self.fsm.act("WAIT_TRIGGER",
+            If(trig, NextState("WAIT_LEVEL"))
         )
         self.fsm.act("WAIT_LEVEL",
-            If((data_in_d < self.trig_level.storage) &
-               (self.data_in >= self.trig_level.storage),
-                p1.we.eq(1),
-                NextValue(p1.adr, p1.adr + 1),
+            If(is_trigger,
+                mem_we.eq(1),
+                NextValue(mem_addr, mem_addr + 1),
                 NextState("ACQUIRE")
             )
         )
         self.fsm.act("ACQUIRE",
-            p1.we.eq(1),
-            NextValue(p1.adr, p1.adr + 1),
-            If(p1.adr >= mem.depth - 1,
+            mem_we.eq(1),
+            NextValue(mem_addr, mem_addr + 1),
+            If(mem_addr >= mems[0].depth - 1,
                 NextState("WAIT_TRIGGER"),
-                NextValue(p1.adr, 0)
+                NextValue(mem_addr, 0)
             )
         )
-        self.submodules.trig_sync = PulseSynchronizer("sys", "sample")
-        self.comb += [
-            self.busy.eq(p1.we),
-            self.trig_sync.i.eq(self.trig_csr.re),
-            trig.eq(self.trigger | self.trig_sync.o)
-        ]
+        self.comb += self.busy.eq(mem_we)
+        for mem, data_in in zip(mems, self.data_ins):
+            self.specials += mem
+            p1 = mem.get_port(write_capable=True, clock_domain="sample")
+            self.specials += p1
+            self.comb += [
+                p1.dat_w.eq(data_in),
+                p1.adr.eq(mem_addr),
+                p1.we.eq(mem_we)
+            ]
 
 
 def sample_generator(dut):
     yield dut.trig_level.storage.eq(30)
     for i in range(101):
         yield dut.trigger.eq(0)
-        yield dut.data_in.eq(i)
+        yield dut.data_ins[0].eq(i)
         if i == 15 or i == 75:
             yield dut.trigger.eq(1)
         yield
@@ -88,9 +117,9 @@ def main():
         convert(
             dut,
             ios={
-                dut.sample.clk,
-                dut.data_in,
-                dut.trigger
+                *dut.data_ins,
+                dut.trigger,
+                dut.busy
             },
             display_run=True
         ).write(argv[0].replace(".py", ".v"))

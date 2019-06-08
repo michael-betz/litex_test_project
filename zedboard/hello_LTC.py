@@ -8,9 +8,7 @@ CSR's accessible.
 The Processing System (PS) runs debian and can re-program the PL with a
 .bit.bin file
 
-They do speak to each other through litex CSRs.
-
-Couldn't get memory access to work yet.
+They do speak to each other through litex CSRs and `comm_devmem.py`.
 
 try:
  python3 hello_LTC.py <build / synth / config>
@@ -126,58 +124,33 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         #  Acquisition memory for ADC data
         # ----------------------------
-        mem = Memory(16, 4096, init=[0xDEAD, 0xC0FE, 0xB00B])
-        self.specials += mem
-        self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
-        # Adding the below line makes all AXI reads return 0 :(
-        self.register_mem(
-            "sample", 0x10000000, self.sample_ram.bus, 4096 # mem.depth
-        )
-        self.submodules.acq = Acquisition(mem)
-        self.specials += MultiReg(
-            p.request("user_btn_d"), self.acq.trigger
-        )
-        btn_up = p.request("user_btn_u")
-        self.comb += [
-            p.request("user_led").eq(self.acq.trigger),
-            p.request("user_led").eq(self.acq.busy),
-            self.acq.data_in.eq(self.lvds.sample_outs[0]),
-            p.request("user_led").eq(btn_up)
-        ]
-
-        # ----------------------------
-        #  AXI Analyzer
-        # ----------------------------
-        # w = self._wb_masters[0]
-        # analyzer_signals = [
-        #     btn_up,
-
-        #     # # axi master
-        #     # self.axi_gp0.aw,
-        #     # self.axi_gp0.ar,
-        #     # self.axi_gp0.w,
-        #     # self.axi_gp0.b,
-        #     # self.axi_gp0.r,
-
-        #     # wishbone conversion
-        #     w.dat_w,
-        #     w.dat_r,
-        #     w.adr,
-        #     w.sel,
-        #     w.cyc,
-        #     w.stb,
-        #     w.ack,
-        #     w.we,
-        #     w.cti,
-        #     w.bte,
-        #     w.err
+        mems = []
+        for i, sample_out in enumerate(self.lvds.sample_outs):
+            mem = Memory(16, 4096, init=[i, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
+            mems.append(mem)
+            self.specials += mem
+            self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
+            self.register_mem(
+                "sample{}".format(i),
+                0x10000000 + i * 0x1000000,
+                self.sample_ram.bus,
+                mem.depth
+            )
+            # p2 = mem.get_port(write_capable=True, clock_domain="sample")
+            # self.specials += p2
+            # self.sync.sample += [
+            #     p2.we.eq(1),
+            #     p2.adr.eq(p2.adr + 1),
+            #     p2.dat_w.eq(sample_out)
+            # ]
+        # self.submodules.acq = Acquisition(mems, self.lvds.sample_outs, N_BITS=16)
+        # self.specials += MultiReg(
+        #     p.request("user_btn_d"), self.acq.trigger
+        # )
+        # self.comb += [
+        #     p.request("user_led").eq(self.acq.trigger),
+        #     p.request("user_led").eq(self.acq.busy)
         # ]
-        # self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 512)
-
-    def do_exit(self, vns):
-        # soc.analyzer.export_csv(vns, "build/analyzer.csv")
-        soc.generate_software_header("build/csr.h")
-
 
 if __name__ == '__main__':
     soc = HelloLtc(

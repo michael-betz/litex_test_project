@@ -1,24 +1,28 @@
-@29
-[color] 6
-sys_clk
-@28
-[color] 7
-sample_clk
-@8022
-main_data_in[15:0]
-@20000
--
--
--
--
-@22
-main_storage[15:0]
+[*]
+[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
+[*] Sat Jun  8 01:00:56 2019
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/sp605/dsp/acquisition.vcd"
+[dumpfile_mtime] "Sat Jun  8 00:58:30 2019"
+[dumpfile_size] 14918
+[savefile] "/home/michael/fpga_wsp/litex_test_project/sp605/dsp/acquisition.gtkw"
+[timestart] 0
+[size] 956 1037
+[pos] 959 -1
+*-8.000000 228 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 291
+[signals_width] 222
+[sst_expanded] 1
+[sst_vpaned_height] 307
 @820
-simulator_state[95:0]
+state[95:0]
 @28
-[color] 3
-main_busy
+trigger
+@23
+trig_level_storage[15:0]
 @22
-main_adr[3:0]
+data_ins[15:0]
+@28
+we
 [pattern_trace] 1
 [pattern_trace] 0

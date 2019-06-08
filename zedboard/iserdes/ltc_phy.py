@@ -16,7 +16,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
         S = 8
         D = N_CHANNELS * 2 + 1
 
-        self.sample_outs = [Signal(S * 2)] * N_CHANNELS
+        self.sample_outs = [Signal(S * 2) for i in range(N_CHANNELS)]
 
         ###
 
@@ -41,7 +41,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
 
         dat_p = []
         dat_n = []
-        for i in range(N_CHANNELS):  # For each ADC channel
+        for i, sample_out in enumerate(self.sample_outs):  # For each ADC channel
             pads_out = platform.request("LTC_OUT", i)
             # Wire up the input pads to the serial serdes inputs
             dat_p.append(pads_out.a_p)
@@ -49,7 +49,6 @@ class LTCPhy(S7_iserdes, AutoCSR):
             dat_n.append(pads_out.a_n)
             dat_n.append(pads_out.b_n)
             # re-arrange parallel serdes outputs to form samples
-            sample_out = self.sample_outs[i]
             self.comb += sample_out.eq(
                 Cat(myzip(self.data_outs[2 * i + 1], self.data_outs[2 * i]))
             )

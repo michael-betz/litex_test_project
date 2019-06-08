@@ -15,7 +15,7 @@ vpath %.gtkw test
 %.v: %.py
 	python3 $< build
 
-%.bit: %.py
+build/gateware/%.bit: %.py
 	python3 $< synth
 
 %_view: %.vcd %.gtkw
