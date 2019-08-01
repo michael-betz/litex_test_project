@@ -16,6 +16,7 @@ def main():
     r.open()
     print("Connected to Port", port)
     print(getId(r))
+    print("dut_status: 0x{:02x}".format(r.regs.dut_status_test.read()))
 
 
 if __name__ == "__main__":

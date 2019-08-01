@@ -1,24 +1,6 @@
 #!/usr/bin/env python3
 """
-Connect litex_server to a hardware emulation for testing and experimenting.
-
-I want to connect to a piece of emulated hardware (through verilator)
-in the same way as I would connect to real hardware.
-
-  * Add the serial2tcp plugin to verilator such that I can connect to the UART
-    from outside
-  * Run litex_server to connect to the tcp socket instead to a serial port
-    such that I can access the emulated wishbone bus from outside
-
-# Running it
-
-    # all 3 run in separate windows ...
-    $ python3 verilator_sim.py
-    $ litex_server --uart --uart-port socket://localhost:1111
-    $ python3 test.py
-    Connected to Port 1234
-    LiteX Simulation 2019-07-31 19:58:51
-
+Connect litex_server to a verilator emulation for testing and experimenting.
 """
 import argparse
 
@@ -33,7 +15,9 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
 from litex.soc.cores import uart
+
 from litex.soc.interconnect.wishbonebridge import WishboneStreamingBridge
+from litex.soc.interconnect.csr import AutoCSR, CSRStatus
 
 
 class SimPins(Pins):
@@ -56,7 +40,14 @@ _io = [
 ]
 
 
+class Dut(Module, AutoCSR):
+    def __init__(self):
+        self.status_test = CSRStatus(8)
+        self.comb += self.status_test.status.eq(0xDE)
+
+
 class SimSoC(SoCCore):
+    csr_map_update(SoCCore.csr_map, {"dut"})
 
     def __init__(
         self,
@@ -91,6 +82,8 @@ class SimSoC(SoCCore):
             self.uart_phy, sys_clk_freq
         ))
         self.add_wb_master(self.cpu.wishbone)
+
+        self.submodules.dut = Dut()
 
 
 def main():
