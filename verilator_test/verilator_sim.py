@@ -53,21 +53,20 @@ class Dut(Module, AutoCSR):
         self.comb += self.status_test.status.eq(0xDE)
 
         # For testing bit-banging I2C
-        self.i2c_master = m = I2CMaster()
+        self.submodules.i2c_master = m = I2CMaster()
 
         # Hardwire SDA line to High!!!
-        self.comb += m.pads.sda.eq(1)
+        # self.comb += m.pads.sda.eq(0)
 
-        # # The simulated I2C slave
-        # self.specials += Instance(
-        #     "I2C_slave",
-        #     io_scl=m.pads.scl,
-        #     io_sda=m.pads.sda,
-        #     i_clk=ClockSignal(),
-        #     i_rst=ResetSignal(),
-        #     i_data_to_master=0xAF
-        # )
-
+        # The simulated I2C slave
+        self.specials += Instance(
+            "I2C_slave",
+            io_scl=m.pads.scl,
+            io_sda=m.pads.sda,
+            i_clk=ClockSignal(),
+            i_rst=ResetSignal(),
+            i_data_to_master=0xAF
+        )
 
 
 class SimSoC(SoCCore):
@@ -80,7 +79,7 @@ class SimSoC(SoCCore):
         self.platform = platform = SimPlatform("SIM", _io)
         platform.add_source("I2C_slave.v")
         # Setting sys_clk_freq too low will cause wishbone timeouts !!!
-        sys_clk_freq = int(10e6)
+        sys_clk_freq = int(8e6)
         SoCCore.__init__(
             self, platform,
             clk_freq=sys_clk_freq,
