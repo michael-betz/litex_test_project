@@ -19,7 +19,7 @@ print('''\
 from litex.build.generic_platform import *
 from litex.build.xilinx import XilinxPlatform, VivadoProgrammer
 
-# IOs ----------------------------------------------------------------------------------------------
+# IOs -------------------------------------------------------------------------
 
 _io = [
 ''', end='')
@@ -44,10 +44,10 @@ for i in [1, 2, 4, 8]:
         ('rst_n', 'PCIE_PERST_.*'),
         ('clk_p', 'PCIE_CLK_QO_P'),
         ('clk_n', 'PCIE_CLK_QO_N'),
-        ('rx_p', 'PCIE_RX[0-7]_P', i),
-        ('rx_n', 'PCIE_RX[0-7]_N', i),
-        ('tx_p', 'PCIE_TX[0-7]_P', i),
-        ('tx_n', 'PCIE_TX[0-7]_N', i),
+        ('rx_p', r'PCIE_RX\d_P', i),
+        ('rx_n', r'PCIE_RX\d_N', i),
+        ('tx_p', r'PCIE_TX\d_P', i),
+        ('tx_n', r'PCIE_TX\d_N', i),
     ))
 
 p.getGroup('clk200', (
@@ -84,8 +84,8 @@ p.getGroup('si5324_clkin', (
 ))
 
 p.getGpios('cpu_reset', 'CPU_RESET')
-p.getGpios('user_led', 'GPIO_LED_[0-9]_LS')
-p.getGpios('user_dip_btn', 'GPIO_DIP_SW[0-9]')
+p.getGpios('user_led', r'GPIO_LED_\d_LS')
+p.getGpios('user_dip_btn', r'GPIO_DIP_SW\d')
 p.getGpios('user_btn_c', 'GPIO_SW_C')
 p.getGpios('user_btn_n', 'GPIO_SW_N')
 p.getGpios('user_btn_e', 'GPIO_SW_E')
@@ -109,7 +109,10 @@ p.getGroup('i2c', (
     ('sda', 'IIC_SDA_MAIN_LS'),
 ))
 p.getGpios('i2c_mux_reset', 'IIC_MUX_RESET_B_LS')
-p.getConnector("XADC", nameReplace=(('N_R', '_N'),('P_R', '_P')))
+p.getConnector(
+    "XADC",
+    nameReplace=(('N_R', '_N'), ('P_R', '_P'))
+)
 p.getGroup('serial', (
     ('rx', 'USB_UART_RX'),
     ('rts', 'USB_UART_RTS'),
@@ -118,7 +121,7 @@ p.getGroup('serial', (
 ))
 
 p.getGroup('hdmi', (
-    ('d', 'HDMI_R_D\d+', 36),
+    ('d', r'HDMI_R_D\d+', 36),
     ('de', 'HDMI_R_DE'),
     ('clk', 'HDMI_R_CLK'),
     ('vsync', 'HDMI_R_VSYNC'),
@@ -130,20 +133,20 @@ p.getGroup('hdmi', (
 
 for n, i in (('ddram', 1), ('ddram_dual_rank', 2)):
     p.getGroup(n, (
-        ('a', 'DDR3_A\d+', 16),
-        ('ba', 'DDR3_BA\d', 3),
+        ('a', r'DDR3_A\d+', 16),
+        ('ba', r'DDR3_BA\d', 3),
         ('ras_n', 'DDR3_RAS_B'),
         ('cas_n', 'DDR3_CAS_B'),
         ('we_n', 'DDR3_WE_B'),
-        ('cs_n', 'DDR3_S\d_B', i),  # hope this is right ???
-        ('dm', 'DDR3_DM\d', 8),
-        ('dq', 'DDR3_D\d+', 64),
-        ('dqs_p', 'DDR3_DQS\d_P', 8),
-        ('dqs_n', 'DDR3_DQS\d_N', 8),
-        ('clk_p', 'DDR3_CLK\d_P', i),
-        ('clk_n', 'DDR3_CLK\d_N', i),
-        ('cke', 'DDR3_CKE\d', i),
-        ('odt', 'DDR3_ODT\d', i),
+        ('cs_n', r'DDR3_S\d_B', i),  # hope this is right ???
+        ('dm', r'DDR3_DM\d', 8),
+        ('dq', r'DDR3_D\d+', 64),
+        ('dqs_p', r'DDR3_DQS\d_P', 8),
+        ('dqs_n', r'DDR3_DQS\d_N', 8),
+        ('clk_p', r'DDR3_CLK\d_P', i),
+        ('clk_n', r'DDR3_CLK\d_N', i),
+        ('cke', r'DDR3_CKE\d', i),
+        ('odt', r'DDR3_ODT\d', i),
         ('reset_n', 'DDR3_RESET_B'),
     ))
 
@@ -179,7 +182,7 @@ p.getGpios('vadj_on_b', 'FMC_VADJ_ON_B_LS')
 print('''\
 ]
 
-# Connectors ---------------------------------------------------------------------------------------
+# Connectors ------------------------------------------------------------------
 
 _connectors = [
 ''', end='')
@@ -190,7 +193,7 @@ p.getConnector('FMC2_HPC')
 print('''\
 ]
 
-# Platform -----------------------------------------------------------------------------------------
+# Platform --------------------------------------------------------------------
 
 class Platform(XilinxPlatform):
     default_clk_name = "clk156"
