@@ -3,9 +3,9 @@ from litex.soc.integration.builder import Builder
 from litex import RemoteClient
 from os import system
 from struct import pack, unpack
-from numpy import *
-from matplotlib.pyplot import *
-from scipy.signal import *
+# from numpy import *
+# from matplotlib.pyplot import *
+# from scipy.signal import *
 from migen import *
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 
