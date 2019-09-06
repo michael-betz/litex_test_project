@@ -598,6 +598,10 @@ class Platform(XilinxPlatform):
             _connectors,
             toolchain="vivado"
         )
+        self.add_platform_command("""
+set_property CFGBVS VCCO [current_design]
+set_property CONFIG_VOLTAGE 2.5 [current_design]
+""")
 
     def create_programmer(self):
         return VivadoProgrammer()

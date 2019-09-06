@@ -11,9 +11,9 @@ p = vc707.Platform()
 def main():
     led = p.request("user_led")
     module = Module()
-    # 100e6 Hz / 2**26 = 1.49 Hz
+    # 156.25 MHz / 2**26 = 2.33 Hz
     counter = Signal(26)
-    module.comb += led.eq(counter[25])
+    module.comb += led.eq(counter[-1])
     module.sync += counter.eq(counter + 1)
     p.build(module)
 
