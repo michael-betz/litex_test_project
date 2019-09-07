@@ -63,7 +63,7 @@ class GtTest(SoCCore, AutoCSR):
             ("AD9174_SPI", 0,
                 # FMC_CS1 (AD9174), FMC_CS2 (HMC7044)
                 Subsignal("cs_n", Pins("FMC1_HPC:LA04_N FMC1_HPC:LA05_P")),
-                Subsignal("miso", Pins("FMC1_HPC:LA04_P"), Misc("PULLUP")),
+                Subsignal("miso", Pins("FMC1_HPC:LA04_P"), Misc("PULLUP TRUE")),
                 Subsignal("mosi", Pins("FMC1_HPC:LA03_N")),
                 Subsignal("clk",  Pins("FMC1_HPC:LA03_P")),
                 IOStandard("LVCMOS18")
