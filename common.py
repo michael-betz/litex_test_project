@@ -13,7 +13,7 @@ from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 ltc_pads = [
     ("LTC_SPI", 0,
         Subsignal("cs_n", Pins("LPC:LA14_P")),
-        Subsignal("miso", Pins("LPC:LA14_N"), Misc("PULLUP")),
+        Subsignal("miso", Pins("LPC:LA14_N"), Misc("PULLUP TRUE")),
         Subsignal("mosi", Pins("LPC:LA27_P")),
         Subsignal("clk",  Pins("LPC:LA27_N")),
         IOStandard("LVCMOS25")

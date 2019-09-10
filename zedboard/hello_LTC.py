@@ -19,7 +19,7 @@ from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_zynq import *
 from litex.soc.integration.builder import *
 from migen.genlib.cdc import MultiReg
-from litex.soc.cores import dna, uart, spi
+from litex.soc.cores import dna, uart, spi_old
 from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
 from litex.soc.interconnect import wishbone
@@ -119,7 +119,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         #  SPI master
         # ----------------------------
         spi_pads = p.request("LTC_SPI")
-        self.submodules.spi = spi.SPIMaster(spi_pads)
+        self.submodules.spi = spi_old.SPIMaster(spi_pads)
 
         # ----------------------------
         #  Acquisition memory for ADC data
