@@ -12,12 +12,12 @@ from litex.build.generic_platform import *
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.soc_zynq import *
 from litex.soc.integration.builder import *
-from litex.soc.cores import dna
+from litex.soc.cores import dna, spi
 from litex.boards.platforms import zedboard
 from sys import path
 path.append("..")
 from common import main
-from zedboard import spi
+# from zedboard import spi
 
 
 # create our soc (no cpu, only wishbone 2 mem_map bridge)
@@ -26,9 +26,6 @@ class HelloHmc(SoCZynq, AutoCSR):
     csr_peripherals = [
         "dna",
         "spi",
-        "lvds",
-        "acq",
-        "analyzer"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -62,6 +59,7 @@ class HelloHmc(SoCZynq, AutoCSR):
                 Subsignal("miso", Pins("LPC:LA04_P"), Misc("PULLUP TRUE")),
                 Subsignal("mosi", Pins("LPC:LA03_N")),
                 Subsignal("clk",  Pins("LPC:LA03_P")),
+                Subsignal("spi_en", Pins("LPC:LA05_N")),
                 IOStandard("LVCMOS18")
             ),
         ])
@@ -74,11 +72,12 @@ class HelloHmc(SoCZynq, AutoCSR):
         #  SPI master
         # ----------------------------
         spi_pads = p.request("AD9174_SPI")
+        self.comb += spi_pads.spi_en.eq(0)
         self.submodules.spi = spi.SPIMaster(
             spi_pads,
-            # 16,
-            # self.clk_freq,
-            # int(1e6)
+            32,
+            self.clk_freq,
+            int(1e6)
         )
 
 
