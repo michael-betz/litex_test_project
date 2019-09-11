@@ -49,7 +49,7 @@ class S7_iserdes(Module):
         self.data_outs = [Signal(S) for i in range(D)]
 
         ###
-        self.initial_tl_done = Signal()
+        self.init_running = Signal(reset=1)
 
         self.clock_domains.cd_sample = ClockDomain("sample", reset_less=True)  # recovered ADC sample clock
 
@@ -66,7 +66,7 @@ class S7_iserdes(Module):
             "i_CE2": 1,
             "i_DYNCLKDIVSEL": 0,
             "i_DYNCLKSEL": 0,
-            "i_RST": ~self.initial_tl_done,
+            "i_RST": self.init_running,
             "i_BITSLIP": self.bitslip
         }
 
@@ -114,12 +114,12 @@ class S7_iserdes(Module):
         #   different number of bitslips are required
         #   for ISERDES on different clock domains
         self.sync += timeline(
-            ~self.initial_tl_done,
+            self.init_running,
             [
                 (0, [bufr_clr.eq(1), bufmr_ce.eq(0)]),
                 (1, [bufmr_ce.eq(1)]),
                 (2, [bufr_clr.eq(0)]),
-                (5, [self.initial_tl_done.eq(1)])
+                (5, [self.init_running.eq(0)])
             ]
         )
 
@@ -193,6 +193,7 @@ class S7_iserdes(Module):
             self.id_value,
             *self.data_outs
         }
+
 
 
 if __name__ == "__main__":

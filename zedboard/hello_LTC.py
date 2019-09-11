@@ -118,6 +118,13 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
         self.submodules.lvds = LTCPhy(p, clk_freq)
+        self.platform.add_false_path_constraints(
+            self.crg.cd_sys.clk,
+            self.lvds.cd_dco.clk
+        )
+        # self.platform.add_platform_command(
+        #     'set_false_path -through [get_nets lvds_dco_delay]'
+        # )
 
         # ----------------------------
         #  SPI master
