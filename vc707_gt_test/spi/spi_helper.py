@@ -75,8 +75,6 @@ class HmcSpi(NewSpi):
     def wr(self, adr, val):
         # R/W + W1 + W0 + A[13] + D[8]
         word = (0 << 23) | ((adr & 0x1FFF) << 8) | (val & 0xFF)
-        # Send 24 bit / 32 bit starting from MSB
-        word <<= 8
         self.rxtx(word, 2, True)
 
     def rr(self, adr):

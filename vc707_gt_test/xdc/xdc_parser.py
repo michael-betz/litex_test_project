@@ -16,13 +16,18 @@ class XdcParser:
             line = line.strip()
             if line.startswith('#'):
                 continue
-            parts = line.split()
-            if not parts[0] == 'set_property':
+            # line = 'set_property PACKAGE_PIN R5 [get_ports "DDR_RAS_n"]'
+            # line = 'set_property PIO_DIRECTION "BIDIR" [get_ports "MIO[53]"]'
+            m = re.fullmatch(
+                r'set_property\s+(\w+)\s+"?(\w+)"?\s+\[get_ports\s+"?([\w\[\]]+)"?\s*]',
+                line
+            )
+            if m is None or len(m.groups()) != 3:
+                print('sorry, parser is too dumb for this:\n', line)
                 continue
-            if parts[3] == '[get_ports':
-                self.props[parts[4].replace(']', '')][parts[1]] = parts[2]
-            else:
-                print('sorry, parser is too dumb for this:', parts)
+            parts = m.groups()
+            # parts = ('PACKAGE_PIN', 'R5', 'DDR_RAS_n')
+            self.props[parts[2]][parts[0]] = parts[1]
         self.sortKeys()
 
     def sortKeys(self):

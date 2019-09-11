@@ -42,15 +42,19 @@ class _CRG(Module):
 
         self.cd_sys.clk.attr.add("keep")
 
-        self.submodules.pll = pll = S7MMCM(speedgrade=-2)
-        self.comb += pll.reset.eq(platform.request("user_btn_c"))
-        pll.register_clkin(platform.request("clk100"), 100e6)
+        self.submodules.pll = pll = S7MMCM(speedgrade=-1)
+        pll.register_clkin(ClockSignal(), 100e6)
+        self.comb += [
+            pll.reset.eq(ResetSignal()),
+            platform.request("user_led").eq(pll.locked)
+        ]
+
+        pll.create_clkout(self.cd_clk200, 200e6)
+        self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
+
         # sys_clk is provided by FCLK_CLK0 from PS7
         # pll.create_clkout(self.cd_sys, sys_clk_freq)
-        pll.create_clkout(self.cd_clk200, 200e6)
-        self.comb += platform.request("user_led").eq(pll.locked)
 
-        self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_clk200)
 
 
 # create our soc (no cpu, only wishbone 2 serial)
@@ -113,7 +117,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         #  LTC LVDS driver on FMC LPC
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
-        self.submodules.lvds = LTCPhy(p, clk_freq)
+        # self.submodules.lvds = LTCPhy(p, clk_freq)
 
         # ----------------------------
         #  SPI master
@@ -124,18 +128,18 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         #  Acquisition memory for ADC data
         # ----------------------------
-        mems = []
-        for i, sample_out in enumerate(self.lvds.sample_outs):
-            mem = Memory(16, 4096, init=[i, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
-            mems.append(mem)
-            self.specials += mem
-            self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
-            self.register_mem(
-                "sample{}".format(i),
-                0x10000000 + i * 0x1000000,
-                self.sample_ram.bus,
-                mem.depth
-            )
+        # mems = []
+        # for i, sample_out in enumerate(self.lvds.sample_outs):
+        mem = Memory(16, 4096, init=[0, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
+        #     mems.append(mem)
+        self.specials += mem
+        self.submodules.sample_ram = wishbone.SRAM(mem, read_only=False)
+        self.register_mem(
+            "sample{}".format(0),
+            0x10000000 + 0 * 0x1000000,
+            self.sample_ram.bus,
+            mem.depth
+        )
             # p2 = mem.get_port(write_capable=True, clock_domain="sample")
             # self.specials += p2
             # self.sync.sample += [
