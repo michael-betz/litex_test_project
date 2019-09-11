@@ -117,7 +117,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         #  LTC LVDS driver on FMC LPC
         # ----------------------------
         # LTCPhy will recover ADC clock and drive `sample` clock domain
-        # self.submodules.lvds = LTCPhy(p, clk_freq)
+        self.submodules.lvds = LTCPhy(p, clk_freq)
 
         # ----------------------------
         #  SPI master

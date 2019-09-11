@@ -20,6 +20,11 @@ class LTCPhy(S7_iserdes, AutoCSR):
 
         ###
 
+        # self.platform.add_false_path_constraints(
+        #     self.crg.cd_sys.clk,
+        #     gtx.cd_tx.clk,
+        #     gtx.cd_rx.clk)
+
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
         S7_iserdes.__init__(
             self,
