@@ -9,20 +9,81 @@ from numpy import *
 from matplotlib.pyplot import *
 from matplotlib.animation import FuncAnimation
 from scipy.signal import periodogram
+import threading
 import argparse
 import os
-sys.path.append("..")
+sys.path.append("../..")
 from common import *
+
+
+def autoBitslip(r):
+    for i in range(8):
+        val0 = r.regs.lvds_data_peek0.read()
+        val1 = r.regs.lvds_data_peek2.read()
+        if val0 == 4 and val1 == 4:
+            print("autoBitslip(): aligned after", i)
+            return
+        if val0 != 4:
+            r.regs.lvds_bitslip0_csr.write(1)
+        if val1 != 4:
+            r.regs.lvds_bitslip1_csr.write(1)
+    raise RuntimeError("autoBitslip(): failed to align :(")
+
+
+def autoIdelay(r):
+    # approximately center the idelay first
+    val = r.regs.lvds_idelay_value.read()
+    val -= 16
+    if val > 0:
+        for i in range(val):
+            r.regs.lvds_idelay_dec.write(1)
+    else:
+        for i in range(-val):
+            r.regs.lvds_idelay_inc.write(1)
+
+    # decrement until the channels break
+    for i in range(32):
+        val0 = r.regs.lvds_data_peek0.read()
+        val1 = r.regs.lvds_data_peek2.read()
+        if val0 != 4 or val1 != 4:
+            break
+        r.regs.lvds_idelay_dec.write(1)
+    minValue = r.regs.lvds_idelay_value.read()
+
+    # step back up a little
+    for i in range(5):
+        r.regs.lvds_idelay_inc.write(1)
+
+    # increment until the channels break
+    for i in range(32):
+        val0 = r.regs.lvds_data_peek0.read()
+        val1 = r.regs.lvds_data_peek2.read()
+        if val0 != 4 or val1 != 4:
+            break
+        r.regs.lvds_idelay_inc.write(1)
+    maxValue = r.regs.lvds_idelay_value.read()
+
+    # set idelay to the sweet spot in the middle
+    for i in range((maxValue - minValue) // 2):
+        r.regs.lvds_idelay_dec.write(1)
+
+    print('autoIdelay(): min = {:}, mean = {:}, max = {:} idelays'.format(
+        minValue,
+        r.regs.lvds_idelay_value.read(),
+        maxValue
+    ))
 
 
 def getSamples(r, N=None):
     """ why doesn't RemoteClient take care of chunking for me ??? """
+    r_ch = r.mems.sample3
     if N is None:
-        N = r.mems.sample.size
-    o = r.mems.sample.base
-    r.regs.acq_trig_csr.write(0)
+        N = r_ch.size
+    o = r_ch.base
+    # r.regs.acq_trig_csr.write(0)
     samples = []
     while N:
+        print("read", hex(o), hex(min(255, N)))
         temp = r.read(o, min(255, N))
         o += len(temp) * 4  # in bytes!
         N -= len(temp)
@@ -31,25 +92,24 @@ def getSamples(r, N=None):
     return samples / (1 << 15) - 1
 
 
-def ani(i, r, args, lt=None, lf=None, rollBuffer=None):
-    yVect = getSamples(r, args.N)
-    if rollBuffer is not None:
+def ani_thread():
+    while isRunning:
+        # print('*', end='', flush=True)
+        yVect = getSamples(r, args.N)
         if len(rollBuffer) >= 32:
             rollBuffer.pop(0)
         rollBuffer.append(yVect)
-    f, Pxx = periodogram(
-        yVect,
-        args.fs,
-        window='hanning',
-        scaling='spectrum',
-        nfft=args.N * 2
-    )
-    spect = 10 * log10(Pxx) + 3
-    if lt:
+        f, Pxx = periodogram(
+            yVect,
+            args.fs,
+            window='hanning',
+            scaling='spectrum',
+            nfft=args.N * 2
+        )
+        spect = 10 * log10(Pxx) + 3
         lt.set_ydata(yVect)
-    if lf:
         lf.set_ydata(spect)
-    return yVect, f, spect
+        fig.canvas.draw_idle()
 
 
 def unique_filename(file_name):
@@ -63,6 +123,8 @@ def unique_filename(file_name):
 
 
 def main():
+    global fig, lt, lf, r, args, rollBuffer, isRunning
+    isRunning = True
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--N", default=1024, type=int, help="Number of samples per acquisition"
@@ -75,24 +137,17 @@ def main():
     # ----------------------------------------------
     #  Init hardware
     # ----------------------------------------------
-    r = conLitexServer()
+    r = conLitexServer('../build/csr.csv')
     print("fs = {:6f} MHz, should be {:6f} MHz".format(
         r.regs.lvds_f_sample_value.read() / 1e6, args.fs / 1e6
     ))
     print("Resetting LTC")
     ltc_spi = LTC_SPI(r)
-    ltc_spi.set_ltc_reg(0, 0x80)   # Software reset
-    print("Aligning bits: ", end="")
-    for i in range(8):
-        rVal = r.regs.lvds_frame_peek.read()
-        if rVal == 0xF0:
-            break
-        else:
-            r.regs.lvds_bitslip_csr.write(1)
-            print("*", end="")
-    if rVal != 0xF0:
-        raise RuntimeError("Bitslip error. Want 0x0F, got " + hex(rVal))
-    print("done!")
+    ltc_spi.set_ltc_reg(0, 0x80)   # reset the chip
+    ltc_spi.setTp(1)
+    autoBitslip(r)
+    autoIdelay(r)
+
     print("ADC word bits:")
     for i in range(14):
         tp = 1 << i
@@ -108,23 +163,27 @@ def main():
     # ----------------------------------------------
     fig, axs = subplots(2, 1, figsize=(10, 6))
     xVect = linspace(0, args.N / args.fs, args.N, endpoint=False)
-    yVect0, fVect, ampsVect = ani(0, r, args, rollBuffer=rollBuffer)
-    lt, = axs[0].plot(xVect * 1e9, yVect0, "-o")
-    lf, = axs[1].plot(fVect / 1e6, ampsVect)
+    yVect = zeros_like(xVect)
+    yVect[:2] = [-1, 1]
+    f, Pxx = periodogram(yVect, args.fs, nfft=args.N * 2)
+    lt, = axs[0].plot(xVect * 1e9, yVect, "-o")
+    lf, = axs[1].plot(f / 1e6, Pxx)
     axs[0].set_xlabel("Time [ns]")
     axs[1].set_xlabel("Frequency [MHz]")
     axs[0].set_ylabel("ADC value [FS]")
     axs[1].set_ylabel("ADC value [dB_FS]")
+    axs[0].axis((-100, 8300, -1, 1))
+    axs[1].axis((-0.5, 63, -110, -10))
     # GUI slider
-    sfreq = Slider(
-        axes([0.13, 0.9, 0.72, 0.05]),
-        'Trigger level',
-        -1, 1, -0.001,
-        '%1.3f'
-    )
-    sfreq.on_changed(
-        lambda l: r.regs.acq_trig_level.write(int((l + 1) * (1 << 15)))
-    )
+    # sfreq = Slider(
+    #     axes([0.13, 0.9, 0.72, 0.05]),
+    #     'Trigger level',
+    #     -1, 1, -0.001,
+    #     '%1.3f'
+    # )
+    # sfreq.on_changed(
+    #     lambda l: r.regs.acq_trig_level.write(int((l + 1) * (1 << 15)))
+    # )
     bDump = Button(axes([0.13, 0.01, 0.2, 0.05]), 'Dump .npz')
     def dump(x):
         fName = unique_filename("measurements/dump.npz")
@@ -132,8 +191,9 @@ def main():
         print("wrote {:} buffers to {:}".format(len(rollBuffer), fName))
         rollBuffer.clear()
     bDump.on_clicked(dump)
-    fani = FuncAnimation(fig, ani, interval=300, fargs=(r, args, lt, lf, rollBuffer))
+    threading.Thread(target=ani_thread).start()
     show()
+    isRunning = False
 
 
 if __name__ == '__main__':

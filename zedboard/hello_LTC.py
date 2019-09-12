@@ -120,7 +120,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         self.submodules.lvds = LTCPhy(p, clk_freq)
         self.platform.add_false_path_constraints(
             self.crg.cd_sys.clk,
-            self.lvds.cd_dco.clk
+            self.lvds.pads_dco.p
         )
         # self.platform.add_platform_command(
         #     'set_false_path -through [get_nets lvds_dco_delay]'
@@ -135,25 +135,27 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         #  Acquisition memory for ADC data
         # ----------------------------
-        # mems = []
-        # for i, sample_out in enumerate(self.lvds.sample_outs):
-        mem = Memory(16, 4096, init=[0, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
-        #     mems.append(mem)
-        self.specials += mem
-        self.submodules.sample_ram = wishbone.SRAM(mem, read_only=False)
-        self.register_mem(
-            "sample{}".format(0),
-            0x10000000 + 0 * 0x1000000,
-            self.sample_ram.bus,
-            mem.depth
-        )
-            # p2 = mem.get_port(write_capable=True, clock_domain="sample")
-            # self.specials += p2
-            # self.sync.sample += [
-            #     p2.we.eq(1),
-            #     p2.adr.eq(p2.adr + 1),
-            #     p2.dat_w.eq(sample_out)
-            # ]
+        mems = []
+        btn_c = self.platform.request('user_btn_c')
+        for i, sample_out in enumerate(self.lvds.sample_outs):
+            mem = Memory(16, 4096, init=[i, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
+            mems.append(mem)
+            self.specials += mem
+            self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
+            self.register_mem(
+                "sample{}".format(i),
+                0x10000000 + i * 0x1000000,
+                self.sample_ram.bus,
+                mem.depth
+            )
+            p2 = mem.get_port(write_capable=True, clock_domain="sample")
+            self.specials += p2
+            self.sync.sample += [
+                p2.we.eq(btn_c),
+                p2.adr.eq(p2.adr + 1),
+                p2.dat_w.eq(sample_out)
+            ]
+            # break
         # self.submodules.acq = Acquisition(mems, self.lvds.sample_outs, N_BITS=16)
         # self.specials += MultiReg(
         #     p.request("user_btn_d"), self.acq.trigger

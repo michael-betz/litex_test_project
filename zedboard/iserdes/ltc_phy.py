@@ -20,11 +20,6 @@ class LTCPhy(S7_iserdes, AutoCSR):
 
         ###
 
-        # self.platform.add_false_path_constraints(
-        #     self.crg.cd_sys.clk,
-        #     gtx.cd_tx.clk,
-        #     gtx.cd_rx.clk)
-
         # Note: LTC2175 streams the MSB first and needs bit-mirroring
         S7_iserdes.__init__(
             self,
@@ -34,14 +29,14 @@ class LTCPhy(S7_iserdes, AutoCSR):
             clock_regions=[0, 0, 0, 0, 1, 1, 1, 1, 1],
         )
 
-        pads_dco = platform.request("LTC_DCO")
+        self.pads_dco = platform.request("LTC_DCO")
         self.comb += [
-            self.dco_p.eq(pads_dco.p),
-            self.dco_n.eq(pads_dco.n)
+            self.dco_p.eq(self.pads_dco.p),
+            self.dco_n.eq(self.pads_dco.n)
         ]
         f_sample_clk = 125e6
         f_dco_clk = f_sample_clk * 4
-        platform.add_period_constraint(pads_dco.p, 1e9 / f_dco_clk)
+        platform.add_period_constraint(self.pads_dco.p, 1e9 / f_dco_clk)
 
         dat_p = []
         dat_n = []
@@ -89,19 +84,29 @@ class LTCPhy(S7_iserdes, AutoCSR):
         self.submodules.f_sample_blink = \
             ClockDomainsRenamer("sample")(LedBlinker(f_sample_clk))
 
-        # CSR for moving a IDELAY2 up / down, doing a bitslip
+        # CSR for moving a IDELAY2 up / down
         self.idelay_inc = CSR(1)
         self.idelay_dec = CSR(1)
         self.idelay_value = CSR(5)
-        self.bitslip_csr = CSR(1)
-        # Bitslip pulse needs to cross clock domains!
-        self.submodules.bs_sync = PulseSynchronizer("sys", "sample")
+
+        # Bitslip controls, one for each clock region
+        for i in range(self.N_CLK_REGIONS):
+            c = CSR(1, "bitslip{:}_csr".format(i))
+            setattr(self, c.name, c)
+
+            # Bitslip pulse needs to cross clock domain cleanly!
+            ps = PulseSynchronizer("sys", "bufr_{:}".format(i))
+            self.submodules += ps
+
+            self.comb += [
+                ps.i.eq(c.re),
+                self.bitslip[i].eq(ps.o)
+            ]
+
         self.comb += [
             platform.request("user_led").eq(self.f_sample_blink.out),
             self.f_sample.clk.eq(ClockSignal("sample")),
             self.id_inc.eq(self.idelay_inc.re),
             self.id_dec.eq(self.idelay_dec.re),
-            self.idelay_value.w.eq(self.id_value),
-            self.bs_sync.i.eq(self.bitslip_csr.re),
-            self.bitslip.eq(self.bs_sync.o)
+            self.idelay_value.w.eq(self.id_value)
         ]

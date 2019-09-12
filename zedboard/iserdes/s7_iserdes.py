@@ -5,6 +5,8 @@
  This transition happens when data is stable (90 deg phase shift)
 
  try `python3 s7_iserdes.py build`
+
+ TODO add ISERDES + BUFMCE reset (with CSR)
  """
 
 from sys import argv
@@ -27,6 +29,7 @@ class S7_iserdes(Module):
             example for 3 signals, where the last one is in a separate clock region:
             clock_regions = [0, 0, 1]
         """
+        self.N_CLK_REGIONS = max(clock_regions) + 1
 
         # LVDS DDR bit clock
         self.dco_p = Signal()
@@ -36,7 +39,9 @@ class S7_iserdes(Module):
         self.lvds_data_p = Signal(D)
         self.lvds_data_n = Signal(D)
 
-        self.bitslip = Signal()  # Pulse to rotate (sample clock domain)
+        # Pulse to rotate bits (sample clock domain)
+        # Each clock region has its own bitslip
+        self.bitslip = Signal(self.N_CLK_REGIONS)
 
         # IDELAY control for DCO clock input
         # on sys clock domain
@@ -49,6 +54,7 @@ class S7_iserdes(Module):
         self.data_outs = [Signal(S) for i in range(D)]
 
         ###
+
         self.init_running = Signal(reset=1)
 
         self.clock_domains.cd_sample = ClockDomain("sample", reset_less=True)  # recovered ADC sample clock
@@ -66,19 +72,18 @@ class S7_iserdes(Module):
             "i_CE2": 1,
             "i_DYNCLKDIVSEL": 0,
             "i_DYNCLKSEL": 0,
-            "i_RST": self.init_running,
-            "i_BITSLIP": self.bitslip
+            "i_RST": self.init_running
         }
 
         # -------------------------------------------------
         #  DCO input clock --> IDELAYE2 --> BUFMRCE
         # -------------------------------------------------
-        self.clock_domains.cd_dco = ClockDomain("dco", reset_less=True)
+        dco = Signal()
         dco_delay = Signal()
         dco_delay_2 = Signal()
         id_CE = Signal()
         self.comb += id_CE.eq(self.id_inc ^ self.id_dec)
-        self.specials += DifferentialInput(self.dco_p, self.dco_n, ClockSignal("dco"))
+        self.specials += DifferentialInput(self.dco_p, self.dco_n, dco)
         self.specials += Instance("IDELAYE2",
             p_DELAY_SRC="IDATAIN",
             p_HIGH_PERFORMANCE_MODE="TRUE",
@@ -95,7 +100,7 @@ class S7_iserdes(Module):
             i_CNTVALUEIN=Constant(0, 5),
             i_DATAIN=0,
             i_REGRST=0,
-            i_IDATAIN=ClockSignal("dco"),
+            i_IDATAIN=dco,
 
             o_DATAOUT=dco_delay,
             o_CNTVALUEOUT=self.id_value
@@ -126,24 +131,26 @@ class S7_iserdes(Module):
         # -------------------------------------------------
         #  generate a BUFR and BUFIO for each clock region
         # -------------------------------------------------
-        io_clks = []
-        sample_clks = []
-        for i in range(max(clock_regions) + 1):
+        io_clks = []  # Regional IO clocks driven by BUFIO
+        r_clks = []   # Regional clocks driven by BUFR
+        for i in range(self.N_CLK_REGIONS):
             io_clk = Signal()
-            sample_clk = Signal()
             self.specials += Instance("BUFIO",
                 i_I=dco_delay_2,
                 o_O=io_clk
             )
+            # Create the regional clock domain
+            cd = ClockDomain('bufr_{:}'.format(i), True)
+            self.clock_domains += cd
             self.specials += Instance("BUFR",
                 p_BUFR_DIVIDE=str(S),
                 i_I=dco_delay_2,
                 i_CE=1,
                 i_CLR=bufr_clr,
-                o_O=sample_clk
+                o_O=cd.clk
             )
             io_clks.append(io_clk)
-            sample_clks.append(sample_clk)
+            r_clks.append(cd)
 
         # Make `sample` clock globally available
         # self.specials += Instance(
@@ -151,7 +158,7 @@ class S7_iserdes(Module):
         #     i_I=sample_clk,
         #     o_O=ClockSignal("sample")
         # )
-        self.comb += ClockSignal("sample").eq(sample_clk)
+        self.comb += ClockSignal("sample").eq(cd.clk)
 
         # -------------------------------------------------
         #  Generate an IDERDES for each data lane
@@ -163,22 +170,27 @@ class S7_iserdes(Module):
             clock_regions
         ):
             d_i = Signal()
+            d_o_ = Signal(8)
             self.specials += DifferentialInput(d_p, d_n, d_i)
             self.specials += Instance("ISERDESE2",
                 **self.iserdes_default,
                 i_CLK=io_clks[c_reg],
                 i_CLKB=~io_clks[c_reg],
-                i_CLKDIV=sample_clks[c_reg],
+                i_CLKDIV=r_clks[c_reg].clk,
                 i_D=d_i,
-                o_Q1=d_o[0],
-                o_Q2=d_o[1],
-                o_Q3=d_o[2],
-                o_Q4=d_o[3],
-                o_Q5=d_o[4],
-                o_Q6=d_o[5],
-                o_Q7=d_o[6],
-                o_Q8=d_o[7]
+                i_BITSLIP=self.bitslip[c_reg],
+                o_Q1=d_o_[0],
+                o_Q2=d_o_[1],
+                o_Q3=d_o_[2],
+                o_Q4=d_o_[3],
+                o_Q5=d_o_[4],
+                o_Q6=d_o_[5],
+                o_Q7=d_o_[6],
+                o_Q8=d_o_[7]
             )
+            # Register the output once in the regional clock domain
+            sync_ = getattr(self.sync, 'bufr_{:}'.format(c_reg))
+            sync_ += d_o.eq(d_o_)
 
     def getIOs(self):
         """ for easier interfacing to testbench """
@@ -193,7 +205,6 @@ class S7_iserdes(Module):
             self.id_value,
             *self.data_outs
         }
-
 
 
 if __name__ == "__main__":

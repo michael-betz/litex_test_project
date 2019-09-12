@@ -10,6 +10,9 @@ all: $(TARGETS).bit.bin
 upload: $(TARGETS).bit.bin
 	util/remote_config_fpga.sh $<
 
+server:
+	util/remote_litex_server.sh
+
 clean::
 	rm -f $(TARGETS).bit.bin
 	rm -rf build
