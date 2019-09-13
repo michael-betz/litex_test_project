@@ -29,7 +29,7 @@ from sys import path
 path.append("iserdes")
 from ltc_phy import LTCPhy
 path.append("..")
-from common import main, ltc_pads
+from common import main, ltc_pads, LedBlinker
 path.append("../sp605/dsp")
 from acquisition import Acquisition
 
@@ -50,8 +50,7 @@ class _CRG(Module):
         self.submodules.pll = pll = S7MMCM(speedgrade=-1)
         pll.register_clkin(ClockSignal('sys'), 100e6)
         self.comb += [
-            pll.reset.eq(ResetSignal('sys')),
-            platform.request('user_led').eq(pll.locked)
+            pll.reset.eq(ResetSignal('sys'))
         ]
 
         pll.create_clkout(self.cd_clk200, 200e6)
@@ -63,9 +62,16 @@ class _CRG(Module):
         else:
             self.comb += rst_sum.eq(platform.request('user_btn_u'))
         self.specials += AsyncResetSynchronizer(self.cd_sys, rst_sum)
-        self.comb += platform.request('user_led').eq(ResetSignal('sys'))
+
         # sys_clk is provided by FCLK_CLK0 from PS7
         # pll.create_clkout(self.cd_sys, sys_clk_freq)
+
+        # Flashy Led blinker for sample_clk
+        bl = LedBlinker(
+            125e6 / 16,
+            Cat([platform.request('user_led', i) for i in range(8)])
+        )
+        self.submodules.sample_blink = ClockDomainsRenamer("sample")(bl)
 
 
 # create our soc (no cpu, only wishbone 2 serial)

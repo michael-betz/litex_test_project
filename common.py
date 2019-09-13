@@ -64,14 +64,17 @@ ltc_pads = [
     )
 ]
 
+
 class LedBlinker(Module):
-    def __init__(self, f_clk=100e6):
+    def __init__(self, f_clk=100e6, outs=None):
         """
         for debugging clocks
-        toggles output at 1 Hz
+        toggles outputs at 1 Hz
         use ClockDomainsRenamer()!
         """
-        self.out = Signal()
+        self.outs = outs
+        if outs is None:
+            self.outs = Signal(8)
 
         ###
 
@@ -81,18 +84,25 @@ class LedBlinker(Module):
             cntr.eq(cntr + 1),
             If(cntr == max_cnt,
                 cntr.eq(0),
-                self.out.eq(~self.out)
+                self.outs.eq(Cat(~self.outs[-1], self.outs[:-1]))
             )
         ]
 
 
-def main(soc, doc=''):
+def main(soc, doc='', **kwargs):
     """ generic main function for litex modules """
+    print(argv, kwargs)
     if len(argv) < 2:
         print(doc)
         exit(-1)
     tName = argv[0].replace(".py", "")
     vns = None
+    if 'sim' in argv:
+        run_simulation(
+            soc,
+            vcd_name=tName + '.vcd',
+            **kwargs
+        )
     if "build" in argv:
         builder = Builder(
             soc, output_dir="build", csr_csv="build/csr.csv",
