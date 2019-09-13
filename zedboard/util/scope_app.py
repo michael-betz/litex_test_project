@@ -18,16 +18,12 @@ from common import *
 
 def autoBitslip(r):
     for i in range(8):
-        val0 = r.regs.lvds_data_peek0.read()
-        val1 = r.regs.lvds_data_peek2.read()
-        if val0 == 4 and val1 == 4:
+        val = r.regs.lvds_frame_peek.read()
+        if val == 0xF0:
             print("autoBitslip(): aligned after", i)
             return
-        if val0 != 4:
-            r.regs.lvds_bitslip0_csr.write(1)
-        if val1 != 4:
-            r.regs.lvds_bitslip1_csr.write(1)
-    raise RuntimeError("autoBitslip(): failed to align :(")
+        r.regs.lvds_bitslip_csr.write(1)
+    raise RuntimeError("autoBitslip(): failed alignment :(")
 
 
 def autoIdelay(r):

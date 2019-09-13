@@ -7,8 +7,8 @@ all: $(TARGETS).bit.bin
 	mv $<.bin .
 
 # Upload to the zedboard via scp and program the PL
-upload: $(TARGETS).bit.bin
-	util/remote_config_fpga.sh $<
+upload:
+	util/remote_config_fpga.sh $(TARGETS).bit.bin
 
 server:
 	util/remote_litex_server.sh

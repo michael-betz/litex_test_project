@@ -12,8 +12,9 @@
 from sys import argv
 from migen import *
 from migen.build.xilinx.common import xilinx_special_overrides
-from migen.genlib.cdc import AsyncResetSynchronizer
+from migen.genlib.resetsync import AsyncResetSynchronizer
 from migen.genlib.io import DifferentialInput
+from migen.genlib.cdc import MultiReg
 from migen.genlib.misc import timeline
 
 
@@ -40,8 +41,9 @@ class S7_iserdes(Module):
         self.lvds_data_n = Signal(D)
 
         # Pulse to rotate bits (sample clock domain)
-        # Each clock region has its own bitslip
-        self.bitslip = Signal(self.N_CLK_REGIONS)
+        # Applies to all iserdes in both clock regions
+        # they should be phase aligned!
+        self.bitslip = Signal()
 
         # IDELAY control for DCO clock input
         # on sys clock domain
@@ -55,9 +57,9 @@ class S7_iserdes(Module):
 
         ###
 
+        # recovered ADC sampling clock
+        self.clock_domains.cd_sample = ClockDomain("sample")
         self.init_running = Signal(reset=1)
-
-        self.clock_domains.cd_sample = ClockDomain("sample", reset_less=True)  # recovered ADC sample clock
 
         self.iserdes_default = {
             "p_DATA_WIDTH": S,
@@ -71,8 +73,7 @@ class S7_iserdes(Module):
             "i_CE1": 1,
             "i_CE2": 1,
             "i_DYNCLKDIVSEL": 0,
-            "i_DYNCLKSEL": 0,
-            "i_RST": self.init_running
+            "i_DYNCLKSEL": 0
         }
 
         # -------------------------------------------------
@@ -108,41 +109,63 @@ class S7_iserdes(Module):
 
         bufmr_ce = Signal()
         bufr_clr = Signal(reset=1)
-        self.specials += Instance("BUFMRCE",
+        self.specials += Instance(
+            "BUFMRCE",
             i_CE=bufmr_ce,
             i_I=dco_delay,
             o_O=dco_delay_2
         )
 
+        # -------------------------------------------------
+        #  Reset sequence
+        # -------------------------------------------------
         # synchronize BUFR dividers on sys_clk reset
         # a symptom of screwing this up is:
-        #   different number of bitslips are required
-        #   for ISERDES on different clock domains
-        self.sync += timeline(
+        #   * different number of bitslips are required
+        #     for ISERDES in different clock regions
+        #
+        # __Note:__
+        # The sequence suggested in [1] releases `bufr_clr` last,
+        # which for me did not align the BUFR dividers reliably.
+        # However releasing `bufmr_ce` last did the tick.
+        # Error in the Xilinx documentation?
+        #
+        # [1] UG472 p. 110 `BUFR Alignment`
+        self.sync.sys += timeline(
             self.init_running,
             [
+                # Shut down sample_clk at BUFMRCE, clear regional dividers ...
                 (0, [bufr_clr.eq(1), bufmr_ce.eq(0)]),
-                (1, [bufmr_ce.eq(1)]),
-                (2, [bufr_clr.eq(0)]),
-                (5, [self.init_running.eq(0)])
+                (4, [bufr_clr.eq(0)]),
+                # Re-enable sample_clk
+                (8, [bufmr_ce.eq(1)]),
+                # Sample clock is running and synced, release iserdes reset
+                (16, [self.init_running.eq(0)])
             ]
+        )
+        # Only release all resets on sample_clk domain after step 16
+        self.specials += AsyncResetSynchronizer(
+            self.cd_sample,
+            self.init_running
         )
 
         # -------------------------------------------------
         #  generate a BUFR and BUFIO for each clock region
         # -------------------------------------------------
         io_clks = []  # Regional IO clocks driven by BUFIO
-        r_clks = []   # Regional clocks driven by BUFR
+        r_clks = []   # Regional fabric clocks driven by BUFR
         for i in range(self.N_CLK_REGIONS):
             io_clk = Signal()
-            self.specials += Instance("BUFIO",
+            self.specials += Instance(
+                "BUFIO",
                 i_I=dco_delay_2,
                 o_O=io_clk
             )
             # Create the regional clock domain
             cd = ClockDomain('bufr_{:}'.format(i), True)
             self.clock_domains += cd
-            self.specials += Instance("BUFR",
+            self.specials += Instance(
+                "BUFR",
                 p_BUFR_DIVIDE=str(S),
                 i_I=dco_delay_2,
                 i_CE=1,
@@ -152,12 +175,7 @@ class S7_iserdes(Module):
             io_clks.append(io_clk)
             r_clks.append(cd)
 
-        # Make `sample` clock globally available
-        # self.specials += Instance(
-        #     "BUFG",
-        #     i_I=sample_clk,
-        #     o_O=ClockSignal("sample")
-        # )
+        # Make last regional clock available to rest of the design
         self.comb += ClockSignal("sample").eq(cd.clk)
 
         # -------------------------------------------------
@@ -170,15 +188,29 @@ class S7_iserdes(Module):
             clock_regions
         ):
             d_i = Signal()
-            d_o_ = Signal(8)
             self.specials += DifferentialInput(d_p, d_n, d_i)
-            self.specials += Instance("ISERDESE2",
+
+            # Register in- and outputs once more in the regional clock domain
+            # maybe not really necessary but might help timing
+            rst_iserdes_ = Signal()
+            bitslip_ = Signal()
+            d_o_ = Signal(8)
+            sync_ = getattr(self.sync, 'bufr_{:}'.format(c_reg))
+            sync_ += [
+                rst_iserdes_.eq(ResetSignal('sample')),
+                bitslip_.eq(self.bitslip),
+                d_o.eq(d_o_),
+            ]
+
+            self.specials += Instance(
+                "ISERDESE2",
                 **self.iserdes_default,
                 i_CLK=io_clks[c_reg],
                 i_CLKB=~io_clks[c_reg],
                 i_CLKDIV=r_clks[c_reg].clk,
                 i_D=d_i,
-                i_BITSLIP=self.bitslip[c_reg],
+                i_BITSLIP=bitslip_,
+                i_RST=rst_iserdes_,
                 o_Q1=d_o_[0],
                 o_Q2=d_o_[1],
                 o_Q3=d_o_[2],
@@ -188,9 +220,6 @@ class S7_iserdes(Module):
                 o_Q7=d_o_[6],
                 o_Q8=d_o_[7]
             )
-            # Register the output once in the regional clock domain
-            sync_ = getattr(self.sync, 'bufr_{:}'.format(c_reg))
-            sync_ += d_o.eq(d_o_)
 
     def getIOs(self):
         """ for easier interfacing to testbench """
@@ -209,7 +238,12 @@ class S7_iserdes(Module):
 
 if __name__ == "__main__":
     """
-    for simulating with test/sp6_ddr_tb.v in Icarus
+    generate a .v file for simulation with xsim using
+    the encrypted UNISIM model of ISERDESE2
+
+    to run the simulation, try:
+        $ make s7_iserdes.vcd
+        $ gtkwave s7_iserdes.vcd
     """
     if "build" not in argv:
         print(__doc__)
@@ -224,4 +258,3 @@ if __name__ == "__main__":
         # create_clock_domains=False,
         name=tName
     ).write(tName + ".v")
-

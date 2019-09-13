@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-
 import argparse
-
-import sys
-import socket
 import time
+import socket
 import threading
-
 from etherbone import EtherbonePacket, EtherboneRecord, EtherboneWrites
 from etherbone import EtherboneIPC
 
@@ -50,7 +46,7 @@ class RemoteServer(EtherboneIPC):
                         packet = self.receive_packet(client_socket)
                         if packet == 0:
                             break
-                    except:
+                    except Exception:
                         break
                     packet = EtherbonePacket(packet)
                     packet.decode()
@@ -65,11 +61,13 @@ class RemoteServer(EtherboneIPC):
                     self.lock = True
 
                     # handle writes:
-                    if record.writes != None:
-                        self.comm.write(record.writes.base_addr, record.writes.get_datas())
+                    if record.writes is not None:
+                        self.comm.write(
+                            record.writes.base_addr, record.writes.get_datas()
+                        )
 
                     # handle reads
-                    if record.reads != None:
+                    if record.reads is not None:
                         reads = []
                         for addr in record.reads.get_addrs():
                             reads.append(self.comm.read(addr))
@@ -109,8 +107,12 @@ def main():
     # Devmem arguments
     parser.add_argument("--devmem", action="store_true",
                         help="Select /dev/mem interface")
-    parser.add_argument("--devmem-offset", default=0x40000000, type=lambda x: int(x, 0),
-                        help="/dev/mem address offset, gp0 is at 0x4000_0000")
+    parser.add_argument(
+        "--devmem-offset",
+        default=0x40000000,
+        type=lambda x: int(x, 0),
+        help="/dev/mem address offset, gp0 is at 0x4000_0000"
+    )
 
     args = parser.parse_args()
 
@@ -129,11 +131,9 @@ def main():
     server = RemoteServer(comm, args.bind_ip, int(args.bind_port))
     server.open()
     server.start(4)
-    try:
-        import time
-        while True: time.sleep(100)
-    except KeyboardInterrupt:
-        pass
+    while True:
+        time.sleep(1000)
+
 
 if __name__ == "__main__":
     main()

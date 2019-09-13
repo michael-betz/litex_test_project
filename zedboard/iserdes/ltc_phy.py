@@ -89,19 +89,15 @@ class LTCPhy(S7_iserdes, AutoCSR):
         self.idelay_dec = CSR(1)
         self.idelay_value = CSR(5)
 
-        # Bitslip controls, one for each clock region
-        for i in range(self.N_CLK_REGIONS):
-            c = CSR(1, "bitslip{:}_csr".format(i))
-            setattr(self, c.name, c)
+        # one bitslip control for all ISERDESE2 in all regions
+        self.bitslip_csr = CSR(1)
 
-            # Bitslip pulse needs to cross clock domain cleanly!
-            ps = PulseSynchronizer("sys", "bufr_{:}".format(i))
-            self.submodules += ps
-
-            self.comb += [
-                ps.i.eq(c.re),
-                self.bitslip[i].eq(ps.o)
-            ]
+        # Bitslip pulse needs to cross clock domain cleanly!
+        self.submodules.ps_bs = PulseSynchronizer("sys", "sample")
+        self.comb += [
+            self.ps_bs.i.eq(self.bitslip_csr.re),
+            self.bitslip.eq(self.ps_bs.o)
+        ]
 
         self.comb += [
             platform.request("user_led").eq(self.f_sample_blink.out),
