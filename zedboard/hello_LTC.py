@@ -24,6 +24,7 @@ from litex.soc.cores import dna, uart, spi_old
 from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
 from litex.soc.interconnect import wishbone
+from litex.soc.cores import frequency_meter
 from litescope import LiteScopeAnalyzer
 from sys import path
 path.append("iserdes")
@@ -76,7 +77,8 @@ class HelloLtc(SoCZynq, AutoCSR):
         "spi",
         "lvds",
         "acq",
-        "analyzer"
+        "analyzer",
+        "f_clk100"
     ]
     csr_map_update(SoCCore.csr_map, csr_peripherals)
 
@@ -121,6 +123,14 @@ class HelloLtc(SoCZynq, AutoCSR):
         p.add_false_path_constraints(
             self.crg.cd_sys.clk,
             self.lvds.pads_dco.p
+        )
+
+        # ----------------------------
+        #  Clock sanity check
+        # ----------------------------
+        self.submodules.f_clk100 = frequency_meter.FrequencyMeter(
+            clk_freq,
+            clk=p.request('clk100')
         )
 
         # ----------------------------

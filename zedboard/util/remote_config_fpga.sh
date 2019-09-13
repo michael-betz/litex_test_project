@@ -1,6 +1,8 @@
 #!/bin/bash
 # Usage: config_remote.sh bitfile.bit.bin
-# Requires ssh-login with pre-shared key and sudo without password :p
+# Used best with pre-shared ssh key and sudo without password :p
+# try:
+#     $ ssh-copy-id <hostname>
 HOSTNAME=spaetzle.dhcp
 FILE_NAME=$(basename -- "$1")
 scp $1 $HOSTNAME:

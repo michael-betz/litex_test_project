@@ -1,4 +1,6 @@
 # Steps to get debian running on zedboard
+It's like having a raspberry pi in your FPGA :)
+
 mostly based on these two guides:
   * https://github.com/PyHDI/zynq-linux
   * https://blog.n621.de/2016/05/running-linux-on-a-zynq-without-vivado-madness/

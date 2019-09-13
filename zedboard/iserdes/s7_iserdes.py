@@ -166,7 +166,7 @@ class S7_iserdes(Module):
             self.clock_domains += cd
             self.specials += Instance(
                 "BUFR",
-                p_BUFR_DIVIDE=str(S),
+                p_BUFR_DIVIDE=str(S // 2),  # half due to DDR
                 i_I=dco_delay_2,
                 i_CE=1,
                 i_CLR=bufr_clr,
