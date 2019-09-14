@@ -17,6 +17,11 @@ from common import *
 
 
 def autoBitslip(r):
+    '''
+    resets IDELAY to the middle,
+    fires bitslips until the frame signal reads 0xF0
+    '''
+    setIdelay(r, 16)
     for i in range(8):
         val = r.regs.lvds_frame_peek.read()
         if val == 0xF0:
@@ -26,16 +31,28 @@ def autoBitslip(r):
     raise RuntimeError("autoBitslip(): failed alignment :(")
 
 
-def autoIdelay(r):
-    # approximately center the idelay first
+def setIdelay(r, target_val):
+    '''
+    increments / decrements IDELAY to reach target_val
+    '''
     val = r.regs.lvds_idelay_value.read()
-    val -= 16
+    val -= target_val
     if val > 0:
         for i in range(val):
             r.regs.lvds_idelay_dec.write(1)
     else:
         for i in range(-val):
             r.regs.lvds_idelay_inc.write(1)
+
+
+def autoIdelay(r):
+    '''
+    testpattern must be 0x01
+    bitslips must have been carried out already such that
+    data_peek reads 0x04
+    '''
+    # approximately center the idelay first
+    setIdelay(r, 16)
 
     # decrement until the channels break
     for i in range(32):
@@ -60,8 +77,7 @@ def autoIdelay(r):
     maxValue = r.regs.lvds_idelay_value.read()
 
     # set idelay to the sweet spot in the middle
-    for i in range((maxValue - minValue) // 2):
-        r.regs.lvds_idelay_dec.write(1)
+    setIdelay(r, (minValue + maxValue) // 2)
 
     print('autoIdelay(): min = {:}, mean = {:}, max = {:} idelays'.format(
         minValue,

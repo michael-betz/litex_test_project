@@ -69,7 +69,7 @@ class _CRG(Module):
 
         # Flashy Led blinker for sample_clk
         bl = LedBlinker(
-            125e6 / 16,
+            125e6 / 8,
             Cat([platform.request('user_led', i) for i in range(8)])
         )
         self.submodules.sample_blink = ClockDomainsRenamer("sample")(bl)
@@ -128,15 +128,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         # tell vivado that sys_clk and sampl_clk are asynchronous
         p.add_false_path_constraints(
             self.crg.cd_sys.clk,
-            self.lvds.pads_dco.p
-        )
-
-        # ----------------------------
-        #  Clock sanity check
-        # ----------------------------
-        self.submodules.f_clk100 = frequency_meter.FrequencyMeter(
-            clk_freq,
-            clk=p.request('clk100')
+            self.lvds.pads_dco
         )
 
         # ----------------------------
@@ -166,17 +158,17 @@ class HelloLtc(SoCZynq, AutoCSR):
             self.sync.sample += [
                 p2.we.eq(btn_c),
                 p2.adr.eq(p2.adr + 1),
-                p2.dat_w.eq(sample_out)
+                p2.dat_w.eq(p2.adr + 1)
             ]
-            # break
-        # self.submodules.acq = Acquisition(mems, self.lvds.sample_outs, N_BITS=16)
-        # self.specials += MultiReg(
-        #     p.request("user_btn_d"), self.acq.trigger
+        # self.submodules.acq = Acquisition(
+        #     mems,
+        #     self.lvds.sample_outs,
+        #     N_BITS=16
         # )
-        # self.comb += [
-        #     p.request("user_led").eq(self.acq.trigger),
-        #     p.request("user_led").eq(self.acq.busy)
-        # ]
+        # self.specials += MultiReg(
+        #     p.request("user_btn_c"), self.acq.trigger
+        # )
+
 
 if __name__ == '__main__':
     soc = HelloLtc(
