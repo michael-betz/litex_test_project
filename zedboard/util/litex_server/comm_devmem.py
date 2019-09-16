@@ -53,8 +53,10 @@ class CommDevmem:
     def read(self, addr, length=None):
         data = []
         length_int = 1 if length is None else length
+        if addr % 4 > 0:
+            print("warning: un-aligned memory access", hex(addr))
+        self.mmap.seek(addr)
         for i in range(length_int):
-            self.mmap.seek(addr + 4 * i)
             value = int.from_bytes(self.mmap.read(4), byteorder="little")
             if self.debug:
                 print("read {:08x} @ {:08x}".format(value, addr + 4 * i))
@@ -65,7 +67,8 @@ class CommDevmem:
 
     def write(self, addr, data):
         data = data if isinstance(data, list) else [data]
+        self.mmap.seek(addr)
         for i, value in enumerate(data):
-            self.mmap[addr + 4 * i: addr + 4 * (i + 1)] = value.to_bytes(4, byteorder="little")
+            self.mmap.write(value.to_bytes(4, byteorder="little"))
             if self.debug:
                 print("write {:08x} @ {:08x}".format(value, addr + 4 * i))
