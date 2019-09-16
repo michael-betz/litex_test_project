@@ -236,6 +236,17 @@ def getNyquist(f, fs):
         return (1 - f_fract) * fs
 
 
+def hd(dat, pad_width=1, word_width=None):
+    ''' print a hex-dump, word_width in bytes '''
+    if word_width is None:
+        word_width = pad_width
+    for i, d in enumerate(dat):
+        if i % 8 == 0 and len(dat) > 8:
+            print('\n{:04x}: '.format(i * word_width), end='')
+        print('{:0{ww}x} '.format(d, ww=pad_width * 2), end='')
+    print()
+
+
 def printPd(r):
     """ read iserdes phase detectors, -1 < val < 1 """
     integr = r.regs.lvds_pd_period_csr.read()
