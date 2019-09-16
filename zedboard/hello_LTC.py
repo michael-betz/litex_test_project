@@ -138,10 +138,9 @@ class HelloLtc(SoCZynq, AutoCSR):
         self.submodules.spi = spi_old.SPIMaster(spi_pads)
 
         # ----------------------------
-        #  Acquisition memory for ADC data
+        #  4 x Acquisition memory for ADC data
         # ----------------------------
         mems = []
-        btn_c = p.request('user_btn_c')
         for i, sample_out in enumerate(self.lvds.sample_outs):
             mem = Memory(16, 4096, init=[i, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
             mems.append(mem)
@@ -149,25 +148,22 @@ class HelloLtc(SoCZynq, AutoCSR):
             self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
             self.register_mem(
                 "sample{}".format(i),
-                0x10000000 + i * 0x1000000,
+                0x10000000 + i * 0x01000000,  # [bytes]
                 self.sample_ram.bus,
-                mem.depth
+                mem.depth * 4  # [bytes]
             )
-            p2 = mem.get_port(write_capable=True, clock_domain="sample")
-            self.specials += p2
-            self.sync.sample += [
-                p2.we.eq(btn_c),
-                p2.adr.eq(p2.adr + 1),
-                p2.dat_w.eq(p2.adr + 1)
-            ]
-        # self.submodules.acq = Acquisition(
-        #     mems,
-        #     self.lvds.sample_outs,
-        #     N_BITS=16
-        # )
-        # self.specials += MultiReg(
-        #     p.request("user_btn_c"), self.acq.trigger
-        # )
+
+        # ----------------------------
+        #  Trigger logic
+        # ----------------------------
+        self.submodules.acq = Acquisition(
+            mems,
+            self.lvds.sample_outs,
+            N_BITS=16
+        )
+        self.specials += MultiReg(
+            p.request("user_btn_c"), self.acq.trigger
+        )
 
 
 if __name__ == '__main__':

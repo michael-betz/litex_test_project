@@ -73,7 +73,7 @@ class Acquisition(Module, AutoCSR):
             If(trig, NextState("WAIT_LEVEL"))
         )
         self.fsm.act("WAIT_LEVEL",
-            If(is_trigger | 1,
+            If(is_trigger,
                 mem_we.eq(1),
                 NextValue(mem_addr, mem_addr + 1),
                 NextState("ACQUIRE")
