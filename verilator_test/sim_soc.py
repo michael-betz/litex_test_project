@@ -17,8 +17,6 @@ from litex.soc.integration.builder import *
 from litex.soc.cores import uart
 
 from litex.soc.interconnect.wishbonebridge import WishboneStreamingBridge
-from litex.soc.interconnect.csr import AutoCSR, CSRStatus
-from litex.soc.cores.bitbang import I2CMaster
 
 
 class SimPins(Pins):
@@ -41,34 +39,6 @@ _io = [
 ]
 
 
-class Dut(Module, AutoCSR):
-    '''
-    Device under test
-    I2C master with litex I2CMaster bitbang class
-    '''
-
-    def __init__(self):
-        # For making sure csr registers are read back correctly
-        self.status_test = CSRStatus(8)
-        self.comb += self.status_test.status.eq(0xDE)
-
-        # For testing bit-banging I2C
-        self.submodules.i2c_master = m = I2CMaster()
-
-        # Hardwire SDA line to High!!!
-        # self.comb += m.pads.sda.eq(0)
-
-        # The simulated I2C slave
-        self.specials += Instance(
-            "I2C_slave",
-            io_scl=m.pads.scl,
-            io_sda=m.pads.sda,
-            i_clk=ClockSignal(),
-            i_rst=ResetSignal(),
-            i_data_to_master=0xAF
-        )
-
-
 class SimSoC(SoCCore):
     csr_map_update(SoCCore.csr_map, {"dut"})
 
@@ -76,12 +46,11 @@ class SimSoC(SoCCore):
         self,
         **kwargs
     ):
-        self.platform = platform = SimPlatform("SIM", _io)
-        platform.add_source("I2C_slave.v")
         # Setting sys_clk_freq too low will cause wishbone timeouts !!!
         sys_clk_freq = int(8e6)
         SoCCore.__init__(
-            self, platform,
+            self,
+            SimPlatform("SIM", _io),
             clk_freq=sys_clk_freq,
             cpu_type=None,
             integrated_rom_size=0x0,
@@ -92,14 +61,14 @@ class SimSoC(SoCCore):
             **kwargs
         )
         # crg
-        self.submodules.crg = CRG(platform.request("sys_clk"))
+        self.submodules.crg = CRG(self.platform.request("sys_clk"))
 
         # ----------------------------
         #  Virtual serial to Wishbone bridge
         # ----------------------------
         # virtual serial phy
         self.submodules.uart_phy = uart.RS232PHYModel(
-            platform.request("serial")
+            self.platform.request("serial")
         )
         # bridge virtual serial phy as wishbone master
         self.add_cpu(WishboneStreamingBridge(
@@ -107,10 +76,8 @@ class SimSoC(SoCCore):
         ))
         self.add_wb_master(self.cpu.wishbone)
 
-        self.submodules.dut = Dut()
 
-
-def main():
+def main(soc):
     parser = argparse.ArgumentParser(description="LiteX SoC Simulation test")
     builder_args(parser)
     parser.add_argument("--trace", action="store_true",
@@ -122,17 +89,17 @@ def main():
     args = parser.parse_args()
 
     builder_kwargs = builder_argdict(args)
-    builder_kwargs["csr_csv"] = "csr.csv"
+    builder_kwargs['output_dir'] = 'out'
+    builder_kwargs['csr_csv'] = 'out/csr.csv'
 
     sim_config = SimConfig(default_clk="sys_clk")
     sim_config.add_module("serial2tcp", "serial", args={
         "port": 1111
     })
-    # sim_config.add_module("serial2console", "serial")
 
-    soc = SimSoC()
     builder = Builder(soc, **builder_kwargs)
     builder.build(
+        run=False,
         sim_config=sim_config,
         trace=args.trace,
         trace_start=int(args.trace_start),
@@ -141,4 +108,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(SimSoC())

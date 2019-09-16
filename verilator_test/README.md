@@ -1,26 +1,33 @@
 # verilator + litex_server experiment
 
-I want to connect to a piece of emulated hardware (through verilator)
-in the same way as I would connect to real hardware.
+Connect to a piece of emulated hardware (verilator simulation)
+in the same way as connecting to real hardware.
 
-## steps to get there
+I mostly use this test-setup to troubleshoot and experiment with litex socs, to gain a better understanding of how they work under the hood.
+
+## the setup
 
   * Add the serial2tcp plugin to verilator such that I can connect to the SOC UART
     from outside
   * Run litex_server to connect to the tcp socket instead to a serial port
     such that I can access the emulated wishbone bus from outside
 
-## steps which got me there
+## to run the simulation
 
 ```bash
 # all 3 run at the same time in separate windows ...
-$ python3 verilator_sim.py
+$ python3 sim_soc.py
 $ litex_server --uart --uart-port socket://localhost:1111
-$ python3 test.py
+$ python3 test_soc.py
 Connected to Port 1234
 LiteX Simulation 2019-07-31 19:58:51
 ```
 The last line is a string read out from ID memory on the virtual hardware.
+
+alternatively, use the provided script
+```bash
+$ ./run_target.sh soc
+```
 
 ## gotchas
 
