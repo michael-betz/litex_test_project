@@ -87,41 +87,110 @@ def autoIdelay(r):
 
 
 def getSamples(r, N=None):
-    """ why doesn't RemoteClient take care of chunking for me ??? """
-    r_ch = r.mems.sample3
-    if N is None:
-        N = r_ch.size
-    o = r_ch.base
-    # r.regs.acq_trig_csr.write(0)
-    samples = []
-    while N:
-        print("read", hex(o), hex(min(255, N)))
-        temp = r.read(o, min(255, N))
-        o += len(temp) * 4  # in bytes!
-        N -= len(temp)
-        samples.append(temp)
-    samples = hstack(samples)
-    return samples / (1 << 15) - 1
+    addr = getattr(r.mems, 'sample{:}'.format(args.CH)).base
+    samples = r.big_read(addr, N)
+    return array(samples) / (1 << 15) - 1
+
+class ScopeController:
+    def __init__(self, r):
+        self._trigRequest = True
+        self._trigLevelRequest = (1 << 15)
+        self._curTrigLevel = None
+        self._autoTrigger = True
+        self._forceTrig = False
+        self.isRunning = True
+        self.r = r
+        # last 32 blocks of samples for dumping to .npz file
+        self.rollBuffer_t = []
+        self.rollBuffer_f = []
 
 
-def ani_thread():
-    while isRunning:
-        # print('*', end='', flush=True)
-        yVect = getSamples(r, args.N)
-        if len(rollBuffer) >= 32:
-            rollBuffer.pop(0)
-        rollBuffer.append(yVect)
-        f, Pxx = periodogram(
-            yVect,
-            args.fs,
-            window='hanning',
-            scaling='spectrum',
-            nfft=args.N * 2
-        )
-        spect = 10 * log10(Pxx) + 3
-        lt.set_ydata(yVect)
-        lf.set_ydata(spect)
-        fig.canvas.draw_idle()
+    def forceTrig(self, e):
+        self._forceTrig = True
+
+    def trigLevel(self, l):
+        self._trigLevelRequest = int((l + 1) * (1 << 15))
+
+    def trigRequest(self, e):
+        self._trigRequest = True
+
+    def handleSettings(self):
+        if self._curTrigLevel is None or \
+           self._curTrigLevel != self._trigLevelRequest:
+            self.r.regs.acq_trig_level.write(self._trigLevelRequest)
+            self._curTrigLevel = self.r.regs.acq_trig_level.read()
+            print('trigLevel:', hex(self._curTrigLevel))
+
+        if self._trigRequest:
+            # print("t")
+            self.r.regs.acq_trig_csr.write(1)
+            self._trigRequest = False
+            return True
+
+        if self._forceTrig:
+            self.r.regs.acq_trig_force.write(1)
+            self.r.regs.acq_trig_force.write(0)
+            self._forceTrig = False
+        return False
+
+    def buf_append(buf, val):
+        if len(buf) >= args.AVG:
+            buf.pop(0)
+        else:
+            print("Buf:", len(buf))
+        buf.append(val)
+
+    def dumpNpz(self, x):
+        fName = unique_filename("measurements/dump.npz")
+        savez_compressed(fName, dat=vstack(self.rollBuffer_t))
+        print("wrote {:} buffers to {:}".format(len(self.rollBuffer_t), fName))
+        self.rollBuffer_t.clear()
+        self.rollBuffer_f.clear()
+
+    def ani_thread(self):
+        tReq = False
+        while self.isRunning:
+            tReq |= self.handleSettings()
+
+            # wait while acquisition is running
+            if r.regs.acq_trig_csr.read() >= 1:
+                # print('y', end='', flush=True)
+                time.sleep(0.2)
+                continue
+
+            # only read data after a new acquisition
+            if not tReq:
+                # print('x', end='', flush=True)
+                time.sleep(0.2)
+                continue
+
+            # print('z', end='', flush=True)
+            yVect = getSamples(r, args.N)
+            ScopeController.buf_append(
+                self.rollBuffer_t,
+                yVect
+            )
+            f, Pxx = periodogram(
+                yVect,
+                args.fs,
+                window='hanning',
+                scaling='spectrum',
+                nfft=args.N * 2
+            )
+            ScopeController.buf_append(
+                self.rollBuffer_f,
+                Pxx
+            )
+            spect = 10 * log10(mean(self.rollBuffer_f, 0)) + 3
+            lt.set_ydata(yVect)
+            lf.set_ydata(spect)
+            fig.canvas.draw_idle()
+
+            tReq = False
+
+            # Start next acquisition
+            if self._autoTrigger:
+                self.trigRequest(None)
 
 
 def unique_filename(file_name):
@@ -135,17 +204,21 @@ def unique_filename(file_name):
 
 
 def main():
-    global fig, lt, lf, r, args, rollBuffer, isRunning
-    isRunning = True
+    global fig, lt, lf, r, args, rollBuffer_t
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--N", default=1024, type=int, help="Number of samples per acquisition"
     )
     parser.add_argument(
+        "--AVG", default=8, type=int, help="How many buffers to average the spectrum"
+    )
+    parser.add_argument(
+        "--CH", default=0, choices=[0, 1, 2, 3], type=int, help="Which channel to plot"
+    )
+    parser.add_argument(
         "--fs", default=125e6, type=float, help="ADC sample rate [MHz]. Must match hello_LTC.py setting."
     )
     args = parser.parse_args()
-    rollBuffer = []  # last 32 blocks of samples for dumping to .npz file
     # ----------------------------------------------
     #  Init hardware
     # ----------------------------------------------
@@ -159,6 +232,7 @@ def main():
     ltc_spi.setTp(1)
     autoBitslip(r)
     autoIdelay(r)
+    r.regs.acq_trig_channel.write(args.CH)
 
     print("ADC word bits:")
     for i in range(14):
@@ -173,6 +247,7 @@ def main():
     # ----------------------------------------------
     #  Setup Matplotlib
     # ----------------------------------------------
+    sc = ScopeController(r)
     fig, axs = subplots(2, 1, figsize=(10, 6))
     xVect = linspace(0, args.N / args.fs, args.N, endpoint=False)
     yVect = zeros_like(xVect)
@@ -186,26 +261,31 @@ def main():
     axs[1].set_ylabel("ADC value [dB_FS]")
     axs[0].axis((-100, 8300, -1, 1))
     axs[1].axis((-0.5, 63, -110, -10))
-    # GUI slider
-    # sfreq = Slider(
-    #     axes([0.13, 0.9, 0.72, 0.05]),
-    #     'Trigger level',
-    #     -1, 1, -0.001,
-    #     '%1.3f'
-    # )
-    # sfreq.on_changed(
-    #     lambda l: r.regs.acq_trig_level.write(int((l + 1) * (1 << 15)))
-    # )
-    bDump = Button(axes([0.13, 0.01, 0.2, 0.05]), 'Dump .npz')
-    def dump(x):
-        fName = unique_filename("measurements/dump.npz")
-        savez_compressed(fName, dat=vstack(rollBuffer))
-        print("wrote {:} buffers to {:}".format(len(rollBuffer), fName))
-        rollBuffer.clear()
-    bDump.on_clicked(dump)
-    threading.Thread(target=ani_thread).start()
+
+    # GUI slider for trigger level
+    sfreq = Slider(
+        axes([0.13, 0.9, 0.72, 0.05]),
+        'Trigger level',
+        -1, 1, -0.001,
+        '%1.3f'
+    )
+    sfreq.on_changed(sc.trigLevel)
+
+    # Checkboxes
+    check = Button(axes([0.05, 0.01, 0.2, 0.05]), "Force trigger")
+    check.on_clicked(sc.forceTrig)
+
+    # # Single acquisition button
+    # bSingle = Button(axes([0.25, 0.01, 0.2, 0.05]), 'Single trig.')
+    # bSingle.on_clicked(sc.trigRequest)
+
+    # Buffer dump button
+    bDump = Button(axes([0.25, 0.01, 0.2, 0.05]), 'Dump .npz')
+    bDump.on_clicked(sc.dumpNpz)
+
+    threading.Thread(target=sc.ani_thread).start()
     show()
-    isRunning = False
+    sc.isRunning = False
 
 
 if __name__ == '__main__':

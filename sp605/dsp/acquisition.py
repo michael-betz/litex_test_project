@@ -9,6 +9,7 @@ from sys import argv
 from migen import *
 from litex.soc.interconnect.csr import AutoCSR, CSR, CSRStorage
 from migen.genlib.cdc import PulseSynchronizer
+from migen.genlib.cdc import MultiReg
 
 
 class Acquisition(Module, AutoCSR):
@@ -35,17 +36,23 @@ class Acquisition(Module, AutoCSR):
             mems = [Memory(N_BITS, 12) for i in range(N_CHANNELS)]
 
         trig = Signal()
+        # writing trig_csr triggers a single shot acquisition (value dont matter)
+        # reading trig_csr reads the 1 when an acquisiton is in progress
         self.trig_csr = CSR()
-        # select the trigger level
-        self.trig_level = CSRStorage(16, reset=(1 << 15))
-        # select the channel to trigger on
-        self.trig_channel = CSRStorage(8)
-
+        self.specials += MultiReg(
+            self.busy, self.trig_csr.w
+        )
         self.submodules.trig_sync = PulseSynchronizer("sys", "sample")
         self.comb += [
             self.trig_sync.i.eq(self.trig_csr.re),
             trig.eq(self.trigger | self.trig_sync.o)
         ]
+        # select the trigger level
+        self.trig_level = CSRStorage(16, reset=(1 << 15))
+        # force trigger
+        self.trig_force = CSRStorage(1)
+        # select the channel to trigger on
+        self.trig_channel = CSRStorage(8)
 
         # data stream of the channel to trigger on
         data_trigger = Signal(N_BITS)
@@ -61,7 +68,8 @@ class Acquisition(Module, AutoCSR):
             # Pulse `is_trigger` high when sample passes the trigger threshold
             is_trigger.eq(
                 (data_trigger_d < self.trig_level.storage) &
-                (data_trigger >= self.trig_level.storage)
+                (data_trigger >= self.trig_level.storage) |
+                self.trig_force.storage
             )
         ]
         self.sync.sample += data_trigger_d.eq(data_trigger)
@@ -87,7 +95,7 @@ class Acquisition(Module, AutoCSR):
                 NextValue(mem_addr, 0)
             )
         )
-        self.comb += self.busy.eq(mem_we)
+        self.comb += self.busy.eq(~self.fsm.ongoing('WAIT_TRIGGER'))
         for mem, data_in in zip(mems, self.data_ins):
             self.specials += mem
             p1 = mem.get_port(write_capable=True, clock_domain="sample")
