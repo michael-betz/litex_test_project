@@ -1,25 +1,16 @@
-TARGETS = hello_hmc
-UTIL = ../zedboard/util
+# TARGETS = hello_hmc
+TARGETS = gt_test
 
-all: $(TARGETS).bit.bin
+all: build/gateware/$(TARGETS).bit
 
-%.bit.bin: build/gateware/%.bit
-	python3 $(UTIL)/bitstream_fix.py $<
-	mv $<.bin .
-
-# Upload to the zedboard via scp and program the PL
-upload: $(TARGETS).bit.bin
-	$(UTIL)/remote_config_fpga.sh $<
+upload: $(TARGETS).py
+	python3 $^ config
 
 server:
-	$(UTIL)/remote_litex_server.sh
+	litex_server --uart --uart-port /dev/ttyUSB0 --uart-baudrate 1152000
 
 clean::
-	rm -f $(TARGETS).bit.bin
+	rm -f $(TARGETS).bit
 	rm -rf build
-	# in ./ip, delete EVERYTHING except processing_system7_0.xci (a bit harsh, I know ...)
-	mv ip/processing_system7_0.xci .
-	rm -rf ip/*
-	mv processing_system7_0.xci ip
 
 include ../rules.mk

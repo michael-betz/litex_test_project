@@ -66,6 +66,7 @@ class GtTest(SoCCore, AutoCSR):
                 Subsignal("miso", Pins("FMC1_HPC:LA04_P"), Misc("PULLUP TRUE")),
                 Subsignal("mosi", Pins("FMC1_HPC:LA03_N")),
                 Subsignal("clk",  Pins("FMC1_HPC:LA03_P")),
+                Subsignal("spi_en", Pins("FMC1_HPC:LA05_N")),
                 IOStandard("LVCMOS18")
             ),
         ])
@@ -98,6 +99,7 @@ class GtTest(SoCCore, AutoCSR):
         #  SPI master
         # ----------------------------
         spi_pads = p.request("AD9174_SPI")
+        self.comb += spi_pads.spi_en.eq(0)
         self.submodules.spi = spi.SPIMaster(
             spi_pads,
             16,
@@ -111,7 +113,7 @@ class GtTest(SoCCore, AutoCSR):
         self.add_cpu(uart.UARTWishboneBridge(
             p.request("serial"),
             self.clk_freq,
-            baudrate=115200
+            baudrate=1152000
         ))
         self.add_wb_master(self.cpu.wishbone)
 
