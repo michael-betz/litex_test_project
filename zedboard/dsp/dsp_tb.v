@@ -34,32 +34,38 @@ module dsp_tb;
     reg signed [13:0] adc_b = 14'h0;
     reg signed [13:0] adc_c = 14'h0;
 
-    reg strobe_cc_d = 0;
-    reg signed [19:0] adc_ref_dc_i = 20'h0;
-    reg signed [19:0] adc_ref_dc_q = 20'h0;
+    // Deserialize one of the channels after the down-converter
+    // for plotting
+    wire strobe_out;
+    wire signed [19:0] adc_ref_dc_i;
+    wire signed [19:0] adc_ref_dc_q;
+    grab_channels #(
+        .DW     (20)
+    ) gc_inst (
+        .clk        (clk_adc),
+        .stream_in  (dsp_inst.result_iq),
+        .strobe_in  (dsp_inst.strobe_cc),
 
+        .strobe_out (strobe_out),
+        .i_out0     (adc_ref_dc_i),
+        .q_out0     (adc_ref_dc_q)
+    );
 
     integer sample_cnt = 0;
     always @(posedge clk_adc) begin
         sample_cnt <= sample_cnt + 1;
-        adc_ref <= ((1 << 12) - 1) * $sin(1.0 * sample_cnt * OMEGA_REF);
+        adc_ref <= ((1 << 13) - 1) * $sin(1.0 * sample_cnt * OMEGA_REF);
         adc_a <= ((1 << 13) - 1) * $sin(1.0 * sample_cnt * OMEGA_REF + THETA_A);
         adc_b <= ((1 << 13) - 1) * $sin(1.0 * sample_cnt * OMEGA_REF + THETA_B);
         adc_c <= ((1 << 13) - 1) * $sin(1.0 * sample_cnt * OMEGA_REF + THETA_C);
         if (!reset) begin
-            strobe_cc_d <= dsp_inst.strobe_cc;
-            adc_ref_dc_i <= 20'h0;
-            adc_ref_dc_q <= 20'h0;
-            if (dsp_inst.strobe_cc && !strobe_cc_d) begin
-                adc_ref_dc_i <= dsp_inst.result_i;
-                adc_ref_dc_q <= dsp_inst.result_q;
-            end
             $fwrite(
                 f,
                 "%d, %d, %d, %d, %d, %d\n",
                 adc_ref, 0,
                 dsp_inst.lo_cos, dsp_inst.lo_sin,
-                adc_ref_dc_i, adc_ref_dc_q
+                strobe_out ? adc_ref_dc_i : 20'sh0,
+                strobe_out ? adc_ref_dc_q : 20'sh0,
             );
         end
     end
@@ -88,15 +94,17 @@ module dsp_tb;
     // IF at 10 kHz offset (rate at which phase_ref rolls over)
     localparam LO_FTW = 1.0 * (F_REF_US + 10000) / F_ADC * 2**32;
     wire [31:0] dds_ftw = LO_FTW;
-    dsp #(
-        .LO_FTW         (LO_FTW)
-    ) dsp_inst (
+    dsp #() dsp_inst (
         .clk            (clk_adc),
         .reset          (reset),
+
         .adc_ref        (adc_ref),
         .adc_a          (adc_a),
         .adc_b          (adc_b),
-        .adc_c          (adc_c)
+        .adc_c          (adc_c),
+
+        .dds_ftw        (LO_FTW),
+        .decimation     (13'd48)
     );
 
 endmodule

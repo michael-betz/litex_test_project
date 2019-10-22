@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.101 (w)1999-2019 BSI
-[*] Mon Oct 21 00:50:26 2019
+[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
+[*] Tue Oct 22 02:46:21 2019
 [*]
 [dumpfile] "/home/michael/fpga_wsp/litex_test_project/zedboard/dsp/dsp.vcd"
-[dumpfile_mtime] "Mon Oct 21 00:49:25 2019"
-[dumpfile_size] 113424445
+[dumpfile_mtime] "Tue Oct 22 02:42:48 2019"
+[dumpfile_size] 128851968
 [savefile] "/home/michael/fpga_wsp/litex_test_project/zedboard/dsp/dsp.gtkw"
 [timestart] 0
-[size] 1916 1033
+[size] 1916 1037
 [pos] -1 -1
-*-15.000000 44400 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.000000 39792 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] dsp_tb.
 [treeopen] dsp_tb.dsp_inst.
 [sst_width] 318
@@ -40,19 +40,22 @@ dsp_tb.dsp_inst.lo_sin[17:0]
 @800200
 -DDC
 @28
-dsp_tb.dsp_inst.strobe_cc
-@8420
-dsp_tb.dsp_inst.result_i[19:0]
-dsp_tb.dsp_inst.result_q[19:0]
+dsp_tb.dsp_inst.ddc_inst.strobe_cc
+@22
+dsp_tb.dsp_inst.ddc_inst.result_iq[19:0]
 @1000200
 -DDC
 @800200
 -phase_calc
+@22
+dsp_tb.dsp_inst.result_iq[19:0]
+dsp_tb.dsp_inst.result_iq_d[19:0]
 @28
 dsp_tb.dsp_inst.strobe_r2p
 @22
 dsp_tb.dsp_inst.mag_out[19:0]
 dsp_tb.dsp_inst.phase_out[20:0]
+dsp_tb.dsp_inst.sig_cnt[4:0]
 @200
 -
 @22
@@ -70,5 +73,16 @@ dsp_tb.dsp_inst.phase_b[20:0]
 dsp_tb.dsp_inst.phase_c[20:0]
 @1000200
 -phase_calc
+@22
+dsp_tb.adc_ref_dc_i[19:0]
+dsp_tb.adc_ref_dc_q[19:0]
+@8421
+dsp_tb.adc_ref_dc_i[19:0]
+@20000
+-
+@8420
+dsp_tb.adc_ref_dc_q[19:0]
+@20000
+-
 [pattern_trace] 1
 [pattern_trace] 0

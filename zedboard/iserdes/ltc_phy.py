@@ -1,7 +1,7 @@
 from migen import *
 from migen.build.xilinx.common import *
 from litex.soc.interconnect.csr import *
-from litex.soc.cores import frequency_meter
+from litex.soc.cores.freqmeter import FreqMeter
 from migen.genlib.cdc import MultiReg, PulseSynchronizer
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 from sys import path
@@ -78,7 +78,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
         )
 
         # Frequency counter for received sample clock
-        self.submodules.f_sample = frequency_meter.FrequencyMeter(clk_freq)
+        self.submodules.f_sample = FreqMeter(clk_freq)
 
         # CSR for moving a IDELAY2 up / down
         self.idelay_inc = CSR(1)

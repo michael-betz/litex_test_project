@@ -24,15 +24,16 @@ from litex.soc.cores import dna, uart, spi_old
 from litex.boards.platforms import zedboard
 from litex.soc.cores.clock import S7MMCM, S7IDELAYCTRL
 from litex.soc.interconnect import wishbone
-from litex.soc.cores import frequency_meter
 from litescope import LiteScopeAnalyzer
 from sys import path
 path.append("iserdes")
 from ltc_phy import LTCPhy
 path.append("..")
 from common import main, ltc_pads, LedBlinker
-path.append("../sp605/dsp")
-from acquisition import Acquisition
+# path.append("../sp605/dsp")
+# from acquisition import Acquisition
+path.append("dsp")
+from dsp_wrapper import DspWrapper
 
 
 class _CRG(Module):
@@ -86,7 +87,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         "analyzer",
         "f_clk100"
     ]
-    csr_map_update(SoCCore.csr_map, csr_peripherals)
+    # csr_map_update(SoCCore.csr_map, csr_peripherals)
 
     def __init__(self, clk_freq, **kwargs):
         print("HelloLtc: ", kwargs)
@@ -108,7 +109,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         )
         p = self.platform
         self.add_gp0()
-        self.add_axi_to_wishbone(self.axi_gp0, base_address=0x4000_0000)
+        # self.add_axi_to_wishbone(self.axi_gp0, base_address=0x4000_0000)
 
         self.submodules.crg = _CRG(
             p,
@@ -137,33 +138,44 @@ class HelloLtc(SoCZynq, AutoCSR):
         spi_pads = p.request("LTC_SPI")
         self.submodules.spi = spi_old.SPIMaster(spi_pads)
 
-        # ----------------------------
-        #  4 x Acquisition memory for ADC data
-        # ----------------------------
-        mems = []
-        for i, sample_out in enumerate(self.lvds.sample_outs):
-            mem = Memory(16, 4096, init=[i, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
-            mems.append(mem)
-            self.specials += mem
-            self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
-            self.register_mem(
-                "sample{}".format(i),
-                0x10000000 + i * 0x01000000,  # [bytes]
-                self.sample_ram.bus,
-                mem.depth * 4  # [bytes]
-            )
+        # # ----------------------------
+        # #  4 x Acquisition memory for ADC data
+        # # ----------------------------
+        # mems = []
+        # for i, sample_out in enumerate(self.lvds.sample_outs):
+        #     mem = Memory(16, 4096, init=[i, 0xDEAD, 0xBEEF, 0xC0FE, 0xAFFE])
+        #     mems.append(mem)
+        #     self.specials += mem
+        #     self.submodules.sample_ram = wishbone.SRAM(mem, read_only=True)
+        #     self.register_mem(
+        #         "sample{}".format(i),
+        #         0x10000000 + i * 0x01000000,  # [bytes]
+        #         self.sample_ram.bus,
+        #         mem.depth * 4  # [bytes]
+        #     )
+
+        # # ----------------------------
+        # #  Trigger logic
+        # # ----------------------------
+        # self.submodules.acq = Acquisition(
+        #     mems,
+        #     self.lvds.sample_outs,
+        #     N_BITS=16
+        # )
+        # self.specials += MultiReg(
+        #     p.request("user_btn_c"), self.acq.trigger
+        # )
 
         # ----------------------------
-        #  Trigger logic
+        #  Vector volt-meter
         # ----------------------------
-        self.submodules.acq = Acquisition(
-            mems,
-            self.lvds.sample_outs,
-            N_BITS=16
-        )
-        self.specials += MultiReg(
-            p.request("user_btn_c"), self.acq.trigger
-        )
+        self.submodules.vvm = DspWrapper()
+        self.comb += [
+            self.vvm.adc_ref.eq(self.lvds.sample_outs[0]),
+            self.vvm.adc_a.eq(self.lvds.sample_outs[1]),
+            self.vvm.adc_b.eq(self.lvds.sample_outs[2]),
+            self.vvm.adc_c.eq(self.lvds.sample_outs[3])
+        ]
 
 
 if __name__ == '__main__':
