@@ -4,9 +4,37 @@ Vector voltmeter
 
 from migen import *
 from litex.soc.interconnect.csr import AutoCSR, CSRStorage, CSRStatus
+from os.path import join, dirname, abspath
 
 
 class DspWrapper(Module, AutoCSR):
+    @staticmethod
+    def add_sources(platform):
+        vdir = abspath(dirname(__file__))
+
+        srcs = [
+            "dsp.v", "ddc.v", "cordicg_b22.v"
+        ]
+        for src in srcs:
+            platform.add_source(join(vdir, src))
+
+        srcs = [
+            "rot_dds.v",
+            "iq_mixer_multichannel.v", "mixer.v",
+            "multi_sampler.v", "cic_multichannel.v",
+            "serializer_multichannel.v", "reg_delay.v", "ccfilt.v",
+            "double_inte_smp.v", "doublediff.v", "serialize.v"
+        ]
+        for src in srcs:
+            platform.add_source(join(vdir, "../../../bedrock/dsp", src))
+
+        srcs = [
+            "cstageg.v", "addsubg.v"
+        ]
+        for src in srcs:
+            platform.add_source(join(vdir, "../../../bedrock/cordic", src))
+
+
     def __init__(self):
         """
         mems

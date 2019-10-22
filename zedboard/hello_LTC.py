@@ -85,9 +85,9 @@ class HelloLtc(SoCZynq, AutoCSR):
         "lvds",
         "acq",
         "analyzer",
-        "f_clk100"
+        "f_clk100",
+        "vvm"
     ]
-    # csr_map_update(SoCCore.csr_map, csr_peripherals)
 
     def __init__(self, clk_freq, **kwargs):
         print("HelloLtc: ", kwargs)
@@ -107,6 +107,9 @@ class HelloLtc(SoCZynq, AutoCSR):
             add_reset=False,
             **kwargs
         )
+        for p in HelloLtc.csr_peripherals:
+            self.add_csr(p)
+
         p = self.platform
         self.add_gp0()
         # self.add_axi_to_wishbone(self.axi_gp0, base_address=0x4000_0000)
@@ -169,6 +172,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         #  Vector volt-meter
         # ----------------------------
+        DspWrapper.add_sources(p)
         self.submodules.vvm = DspWrapper()
         self.comb += [
             self.vvm.adc_ref.eq(self.lvds.sample_outs[0]),
