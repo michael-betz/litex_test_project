@@ -4,6 +4,7 @@ Vector voltmeter
 
 from migen import *
 from litex.soc.interconnect.csr import AutoCSR, CSRStorage, CSRStatus
+from migen.genlib.cdc import MultiReg
 from os.path import join, dirname, abspath
 
 
@@ -35,50 +36,56 @@ class DspWrapper(Module, AutoCSR):
             platform.add_source(join(vdir, "../../../bedrock/cordic", src))
 
 
-    def __init__(self):
+    def __init__(self, adc_chs=None):
         """
-        mems
-            list of memory objects of length N_CHANNELS
-        acquisition starts after
-          * rising edge on self.trigger
-          * data_in of the selected channel crossing trig_level
+        adc_*:
+            * 14 bit signed inputs
+            * twos complement format
+            * matched to LTC2175-14
         """
-        self.adc_ref = Signal((14, True))
-        self.adc_a = Signal((14, True))
-        self.adc_b = Signal((14, True))
-        self.adc_c = Signal((14, True))
+        self.strobe = Signal()
+        if adc_chs is None:
+            # Fake input for simulation
+            adc_chs = [Signal((14, True)) for i in range(4)]
+        self.adc_chs = adc_chs
+        n_channels = len(adc_chs)
 
-        ###
+        self.mags = [Signal((20, False)) for i in range(n_channels)]
+        self.phases = [Signal((21, True)) for i in range(n_channels)]
 
         self.ddc_ftw = CSRStorage(32, reset=0x40059350)
         self.ddc_deci = CSRStorage(13, reset=48)
 
-        self.mag_ref = CSRStatus(20)
-        self.mag_a   = CSRStatus(20)
-        self.mag_b   = CSRStatus(20)
-        self.mag_c   = CSRStatus(20)
-
-        self.phase_ref = CSRStatus(21)
-        self.phase_a   = CSRStatus(21)
-        self.phase_b   = CSRStatus(21)
-        self.phase_c   = CSRStatus(21)
+        # CSRs for peeking at phase / magnitude values
+        for i, val in enumerate(self.mags + self.phases):
+            s_latch = Signal.like(val)
+            self.sync.sample += If(self.strobe, s_latch.eq(val))
+            if i <= 3:
+                n = 'mag{:d}'.format(i)
+            else:
+                n = 'phase{:d}'.format(i - 4)
+            csr = CSRStatus(20, name=n)
+            setattr(self, n, csr)
+            self.specials += MultiReg(s_latch, csr.status)
 
         self.specials += Instance("dsp",
             i_clk=ClockSignal("sample"),
             i_reset=ResetSignal("sample"),
 
-            i_adc_ref=self.adc_ref,
-            i_adc_a=self.adc_a,
-            i_adc_b=self.adc_b,
-            i_adc_c=self.adc_c,
+            i_adc_ref=adc_chs[0],
+            i_adc_a=adc_chs[1],
+            i_adc_b=adc_chs[2],
+            i_adc_c=0,
 
-            o_mag_ref=self.mag_ref.status,
-            o_mag_a=self.mag_a.status,
-            o_mag_b=self.mag_b.status,
-            o_mag_c=self.mag_c.status,
+            o_mag_ref=self.mags[0],
+            o_mag_a=self.mags[1],
+            o_mag_b=self.mags[2],
+            o_mag_c=self.mags[3],
 
-            o_phase_ref=self.phase_ref.status,
-            o_phase_a=self.phase_a.status,
-            o_phase_b=self.phase_b.status,
-            o_phase_c=self.phase_c.status
+            o_phase_ref=self.phases[0],
+            o_phase_a=self.phases[1],
+            o_phase_b=self.phases[2],
+            o_phase_c=self.phases[3],
+
+            o_out_strobe=self.strobe
         )

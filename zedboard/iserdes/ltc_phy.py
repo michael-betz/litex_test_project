@@ -13,10 +13,11 @@ from common import LedBlinker, myzip
 class LTCPhy(S7_iserdes, AutoCSR):
     def __init__(self, platform, clk_freq):
         N_CHANNELS = 4
-        S = 8
-        D = N_CHANNELS * 2 + 1
+        S = 8  # S = serdes factor
+        D = N_CHANNELS * 2 + 1  # D = number of lanes
 
-        self.sample_outs = [Signal(S * 2) for i in range(N_CHANNELS)]
+        # outputs 4 x 14 bit twos complement samples
+        self.sample_outs = [Signal((14, True)) for i in range(N_CHANNELS)]
 
         ###
 
@@ -48,13 +49,14 @@ class LTCPhy(S7_iserdes, AutoCSR):
             dat_n.append(pads_out.a_n)
             dat_n.append(pads_out.b_n)
             # re-arrange parallel serdes outputs to form samples
-            self.comb += sample_out.eq(
-                Cat(myzip(self.data_outs[2 * i + 1], self.data_outs[2 * i]))
-            )
+            # cut the 2 lowest bits of each channel (always zero)
+            self.comb += sample_out.eq(Cat(
+                myzip(self.data_outs[2 * i + 1], self.data_outs[2 * i])[2:]
+            ))
             # CSRs for peeking at data patterns
             # LVDS_B (data_outs[1]) has the LSB and needs to come first!
             n = 'data_peek{:d}'.format(i)
-            data_peek = CSRStatus(S * 2, name=n)
+            data_peek = CSRStatus(14, name=n)
             setattr(self, n, data_peek)
             self.specials += MultiReg(
                 sample_out,

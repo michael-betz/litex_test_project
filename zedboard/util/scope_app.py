@@ -49,7 +49,7 @@ def autoIdelay(r):
     '''
     testpattern must be 0x01
     bitslips must have been carried out already such that
-    data_peek reads 0x04
+    data_peek reads 0x01
     '''
     # approximately center the idelay first
     setIdelay(r, 16)
@@ -58,7 +58,7 @@ def autoIdelay(r):
     for i in range(32):
         val0 = r.regs.lvds_data_peek0.read()
         val1 = r.regs.lvds_data_peek2.read()
-        if val0 != 4 or val1 != 4:
+        if val0 != 1 or val1 != 1:
             break
         r.regs.lvds_idelay_dec.write(1)
     minValue = r.regs.lvds_idelay_value.read()
@@ -71,7 +71,7 @@ def autoIdelay(r):
     for i in range(32):
         val0 = r.regs.lvds_data_peek0.read()
         val1 = r.regs.lvds_data_peek2.read()
-        if val0 != 4 or val1 != 4:
+        if val0 != 1 or val1 != 1:
             break
         r.regs.lvds_idelay_inc.write(1)
     maxValue = r.regs.lvds_idelay_value.read()
@@ -85,16 +85,15 @@ def autoIdelay(r):
         maxValue
     ))
 
-
-def getSamples(r, N=None):
-    addr = getattr(r.mems, 'sample{:}'.format(args.CH)).base
-    samples = r.big_read(addr, N)
-    return array(samples) / (1 << 15) - 1
+def getSamples(r, CH, N=None):
+    addr = getattr(r.mems, 'sample{:}'.format(CH)).base
+    samples = array(r.big_read(addr, N))
+    return twos_comps(samples, 14) / 2**13
 
 class ScopeController:
     def __init__(self, r):
         self._trigRequest = True
-        self._trigLevelRequest = (1 << 15)
+        self._trigLevelRequest = 0
         self._curTrigLevel = None
         self._autoTrigger = True
         self._forceTrig = False
@@ -109,7 +108,7 @@ class ScopeController:
         self._forceTrig = True
 
     def trigLevel(self, l):
-        self._trigLevelRequest = int((l + 1) * (1 << 15))
+        self._trigLevelRequest = int(l * (1 << 13))
 
     def trigRequest(self, e):
         self._trigRequest = True
@@ -118,8 +117,8 @@ class ScopeController:
         if self._curTrigLevel is None or \
            self._curTrigLevel != self._trigLevelRequest:
             self.r.regs.acq_trig_level.write(self._trigLevelRequest)
-            self._curTrigLevel = self.r.regs.acq_trig_level.read()
-            print('trigLevel:', hex(self._curTrigLevel))
+            self._curTrigLevel = self._trigLevelRequest
+            print('trigLevel:', hex(self.r.regs.acq_trig_level.read()))
 
         if self._trigRequest:
             # print("t")
@@ -165,7 +164,7 @@ class ScopeController:
                 continue
 
             # print('z', end='', flush=True)
-            yVect = getSamples(r, args.N)
+            yVect = getSamples(r, args.CH, args.N)
             ScopeController.buf_append(
                 self.rollBuffer_t,
                 yVect
@@ -242,7 +241,7 @@ def main():
             tp, r.regs.lvds_data_peek0.read()
         ))
     ltc_spi.set_ltc_reg(3, 0)  # Test pattern off
-    ltc_spi.set_ltc_reg(1, 0)  # Randomizer off
+    ltc_spi.set_ltc_reg(1, (1 << 5))  # Randomizer off, twos complement output
 
     # ----------------------------------------------
     #  Setup Matplotlib

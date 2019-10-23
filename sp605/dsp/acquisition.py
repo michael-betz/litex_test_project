@@ -26,7 +26,7 @@ class Acquisition(Module, AutoCSR):
             self.data_ins = data_ins
             N_CHANNELS = len(data_ins)
         else:
-            self.data_ins = [Signal(N_BITS) for i in range(N_CHANNELS)]
+            self.data_ins = [Signal((N_BITS, True)) for i in range(N_CHANNELS)]
         self.trigger = Signal()
         self.busy = Signal()
 
@@ -48,19 +48,21 @@ class Acquisition(Module, AutoCSR):
             trig.eq(self.trigger | self.trig_sync.o)
         ]
         # select the trigger level
-        self.trig_level = CSRStorage(16, reset=(1 << 15))
+        self.trig_level = CSRStorage(16)
+        # Force signedness
+        self.trig_level.storage.signed = True
         # force trigger
         self.trig_force = CSRStorage(1)
         # select the channel to trigger on
         self.trig_channel = CSRStorage(8)
 
         # data stream of the channel to trigger on
-        data_trigger = Signal(N_BITS)
-        data_trigger_d = Signal(N_BITS)
+        data_trigger = Signal((N_BITS, True))
+        data_trigger_d = Signal((N_BITS, True))
 
         is_trigger = Signal()
         self.comb += [
-            # select one of the channels to trigger on
+            # select one of the channels to trigger on,
             Case(
                 self.trig_channel.storage,
                 {k: data_trigger.eq(v) for k, v in enumerate(self.data_ins)}

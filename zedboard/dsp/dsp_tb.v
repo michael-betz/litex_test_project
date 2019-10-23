@@ -4,8 +4,8 @@ module dsp_tb;
     localparam pi = 3.141592653589793;
     // ADC sampling clock f_s [Hz]
     // chosen for f_RF / f_ADC = 4.25
-    localparam F_ADC = 117552941;
-    // localparam F_ADC = 124000000;
+    // localparam F_ADC = 117552941;
+    localparam F_ADC = 125000000;
     // Simulated clock period in [ns]
     localparam T_ADC = 1000000000 / F_ADC;
     reg clk_adc = 1;
@@ -18,7 +18,8 @@ module dsp_tb;
     //  Simulate ADC signals
     // ------------------------------------------------------------------------
     // ALS MO reference and phase shifted signal under test
-    localparam F_REF = 499600000;  // [Hz]
+    // localparam F_REF = 499600000;  // [Hz]
+    localparam F_REF = 25000000;  // [Hz]
     localparam OMEGA_REF = (1.0 / F_ADC * 2.0 * pi * F_REF);
     // Phase shift between adc_ref and adc_a
     localparam THETA_A = 0;
