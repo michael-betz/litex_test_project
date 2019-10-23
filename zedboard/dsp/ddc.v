@@ -67,10 +67,10 @@ module ddc #(
         .mixout_q (mixout_q)
     );
 
-   // ---------------------
-   // Instantiate two CIC_MULTICHANNEL, one for each stream
-   // ---------------------
-   wire [MIX_W - 1: 0] zero = 0;
+    // ---------------------
+    // Instantiate two CIC_MULTICHANNEL, one for each stream
+    // ---------------------
+    wire [MIX_W - 1: 0] zero = 0;
     cic_multichannel #(
         .n_chan        (nadc * 2),
         // DI parameters

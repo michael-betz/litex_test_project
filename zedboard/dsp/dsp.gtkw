@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
-[*] Tue Oct 22 02:46:21 2019
+[*] GTKWave Analyzer v3.3.101 (w)1999-2019 BSI
+[*] Wed Oct 23 06:46:34 2019
 [*]
 [dumpfile] "/home/michael/fpga_wsp/litex_test_project/zedboard/dsp/dsp.vcd"
-[dumpfile_mtime] "Tue Oct 22 02:42:48 2019"
-[dumpfile_size] 128851968
+[dumpfile_mtime] "Wed Oct 23 06:43:48 2019"
+[dumpfile_size] 151601863
 [savefile] "/home/michael/fpga_wsp/litex_test_project/zedboard/dsp/dsp.gtkw"
 [timestart] 0
-[size] 1916 1037
+[size] 2044 1105
 [pos] -1 -1
-*-16.000000 39792 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.000000 70712 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] dsp_tb.
 [treeopen] dsp_tb.dsp_inst.
 [sst_width] 318
@@ -18,7 +18,7 @@
 [sst_vpaned_height] 304
 @28
 dsp_tb.clk_adc
-@c00200
+@800200
 -testbench
 @8420
 [color] 3
@@ -26,63 +26,47 @@ dsp_tb.adc_ref[13:0]
 dsp_tb.adc_a[13:0]
 dsp_tb.adc_b[13:0]
 dsp_tb.adc_c[13:0]
-@1401200
+@1000200
 -testbench
-@c00200
+@800200
 -dds
 @22
 dsp_tb.dsp_inst.dds_ftw[31:0]
 @8420
 dsp_tb.dsp_inst.lo_cos[17:0]
 dsp_tb.dsp_inst.lo_sin[17:0]
-@1401200
+@1000200
 -dds
 @800200
 -DDC
 @28
 dsp_tb.dsp_inst.ddc_inst.strobe_cc
 @22
-dsp_tb.dsp_inst.ddc_inst.result_iq[19:0]
+dsp_tb.dsp_inst.ddc_inst.result_iq[30:0]
 @1000200
 -DDC
 @800200
 -phase_calc
-@22
-dsp_tb.dsp_inst.result_iq[19:0]
-dsp_tb.dsp_inst.result_iq_d[19:0]
 @28
 dsp_tb.dsp_inst.strobe_r2p
 @22
-dsp_tb.dsp_inst.mag_out[19:0]
-dsp_tb.dsp_inst.phase_out[20:0]
 dsp_tb.dsp_inst.sig_cnt[4:0]
 @200
 -
-@22
-dsp_tb.dsp_inst.mag_ref[19:0]
-dsp_tb.dsp_inst.mag_a[19:0]
-dsp_tb.dsp_inst.mag_b[19:0]
-dsp_tb.dsp_inst.mag_c[19:0]
+@8421
+[color] 6
+dsp_tb.adc_ref_dc_i[30:0]
+[color] 6
+dsp_tb.adc_ref_dc_q[30:0]
 @200
 -
 @22
-dsp_tb.dsp_inst.phase_ref[20:0]
-@420
-dsp_tb.dsp_inst.phase_a[20:0]
-dsp_tb.dsp_inst.phase_b[20:0]
-dsp_tb.dsp_inst.phase_c[20:0]
+dsp_tb.dsp_inst.mag_ref[30:0]
+dsp_tb.dsp_inst.phase_ref[31:0]
 @1000200
 -phase_calc
-@22
-dsp_tb.adc_ref_dc_i[19:0]
-dsp_tb.adc_ref_dc_q[19:0]
-@8421
-dsp_tb.adc_ref_dc_i[19:0]
 @20000
 -
-@8420
-dsp_tb.adc_ref_dc_q[19:0]
-@20000
 -
 [pattern_trace] 1
 [pattern_trace] 0

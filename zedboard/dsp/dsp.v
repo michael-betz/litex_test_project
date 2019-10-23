@@ -2,7 +2,9 @@
 
 `timescale 1 ns / 1 ns
 
-module dsp (
+module dsp #(
+    parameter W_CORDIC = 31
+) (
     input               clk,
     input               reset,
 
@@ -14,15 +16,15 @@ module dsp (
     input        [31:0] dds_ftw,
     input        [12:0] decimation,
 
-    output reg   [19:0] mag_ref,
-    output reg   [19:0] mag_a,
-    output reg   [19:0] mag_b,
-    output reg   [19:0] mag_c,
+    output reg   [W_CORDIC - 1:0] mag_ref,
+    output reg   [W_CORDIC - 1:0] mag_a,
+    output reg   [W_CORDIC - 1:0] mag_b,
+    output reg   [W_CORDIC - 1:0] mag_c,
 
-    output reg signed [20:0] phase_ref,
-    output reg signed [20:0] phase_a,
-    output reg signed [20:0] phase_b,
-    output reg signed [20:0] phase_c,
+    output reg signed [W_CORDIC:0] phase_ref,
+    output reg signed [W_CORDIC:0] phase_a,
+    output reg signed [W_CORDIC:0] phase_b,
+    output reg signed [W_CORDIC:0] phase_c,
 
     output reg out_strobe
 );
@@ -45,8 +47,8 @@ module dsp (
         .sina           (lo_sin)
     );
 
-    wire signed [19:0] result_iq;
-    reg signed [19:0] result_iq_d;
+    wire signed [W_CORDIC - 1:0] result_iq;
+    reg signed [W_CORDIC - 1:0] result_iq_d;
     wire strobe_cc;
     always @(posedge clk) result_iq_d <= result_iq;
 
@@ -66,8 +68,8 @@ module dsp (
         .dw        (14),
         .oscw      (18),
         .davr      (3),
-        .ow        (28),
-        .rw        (20),
+        .ow        (W_CORDIC),
+        .rw        (W_CORDIC),
         .pcw       (13),
         .shift_base(7),
         .nadc      (4)
@@ -94,18 +96,19 @@ module dsp (
     // every second clock cycle is a valid result
     // ... only after 21 cycle after strobe_cc
     // ... only for 4 channels
-    wire signed [19:0] mag_out;
-    wire signed [20:0] phase_out;
-    cordicg_b22 #(
-        .nstg       (20),   // latency - 1
-        .width      (20),
+    wire signed [W_CORDIC - 1: 0] mag_out;
+    wire signed [W_CORDIC: 0] phase_out;
+
+    cordicg_b32 #(
+        .nstg       (W_CORDIC), // latency - 1
+        .width      (W_CORDIC),
         .def_op     (2'd1)  // rect to polar, yout = 0
     ) cordic_r2p (
         .clk        (clk),
         .opin       (2'd1),
         .xin        (result_iq_d), // I
         .yin        (result_iq),   // Q
-        .phasein    (21'h0),
+        .phasein    (32'h0),
         .yout       (),
         .xout       (mag_out),
         .phaseout   (phase_out)
@@ -114,7 +117,7 @@ module dsp (
     wire strobe_r2p;
     reg_delay #(
         .dw (1),
-        .len(22)
+        .len(W_CORDIC + 2)
     ) strobe_delay (
         .clk  (clk),
         .reset(1'b0),
@@ -129,24 +132,24 @@ module dsp (
     // also calculate phase difference to reference channel
     reg [ 4:0] sig_cnt = 5'h0;
     always @(posedge clk) begin
-        sig_cnt <= 2'h0;
+        sig_cnt <= 5'h0;
         out_strobe <= 0;
         if (strobe_r2p) begin
             sig_cnt <= sig_cnt + 1;
             case (sig_cnt)
-                3'h0: begin
+                5'h0: begin
                     mag_ref <= mag_out;
                     phase_ref <= phase_out;
                 end
-                3'h2: begin
+                5'h2: begin
                     mag_a <= mag_out;
                     phase_a <= phase_out - phase_ref;
                 end
-                3'h4: begin
+                5'h4: begin
                     mag_b <= mag_out;
                     phase_b <= phase_out - phase_ref;
                 end
-                3'h6: begin
+                5'h6: begin
                     mag_c <= mag_out;
                     phase_c <= phase_out - phase_ref;
                     out_strobe <= 1;

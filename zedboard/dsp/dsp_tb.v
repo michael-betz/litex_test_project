@@ -38,10 +38,10 @@ module dsp_tb;
     // Deserialize one of the channels after the down-converter
     // for plotting
     wire strobe_out;
-    wire signed [19:0] adc_ref_dc_i;
-    wire signed [19:0] adc_ref_dc_q;
+    wire signed [30:0] adc_ref_dc_i;
+    wire signed [30:0] adc_ref_dc_q;
     grab_channels #(
-        .DW     (20)
+        .DW     (31)
     ) gc_inst (
         .clk        (clk_adc),
         .stream_in  (dsp_inst.result_iq),
