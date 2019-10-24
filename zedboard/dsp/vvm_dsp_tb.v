@@ -37,10 +37,11 @@ module vvm_dsp_tb;
     // Deserialize one of the channels after the down-converter
     // for plotting
     wire strobe_out;
-    wire signed [30:0] adc_ref_dc_i;
-    wire signed [30:0] adc_ref_dc_q;
+    parameter W_CORDIC = 30;
+    wire signed [W_CORDIC - 1: 0] adc_ref_dc_i;
+    wire signed [W_CORDIC - 1:0] adc_ref_dc_q;
     grab_channels #(
-        .DW     (31)
+        .DW     (W_CORDIC)
     ) gc_inst (
         .clk        (clk_adc),
         .stream_in  (dsp_inst.result_iq),
@@ -64,8 +65,8 @@ module vvm_dsp_tb;
                 "%d, %d, %d, %d, %d, %d\n",
                 adc_ref, 0,
                 dsp_inst.o_cos, dsp_inst.o_sin,
-                strobe_out ? adc_ref_dc_i : 20'sh0,
-                strobe_out ? adc_ref_dc_q : 20'sh0,
+                strobe_out ? adc_ref_dc_i : 32'sh0,
+                strobe_out ? adc_ref_dc_q : 32'sh0,
             );
         end
     end
@@ -77,13 +78,13 @@ module vvm_dsp_tb;
     initial begin
         if ($test$plusargs("vcd")) begin
             $dumpfile("vvm_dsp.vcd");
-            $dumpvars(5,vvm_dsp_tb);
+            $dumpvars(7,vvm_dsp_tb);
         end
         f = $fopen("output.txt","w");
         $fwrite(f, "adc_ref, lo, adc_ref_dc\n");
         repeat (100) @(posedge clk_adc);
         reset <= 0;
-        repeat (8000) @(posedge clk_adc);
+        repeat (16000) @(posedge clk_adc);
         $fclose(f);
         $finish;
     end
@@ -92,7 +93,7 @@ module vvm_dsp_tb;
     //  Instantiate the unit under test
     // ------------------------------------------------------------------------
     // IF at 20 kHz offset (rate at which phase_ref rolls over)
-    localparam LO_FTW = 1.0 * (F_REF_US + 20000) / F_ADC * 2**32;
+    localparam LO_FTW = 1.0 * (F_REF_US + 10000) / F_ADC * 2**32;
     wire [31:0] dds_ftw = LO_FTW;
     vvm_dsp #() dsp_inst (
         .sample_clk     (clk_adc),
@@ -104,8 +105,8 @@ module vvm_dsp_tb;
         .adcs_3         (adc_c),
 
         .ftw            (LO_FTW),
-        .cic_period     (13'd48),
-        .cic_shift      (4'd0)
+        .cic_period     (13'd500),
+        .cic_shift      (4'd4)
     );
 
 endmodule

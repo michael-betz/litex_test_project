@@ -16,6 +16,8 @@ server:
 clean::
 	rm -f $(TARGETS).bit.bin
 	rm -rf build
+	rm -f mem.init
+	rm -f mem_?.init
 	# in ./ip, delete EVERYTHING except processing_system7_0.xci (a bit harsh, I know ...)
 	mv ip/processing_system7_0.xci .
 	rm -rf ip/*

@@ -33,8 +33,7 @@ from common import main, ltc_pads, LedBlinker
 path.append("../sp605/dsp")
 from acquisition import Acquisition
 path.append("dsp")
-from dsp_wrapper import DspWrapper
-
+from vvm_dsp import VVM_DSP
 
 class _CRG(Module):
     def __init__(self, platform, sys_clk_freq, add_rst=None):
@@ -173,8 +172,9 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         #  Vector volt-meter
         # ----------------------------
-        DspWrapper.add_sources(p)
-        self.submodules.vvm = DspWrapper(self.lvds.sample_outs)
+        VVM_DSP.add_sources(p)
+        self.submodules.vvm = VVM_DSP(self.lvds.sample_outs)
+        self.vvm.add_csrs()
 
 
 if __name__ == '__main__':

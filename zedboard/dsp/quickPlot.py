@@ -18,8 +18,8 @@ from scipy.signal import periodogram
 import argparse
 
 
-def plot_td(dat1, ax, ts=8e-9, lbl='', **kwargs):
-    dat0 = linspace(0, len(dat1) * ts, len(dat1))  # time [s]
+def plot_td(dat1, ax, fs, lbl='', **kwargs):
+    dat0 = linspace(0, len(dat1) / fs, len(dat1))  # time [s]
     ax.plot(dat0 / 1000, real(dat1), label=lbl + "_I", **kwargs)
     ax.plot(dat0 / 1000, imag(dat1), label=lbl + "_Q", **kwargs)
     ax.set_xlabel("Time [us]")
@@ -27,10 +27,10 @@ def plot_td(dat1, ax, ts=8e-9, lbl='', **kwargs):
     ax.legend(loc='upper right')
 
 
-def plot_spect(dat1, ax, ts=8e-9, **kwargs):
+def plot_spect(dat1, ax, fs, **kwargs):
     f_dat, mag_dat = periodogram(
         dat1,
-        1 / ts,
+        fs,
         'flattop',
         return_onesided=False,
         detrend=False
@@ -48,8 +48,8 @@ def main():
         "fname", help="File to plot"
     )
     parser.add_argument(
-        "--ts", help="Sample rate in [ns]",
-        default=8, type=float
+        "--fs", help="Sampling frequency in [Hz]",
+        default=125e6, type=float
     )
     parser.add_argument(
         "--skip", help="Skip N samples at beginning",
@@ -66,13 +66,13 @@ def main():
     rcParams['axes.grid'] = True
     fig, axs = subplots(dat.shape[1], 1, sharex=True)
     for n, d, a in zip(dat_names, dat.T, axs):
-        plot_td(d, a, args.ts, lbl=n)
+        plot_td(d, a, args.fs, lbl=n)
     fig.tight_layout()
 
-    fig, ax = subplots(1, 1)
-    for n, d in zip(dat_names, dat.T):
-        plot_spect(d, ax, args.ts, label=n)
-    ax.legend(loc='upper right')
+    fig, axs = subplots(dat.shape[1], 1, sharex=True)
+    for n, d, a in zip(dat_names, dat.T, axs):
+        plot_spect(d, a, args.fs, label=n)
+        a.legend(loc='upper right')
     fig.tight_layout()
 
     show()

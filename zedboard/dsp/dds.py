@@ -4,6 +4,7 @@ try:
     python3 dds.py build
 '''
 from sys import argv
+from os.path import join, dirname, abspath
 from migen import *
 
 
@@ -27,14 +28,14 @@ class DDS(Module):
         self.ftw = Signal(32, reset=1)
 
         # Output amplitude
-        self.amp = Signal(N_BITS, reset=int((1 << N_BITS) / 1.7))
+        self.amp = Signal(N_BITS, reset=int((1 << (N_BITS - 1)) / 1.65))
+        # a CORDIC engine has an intrinsic gain of about 1.64676
+        # (asymptotic value for a large number of stages)
 
         ###
 
         self.phase = Signal(32)
-        self.sync += [
-            self.phase.eq(self.phase + self.ftw)
-        ]
+        self.sync += self.phase.eq(self.phase + self.ftw)
 
         self.specials += Instance(
             "cordicg_b32",

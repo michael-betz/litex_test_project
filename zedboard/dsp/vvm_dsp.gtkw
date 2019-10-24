@@ -1,20 +1,23 @@
 [*]
-[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
-[*] Thu Oct 24 03:09:49 2019
+[*] GTKWave Analyzer v3.3.101 (w)1999-2019 BSI
+[*] Thu Oct 24 08:00:54 2019
 [*]
 [dumpfile] "/home/michael/fpga_wsp/litex_test_project/zedboard/dsp/vvm_dsp.vcd"
-[dumpfile_mtime] "Thu Oct 24 03:09:34 2019"
-[dumpfile_size] 170787705
+[dumpfile_mtime] "Thu Oct 24 08:00:13 2019"
+[dumpfile_size] 352844974
+[optimize_vcd]
 [savefile] "/home/michael/fpga_wsp/litex_test_project/zedboard/dsp/vvm_dsp.gtkw"
 [timestart] 0
-[size] 1916 1037
+[size] 1916 504
 [pos] -1 -1
-*-14.000000 45256 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-15.000000 88320 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] vvm_dsp_tb.
+[treeopen] vvm_dsp_tb.dsp_inst.
+[treeopen] vvm_dsp_tb.dsp_inst.ddc.i_cic_multichannel_i.
 [sst_width] 318
 [signals_width] 276
 [sst_expanded] 1
-[sst_vpaned_height] 304
+[sst_vpaned_height] 118
 @28
 vvm_dsp_tb.clk_adc
 @c00200
@@ -40,48 +43,59 @@ vvm_dsp_tb.adc_c[13:0]
 -testbench
 @c00200
 -dds
-@22
-vvm_dsp_tb.dsp_inst.ftw[31:0]
-@8022
-vvm_dsp_tb.dsp_inst.phase[31:0]
+@8420
+vvm_dsp_tb.dsp_inst.o_sin[17:0]
 @20000
 -
 -
+@22
+vvm_dsp_tb.dsp_inst.ftw[31:0]
+@8420
+vvm_dsp_tb.dsp_inst.phase[31:0]
 @1401200
 -dds
 @800200
 -DDC
 @22
-vvm_dsp_tb.dsp_inst.result_iq[30:0]
+vvm_dsp_tb.dsp_inst.result_iq[29:0]
 @28
 vvm_dsp_tb.dsp_inst.result_strobe
+@8420
+vvm_dsp_tb.adc_ref_dc_i[29:0]
+@20000
+-
+@8420
+vvm_dsp_tb.adc_ref_dc_q[29:0]
+@20000
+-
 @1000200
 -DDC
 @800200
 -phase_calc
 @22
 vvm_dsp_tb.dsp_inst.counter[5:0]
+vvm_dsp_tb.dsp_inst.mag_out[29:0]
+vvm_dsp_tb.dsp_inst.phase_out[30:0]
+@200
+-
 @23
-vvm_dsp_tb.dsp_inst.mag_out[30:0]
+vvm_dsp_tb.dsp_inst.mags[29:0]
 @22
-vvm_dsp_tb.dsp_inst.phase_out[31:0]
+vvm_dsp_tb.dsp_inst.mags_1[29:0]
+vvm_dsp_tb.dsp_inst.mags_2[29:0]
+vvm_dsp_tb.dsp_inst.mags_3[29:0]
 @200
 -
 @22
-vvm_dsp_tb.dsp_inst.mags[30:0]
-vvm_dsp_tb.dsp_inst.mags_1[30:0]
-vvm_dsp_tb.dsp_inst.mags_2[30:0]
-vvm_dsp_tb.dsp_inst.mags_3[30:0]
-@200
--
-@22
-vvm_dsp_tb.dsp_inst.phases[31:0]
-vvm_dsp_tb.dsp_inst.phases_1[31:0]
-vvm_dsp_tb.dsp_inst.phases_2[31:0]
-vvm_dsp_tb.dsp_inst.phases_3[31:0]
+vvm_dsp_tb.dsp_inst.phases[30:0]
+vvm_dsp_tb.dsp_inst.phases_1[30:0]
+vvm_dsp_tb.dsp_inst.phases_2[30:0]
+vvm_dsp_tb.dsp_inst.phases_3[30:0]
 @1000200
 -phase_calc
 @20000
+-
+-
 -
 -
 [pattern_trace] 1

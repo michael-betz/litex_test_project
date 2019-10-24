@@ -27,7 +27,7 @@ module ddc #(
 );
 
     // width [bits] of each I, Q channel at the mixer output
-    localparam MIX_W = (dw + davr);
+    localparam MIX_W = (8'h00 + dw + davr);
 
     // ---------------------
     // Instantiate Sampler
@@ -68,7 +68,7 @@ module ddc #(
     );
 
     // ---------------------
-    // Instantiate two CIC_MULTICHANNEL, one for each stream
+    // Instantiate a shared CIC_MULTICHANNEL
     // ---------------------
     wire [MIX_W - 1: 0] zero = 0;
     cic_multichannel #(
