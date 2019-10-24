@@ -129,7 +129,7 @@ class HelloLtc(SoCZynq, AutoCSR):
         # ----------------------------
         p.add_extension(ltc_pads)
         # LTCPhy will recover ADC clock and drive `sample` clock domain
-        self.submodules.lvds = LTCPhy(p, clk_freq)
+        self.submodules.lvds = LTCPhy(p, clk_freq, 117.6e6)
         # tell vivado that sys_clk and sampl_clk are asynchronous
         p.add_false_path_constraints(
             self.crg.cd_sys.clk,

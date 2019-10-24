@@ -215,7 +215,7 @@ def main():
         "--CH", default=0, choices=[0, 1, 2, 3], type=int, help="Which channel to plot"
     )
     parser.add_argument(
-        "--fs", default=125e6, type=float, help="ADC sample rate [MHz]. Must match hello_LTC.py setting."
+        "--fs", default=117.6e6, type=float, help="ADC sample rate [MHz]. Must match hello_LTC.py setting."
     )
     args = parser.parse_args()
     # ----------------------------------------------
@@ -252,7 +252,7 @@ def main():
     yVect = zeros_like(xVect)
     yVect[:2] = [-1, 1]
     f, Pxx = periodogram(yVect, args.fs, nfft=args.N * 2)
-    lt, = axs[0].plot(xVect * 1e9, yVect, "-o")
+    lt, = axs[0].plot(xVect * 1e9, yVect, drawstyle='steps-post')
     lf, = axs[1].plot(f / 1e6, Pxx)
     axs[0].set_xlabel("Time [ns]")
     axs[1].set_xlabel("Frequency [MHz]")

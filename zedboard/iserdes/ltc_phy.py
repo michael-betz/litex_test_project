@@ -11,7 +11,7 @@ from common import LedBlinker, myzip
 
 
 class LTCPhy(S7_iserdes, AutoCSR):
-    def __init__(self, platform, clk_freq):
+    def __init__(self, platform, freq_sys, freq_sample):
         N_CHANNELS = 4
         S = 8  # S = serdes factor
         D = N_CHANNELS * 2 + 1  # D = number of lanes
@@ -35,8 +35,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
             self.dco_p.eq(self.pads_dco.p),
             self.dco_n.eq(self.pads_dco.n)
         ]
-        f_sample_clk = 125e6
-        f_dco_clk = f_sample_clk * 4
+        f_dco_clk = freq_sample * 4
         platform.add_period_constraint(self.pads_dco.p, 1e9 / f_dco_clk)
 
         dat_p = []
@@ -80,7 +79,7 @@ class LTCPhy(S7_iserdes, AutoCSR):
         )
 
         # Frequency counter for received sample clock
-        self.submodules.f_sample = FreqMeter(clk_freq)
+        self.submodules.f_sample = FreqMeter(freq_sys)
 
         # CSR for moving a IDELAY2 up / down
         self.idelay_inc = CSR(1)

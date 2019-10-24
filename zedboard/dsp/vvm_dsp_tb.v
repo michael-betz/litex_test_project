@@ -1,6 +1,6 @@
 `timescale 1 ns / 1 ns
 
-module dsp_tb;
+module vvm_dsp_tb;
     localparam pi = 3.141592653589793;
     // ADC sampling clock f_s [Hz]
     // chosen for f_RF / f_ADC ~ 4.25
@@ -44,7 +44,7 @@ module dsp_tb;
     ) gc_inst (
         .clk        (clk_adc),
         .stream_in  (dsp_inst.result_iq),
-        .strobe_in  (dsp_inst.strobe_cc),
+        .strobe_in  (dsp_inst.result_strobe),
 
         .strobe_out (strobe_out),
         .i_out0     (adc_ref_dc_i),
@@ -63,7 +63,7 @@ module dsp_tb;
                 f,
                 "%d, %d, %d, %d, %d, %d\n",
                 adc_ref, 0,
-                dsp_inst.lo_cos, dsp_inst.lo_sin,
+                dsp_inst.o_cos, dsp_inst.o_sin,
                 strobe_out ? adc_ref_dc_i : 20'sh0,
                 strobe_out ? adc_ref_dc_q : 20'sh0,
             );
@@ -76,14 +76,14 @@ module dsp_tb;
     reg reset = 1;
     initial begin
         if ($test$plusargs("vcd")) begin
-            $dumpfile("dsp.vcd");
-            $dumpvars(5,dsp_tb);
+            $dumpfile("vvm_dsp.vcd");
+            $dumpvars(5,vvm_dsp_tb);
         end
         f = $fopen("output.txt","w");
         $fwrite(f, "adc_ref, lo, adc_ref_dc\n");
         repeat (100) @(posedge clk_adc);
         reset <= 0;
-        repeat (16000) @(posedge clk_adc);
+        repeat (8000) @(posedge clk_adc);
         $fclose(f);
         $finish;
     end
@@ -91,20 +91,21 @@ module dsp_tb;
     // ------------------------------------------------------------------------
     //  Instantiate the unit under test
     // ------------------------------------------------------------------------
-    // IF at 10 kHz offset (rate at which phase_ref rolls over)
-    localparam LO_FTW = 1.0 * (F_REF_US + 10000) / F_ADC * 2**32;
+    // IF at 20 kHz offset (rate at which phase_ref rolls over)
+    localparam LO_FTW = 1.0 * (F_REF_US + 20000) / F_ADC * 2**32;
     wire [31:0] dds_ftw = LO_FTW;
-    dsp #() dsp_inst (
-        .clk            (clk_adc),
-        .reset          (reset),
+    vvm_dsp #() dsp_inst (
+        .sample_clk     (clk_adc),
+        .sample_rst     (reset),
 
-        .adc_ref        (adc_ref),
-        .adc_a          (adc_a),
-        .adc_b          (adc_b),
-        .adc_c          (adc_c),
+        .adcs           (adc_ref),
+        .adcs_1         (adc_a),
+        .adcs_2         (adc_b),
+        .adcs_3         (adc_c),
 
-        .dds_ftw        (LO_FTW),
-        .decimation     (13'd48)
+        .ftw            (LO_FTW),
+        .cic_period     (13'd48),
+        .cic_shift      (4'd0)
     );
 
 endmodule
