@@ -140,6 +140,7 @@ class VVM_DSP(Module, AutoCSR):
         # from cordic output at the right time into the right place
         self.strobe = Signal()
         self.strobe_ = Signal()
+        self.strobe__ = Signal()
         mags = [Signal.like(self.mags_iir[0]) for i in range(n_ch)]
         phases = [Signal.like(self.phases_iir[0]) for i in range(n_ch)]
         t = []
@@ -158,7 +159,8 @@ class VVM_DSP(Module, AutoCSR):
         self.sync.sample += [
             self.strobe.eq(0),
             timeline(result_strobe, t),
-            self.strobe_.eq(self.strobe)
+            self.strobe_.eq(self.strobe),
+            self.strobe__.eq(self.strobe_)
         ]
 
         # -----------------------------------------------
@@ -174,7 +176,8 @@ class VVM_DSP(Module, AutoCSR):
                 continue
 
             w = self.W_MAG if i < n_ch else self.W_PHASE
-            iir = ClockDomainsRenamer('sample')(TinyIIR(w))
+            # DC error for shift > 31
+            iir = ClockDomainsRenamer('sample')(TinyIIR(w, w + 31))
             self.comb += [
                 iir.x.eq(m),
                 mi.eq(iir.y),
@@ -212,7 +215,7 @@ class VVM_DSP(Module, AutoCSR):
             self.cic_shift.eq(self.ddc_shift.storage),
             self.iir_shift.eq(self.iir.storage),
             self.cdc.data_i.eq(Cat(self.mags_iir + self.phases_iir)),
-            self.cdc.i.eq(self.strobe_),
+            self.cdc.i.eq(self.strobe__),
             Cat(self.mags_sys + self.phases_sys).eq(self.cdc.data_o)
         ]
 
