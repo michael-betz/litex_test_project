@@ -66,7 +66,7 @@ def main():
     rcParams['axes.grid'] = True
     fig, axs = subplots(dat.shape[1], 1, sharex=True)
     for n, d, a in zip(dat_names, dat.T, axs):
-        plot_td(d, a, args.fs, lbl=n)
+        plot_td(d, a, args.fs, lbl=n, drawstyle='steps-post')
     fig.tight_layout()
 
     fig, axs = subplots(dat.shape[1], 1, sharex=True)

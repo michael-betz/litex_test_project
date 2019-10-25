@@ -12,6 +12,7 @@ from litex.soc.interconnect.csr import AutoCSR, CSRStorage, CSRStatus
 from migen.genlib.cdc import BlindTransfer
 from os.path import join, dirname, abspath
 from dds import DDS
+from tiny_iir import TinyIIR
 
 
 class VVM_DSP(Module, AutoCSR):
@@ -21,7 +22,7 @@ class VVM_DSP(Module, AutoCSR):
         DDS.add_sources(platform)
 
         srcs = [
-            "ddc.v", "cordicg_b32.v"
+            "ddc.v", "cordicg_b22.v"
         ]
         for src in srcs:
             platform.add_source(join(vdir, src))
@@ -47,10 +48,14 @@ class VVM_DSP(Module, AutoCSR):
             * 14 bit signed inputs
             * twos complement format
             * matched to LTC2175-14
+
+        dsp:
+            * complex multiply with 18 bit LO
+            *
         """
-        self.W_CORDIC = 30
-        self.PHASE_BITS = self.W_CORDIC + 1
-        self.MAG_BITS = self.W_CORDIC
+        self.W_CORDIC = 21
+        self.W_PHASE = self.W_CORDIC + 1
+        self.W_MAG = self.W_CORDIC
 
         if adcs is None:
             # Mock input for simulation
@@ -58,10 +63,15 @@ class VVM_DSP(Module, AutoCSR):
         self.adcs = adcs
         n_ch = len(adcs)
 
-        self.mags = [Signal((self.MAG_BITS, False)) for i in range(n_ch)]
-        self.phases = [Signal((self.PHASE_BITS, True)) for i in range(n_ch)]
+        self.mags_iir = [
+            Signal((self.W_MAG, False), name='mag') for i in range(n_ch)
+        ]
+        self.phases_iir = [
+            Signal((self.W_PHASE, True), name='phase') for i in range(n_ch)
+        ]
         self.cic_period = Signal(13)
         self.cic_shift = Signal(4)
+        self.iir_shift = Signal(6)
 
         ###
 
@@ -73,18 +83,20 @@ class VVM_DSP(Module, AutoCSR):
         result_iq_d = Signal.like(result_iq)
         self.sync.sample += result_iq_d.eq(result_iq)
 
-        # Digital down-conversion
+        # -----------------------------------------------
+        #  Digital down-conversion
+        # -----------------------------------------------
         self.specials += Instance(
             'ddc',
             p_dw=14,  # ADC input width
             p_oscw=18,  # LO width
-            p_davr=2,  # Mixer guard bits
+            p_davr=4,  # Mixer guard bits
             # CIC integrator width (aka. di_rwi)
             # Increase this to achieve higher decimation factors
-            p_ow=self.W_CORDIC + 13,  # XXX optimize bit-widths!
+            p_ow=self.W_CORDIC + 16,  # XXX optimize bit-widths!
             p_rw=self.W_CORDIC,  # CIC output width (aka. cc_outw)
             p_pcw=13,  # decimation factor width
-            p_shift_base=7,  # Bits to discard in CIC
+            p_shift_base=7,  # Bits to discard after CIC (added to i_cic_shift)
             p_nadc=4,
 
             i_clk=ClockSignal('sample'),
@@ -92,18 +104,20 @@ class VVM_DSP(Module, AutoCSR):
             i_adcs=Cat(self.adcs),
             i_cosa=self.dds.o_cos,
             i_sina=self.dds.o_sin,
-            i_cic_period=self.cic_period,
-            i_cic_shift=self.cic_shift,
+            i_cic_period=self.cic_period,  # CIC decimation ratio
+            i_cic_shift=self.cic_shift,  # CIC output scale adjustment
 
             o_result_iq=result_iq,
             o_strobe_cc=result_strobe
         )
 
-        # Rectangular to Polar conversion
+        # -----------------------------------------------
+        #  Rectangular to Polar conversion
+        # -----------------------------------------------
         mag_out = Signal(self.W_CORDIC)
         phase_out = Signal(self.W_CORDIC + 1)
         self.specials += Instance(
-            'cordicg_b32',
+            'cordicg_b22',
             p_nstg=self.W_CORDIC,
             p_width=self.W_CORDIC,
             p_def_op=1,
@@ -120,45 +134,85 @@ class VVM_DSP(Module, AutoCSR):
         )
         CORDIC_DEL = self.W_CORDIC + 2
 
-        # Latch the cordic output at the right time into the right place
+        # -----------------------------------------------
+        #  Latch the stream
+        # -----------------------------------------------
+        # from cordic output at the right time into the right place
         self.strobe = Signal()
+        self.strobe_ = Signal()
+        mags = [Signal.like(self.mags_iir[0]) for i in range(n_ch)]
+        phases = [Signal.like(self.phases_iir[0]) for i in range(n_ch)]
         t = []
-        for i in range(n_ch):
-            instrs = [self.mags[i].eq(mag_out)]
+        # For each mag / phase result
+        for i, (m, p) in enumerate(zip(mags, phases)):
+            instrs = [m.eq(mag_out)]
             if i == 0:
-                instrs += [self.phases[i].eq(phase_out)]
+                instrs.append(p.eq(phase_out))
             else:
-                instrs += [self.phases[i].eq(self.phases[0] - phase_out)]
-            t += [(
+                instrs.append(p.eq(phases[0] - phase_out))
+            t.append((
                 CORDIC_DEL + 2 * i,  # N cycles after result_strobe ...
                 instrs               # ... carry out these instructions
-            )]
+            ))
         t[-1][1].append(self.strobe.eq(1))
-        self.sync.sample += self.strobe.eq(0)
-        self.sync.sample += timeline(result_strobe, t)
+        self.sync.sample += [
+            self.strobe.eq(0),
+            timeline(result_strobe, t),
+            self.strobe_.eq(self.strobe)
+        ]
+
+        # -----------------------------------------------
+        #  IIR lowpass filter for result averaging
+        # -----------------------------------------------
+        for i, (m, mi) in enumerate(zip(
+            mags + phases,
+            self.mags_iir + self.phases_iir
+        )):
+            # No filter for the reference phase output
+            if i == n_ch:
+                self.comb += mi.eq(m)
+                continue
+
+            w = self.W_MAG if i < n_ch else self.W_PHASE
+            iir = ClockDomainsRenamer('sample')(TinyIIR(w))
+            self.comb += [
+                iir.x.eq(m),
+                mi.eq(iir.y),
+                iir.shifts.eq(self.iir_shift),
+                iir.strobe.eq(self.strobe),
+            ]
+            self.submodules += iir
 
     def add_csrs(self):
-
+        ''' Wire up the config-registers to litex CSRs '''
         # sys clock domain
         n_ch = len(self.adcs)
-        self.mags_sys = [Signal((self.MAG_BITS, False)) for i in range(n_ch)]
-        self.phases_sys = [Signal((self.PHASE_BITS, True)) for i in range(n_ch)]
+        self.mags_sys = [
+            Signal.like(self.mags_iir[0]) for i in range(n_ch)
+        ]
+        self.phases_sys = [
+            Signal.like(self.phases_iir[0]) for i in range(n_ch)
+        ]
 
-        # Clock domain crossing
+        # Clock domain crossing on self.strobe_
         self.submodules.cdc = BlindTransfer(
             "sample",
             "sys",
-            n_ch * (self.MAG_BITS + self.PHASE_BITS)
+            n_ch * (self.W_MAG + self.W_PHASE)
         )
 
-        self.ddc_ftw = CSRStorage(32, reset=0x40059350)
-        self.ddc_deci = CSRStorage(13, reset=48)
+        self.ddc_ftw = CSRStorage(len(self.dds.ftw), reset=0x40059350)
+        self.ddc_deci = CSRStorage(len(self.cic_period), reset=48)
+        self.ddc_shift = CSRStorage(len(self.cic_shift), reset=0)
+        self.iir = CSRStorage(len(self.iir_shift))
 
         self.comb += [
             self.dds.ftw.eq(self.ddc_ftw.storage),
             self.cic_period.eq(self.ddc_deci.storage),
-            self.cdc.data_i.eq(Cat(self.mags + self.phases)),
-            self.cdc.i.eq(self.strobe),
+            self.cic_shift.eq(self.ddc_shift.storage),
+            self.iir_shift.eq(self.iir.storage),
+            self.cdc.data_i.eq(Cat(self.mags_iir + self.phases_iir)),
+            self.cdc.i.eq(self.strobe_),
             Cat(self.mags_sys + self.phases_sys).eq(self.cdc.data_o)
         ]
 
@@ -174,21 +228,22 @@ class VVM_DSP(Module, AutoCSR):
 
 
 def main():
+    ''' generate a .v file for simulation with Icarus / general usage '''
     tName = argv[0].replace('.py', '')
     d = VVM_DSP()
     if 'build' in argv:
-        ''' generate a .v file for simulation with Icarus / general usage '''
         from migen.fhdl.verilog import convert
         convert(
             d,
             name=tName,
             ios={
                 *d.adcs,
-                *d.mags,
-                *d.phases,
+                *d.mags_iir,
+                *d.phases_iir,
                 d.cic_period,
                 d.cic_shift,
-                d.dds.ftw
+                d.dds.ftw,
+                d.iir_shift
             },
             display_run=True
         ).write(tName + '.v')

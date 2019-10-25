@@ -6,7 +6,7 @@ vpath %.v $(CORDIC_DIR) $(DSP_DIR)
 
 TARGET  = vvm_dsp
 
-SRC_V  += cordicg_b32.v cstageg.v addsubg.v ddc.v
+SRC_V  += cordicg_b22.v cstageg.v addsubg.v ddc.v
 SRC_V  += iq_mixer_multichannel.v mixer.v
 SRC_V  += multi_sampler.v cic_multichannel.v
 SRC_V  += serializer_multichannel.v reg_delay.v ccfilt.v double_inte_smp.v
@@ -22,6 +22,6 @@ $(TARGET)_tb: $(SRC_V) $(TARGET).v
 plot: $(TARGET).vcd
 	python3 quickPlot.py output.txt --skip 100 --fs 117.6e6
 
-CLEAN += cordicg_b32.v output.txt dds.v vvm_dsp.v $(TARGET)_tb $(TARGET).vcd
+CLEAN += cordicg_b22.v output.txt dds.v vvm_dsp.v $(TARGET)_tb $(TARGET).vcd
 
 include $(BUILD_DIR)/bottom_rules.mk

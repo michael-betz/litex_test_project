@@ -37,7 +37,7 @@ module vvm_dsp_tb;
     // Deserialize one of the channels after the down-converter
     // for plotting
     wire strobe_out;
-    parameter W_CORDIC = 30;
+    parameter W_CORDIC = 21;
     wire signed [W_CORDIC - 1: 0] adc_ref_dc_i;
     wire signed [W_CORDIC - 1:0] adc_ref_dc_q;
     grab_channels #(
@@ -64,7 +64,7 @@ module vvm_dsp_tb;
                 f,
                 "%d, %d, %d, %d, %d, %d\n",
                 adc_ref, 0,
-                dsp_inst.o_cos, dsp_inst.o_sin,
+                dsp_inst.dds_o_cos, dsp_inst.dds_o_sin,
                 strobe_out ? adc_ref_dc_i : 32'sh0,
                 strobe_out ? adc_ref_dc_q : 32'sh0,
             );
@@ -105,8 +105,13 @@ module vvm_dsp_tb;
         .adcs_3         (adc_c),
 
         .ftw            (LO_FTW),
-        .cic_period     (13'd500),
-        .cic_shift      (4'd4)
+        .cic_period     (13'd100),
+        .cic_shift      (4'd2),
+        // decimation by factor of 1000 works fine with cic_shift = 9
+        // bandwidth = 117.6 kHz
+
+        .iir_shift      (6'd4)
+        // Measurement smoothing factor
     );
 
 endmodule

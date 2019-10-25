@@ -12,9 +12,9 @@ class DDS(Module):
     @staticmethod
     def add_sources(platform):
         vdir = abspath(dirname(__file__))
-        platform.add_source(join(vdir, "cordicg_b32.v"))
+        platform.add_source(join(vdir, "cordicg_b22.v"))
 
-    def __init__(self, N_BITS=24):
+    def __init__(self, N_BITS=18, N_STG=20):
         '''
         DDS with 32 bit accumulator
         and `N` output bits (max = 32)
@@ -38,8 +38,8 @@ class DDS(Module):
         self.sync += self.phase.eq(self.phase + self.ftw)
 
         self.specials += Instance(
-            "cordicg_b32",
-            p_nstg=N_BITS,
+            "cordicg_b22",
+            p_nstg=N_STG,
             p_width=N_BITS,
             p_def_op=0,
 

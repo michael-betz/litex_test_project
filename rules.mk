@@ -21,9 +21,9 @@ build/gateware/%.bit: %.py
 %_view: %.vcd %.gtkw
 	gtkwave $^
 
-clean::
-	rm -rf $(TARGETS:=.vcd) $(TARGETS:=.v) $(TARGETS:=_tb)
-	rm -rf tree0_*.svg
+# clean::
+# 	rm -rf $(TARGETS:=.vcd) $(TARGETS:=.v) $(TARGETS:=_tb)
+# 	rm -rf tree0_*.svg
 
 #-------
 # xsim
