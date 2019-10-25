@@ -177,7 +177,7 @@ class VVM_DSP(Module, AutoCSR):
 
             w = self.W_MAG if i < n_ch else self.W_PHASE
             # DC error for shift > 31
-            iir = ClockDomainsRenamer('sample')(TinyIIR(w, w + 31))
+            iir = ClockDomainsRenamer('sample')(TinyIIR(w))
             self.comb += [
                 iir.x.eq(m),
                 mi.eq(iir.y),

@@ -85,6 +85,28 @@ def autoIdelay(r):
         maxValue
     ))
 
+def initLTC(r, check_align=False):
+    print("Resetting LTC")
+    ltc_spi = LTC_SPI(r)
+    ltc_spi.set_ltc_reg(0, 0x80)   # reset the chip
+    ltc_spi.setTp(1)
+    autoBitslip(r)
+    autoIdelay(r)
+
+    if check_align:
+        print("ADC word bits:")
+        for i in range(14):
+            tp = 1 << i
+            ltc_spi.setTp(tp)
+            tp_read = r.regs.lvds_data_peek0.read()
+            print("{:014b} {:014b}".format(tp, tp_read))
+            if tp != tp_read:
+                raise RuntimeError("LVDS alignment error")
+
+    ltc_spi.set_ltc_reg(3, 0)  # Test pattern off
+    ltc_spi.set_ltc_reg(1, (1 << 5))  # Randomizer off, twos complement output
+
+
 def getSamples(r, CH, N=None):
     addr = getattr(r.mems, 'sample{:}'.format(CH)).base
     samples = array(r.big_read(addr, N))
@@ -225,25 +247,8 @@ def main():
     print("fs = {:6f} MHz, should be {:6f} MHz".format(
         r.regs.lvds_f_sample_value.read() / 1e6, args.fs / 1e6
     ))
-    print("Resetting LTC")
-    ltc_spi = LTC_SPI(r)
-    ltc_spi.set_ltc_reg(0, 0x80)   # reset the chip
-    ltc_spi.setTp(1)
-    autoBitslip(r)
-    autoIdelay(r)
+    initLTC(r, True)
     r.regs.acq_trig_channel.write(args.CH)
-
-    print("ADC word bits:")
-    for i in range(14):
-        tp = 1 << i
-        ltc_spi.setTp(tp)
-        tp_read = r.regs.lvds_data_peek0.read()
-        print("{:014b} {:014b}".format(tp, tp_read))
-        if tp != tp_read:
-            raise RuntimeError("LVDS alignment error")
-
-    ltc_spi.set_ltc_reg(3, 0)  # Test pattern off
-    ltc_spi.set_ltc_reg(1, (1 << 5))  # Randomizer off, twos complement output
 
     # ----------------------------------------------
     #  Setup Matplotlib
