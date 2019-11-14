@@ -53,7 +53,7 @@ class HelloI2c(SoCZynq, AutoCSR):
         # sys_clk is provided by FCLK_CLK0 from PS7
         p = self.platform
         self.add_gp0()
-        self.add_axi_to_wishbone(self.axi_gp0, base_address=0x4000_0000)
+        self.add_axi_to_wishbone(self.axi_gp0, base_address=0x40000000)
 
         p.add_extension([(
             "SI570_I2C",

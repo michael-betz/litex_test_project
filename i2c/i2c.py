@@ -67,8 +67,9 @@ class I2CMaster(Module, AutoCSR):
         fsm.act("IDLE",
             If(self.start & (self.mode != 0),
                 NextState("SYNC")
-            ),
-            self.done.eq(1),
+            ).Else(
+                self.done.eq(1),
+            )
         )
         fsm.act("SYNC",
             If(self.clk_rise,
