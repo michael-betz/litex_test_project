@@ -41,25 +41,28 @@ class I2CMaster(Module, AutoCSR):
 
         # # #
 
+        self.tx_word_ = Signal.like(self.tx_word)
+
+
         # Clock generation ----------------------------------------------------
         clk_divide = math.ceil(sys_clk_freq / i2c_clk_freq)
-        clk_divider = Signal(max=clk_divide)
-        clk_rise = Signal()
-        clk_fall = Signal()
+        self.clk_divider = Signal(max=clk_divide)
+        self.clk_rise = Signal()
+        self.clk_fall = Signal()
         self.sync += [
-            If(clk_fall,
-                clk_divider.eq(0)
+            If(self.clk_fall,
+                self.clk_divider.eq(0)
             ).Else(
-                clk_divider.eq(clk_divider + 1)
+                self.clk_divider.eq(self.clk_divider + 1)
             )
         ]
         self.comb += [
-            clk_rise.eq(clk_divider == (clk_divide // 2 - 1)),
-            clk_fall.eq(clk_divider == (clk_divide - 1))
+            self.clk_rise.eq(self.clk_divider == (clk_divide // 2 - 1)),
+            self.clk_fall.eq(self.clk_divider == (clk_divide - 1))
         ]
 
         # Control FSM ---------------------------------------------------------
-        bits = Signal(4)
+        self.bits = Signal(4)
         self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(self.start & (self.mode != 0),
@@ -68,9 +71,10 @@ class I2CMaster(Module, AutoCSR):
             self.done.eq(1),
         )
         fsm.act("SYNC",
-            If(clk_rise,
+            If(self.clk_rise,
                 If(self.mode == 1,
-                    NextState("XFER")
+                    NextState("XFER"),
+                    NextValue(self.tx_word_, self.tx_word)
                 ),
                 If(self.mode == 2,
                     NextValue(self.sda, 1),
@@ -85,29 +89,29 @@ class I2CMaster(Module, AutoCSR):
             )
         )
         fsm.act("START",
-            If(clk_fall,
+            If(self.clk_fall,
                 NextValue(self.sda, 0),
                 NextState("IDLE")
             )
         )
         fsm.act("STOP",
-            If(clk_fall,
+            If(self.clk_fall,
                 NextValue(self.sda, 1),
                 NextState("IDLE")
             )
         )
         fsm.act("XFER",
-            If(clk_fall,
-                NextValue(self.tx_word, Cat(0, self.tx_word[:-1])),
-                NextValue(self.sda, self.tx_word[-1]),
+            If(self.clk_fall,
+                NextValue(self.tx_word_, Cat(0, self.tx_word_[:-1])),
+                NextValue(self.sda, self.tx_word_[-1]),
                 NextValue(self.scl, 0),
             ),
-            If(clk_rise,
-                NextValue(bits, bits + 1),
+            If(self.clk_rise,
+                NextValue(self.bits, self.bits + 1),
                 NextValue(self.scl, 1),
-                If(bits == 9,
+                If(self.bits == 9,
                     NextState("IDLE"),
-                    NextValue(bits, 0),
+                    NextValue(self.bits, 0),
                     NextValue(self.scl, 0),
                     NextValue(self.sda, 1)
                 ).Else(
@@ -202,7 +206,7 @@ if __name__ == "__main__":
                 dut.rx_word,
                 dut.tx_word
             },
-	    name=tName,
+            name=tName,
             display_run=True
         ).write(tName + '.v')
     if "sim" in argv:

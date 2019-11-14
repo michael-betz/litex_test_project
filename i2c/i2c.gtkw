@@ -1,34 +1,21 @@
 [*]
-[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
-[*] Tue Nov 12 23:21:27 2019
+[*] GTKWave Analyzer v3.3.101 (w)1999-2019 BSI
+[*] Thu Nov 14 03:44:24 2019
 [*]
-[dumpfile] "/home/michael/fpga_wsp/litex/litex/soc/cores/i2c.vcd"
-[dumpfile_mtime] "Tue Nov 12 23:20:48 2019"
-[dumpfile_size] 7604
-[savefile] "/home/michael/fpga_wsp/litex/litex/soc/cores/i2c.gtkw"
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/i2c/i2c.vcd"
+[dumpfile_mtime] "Thu Nov 14 03:43:49 2019"
+[dumpfile_size] 25043
+[savefile] "/home/michael/fpga_wsp/litex_test_project/i2c/i2c.gtkw"
 [timestart] 0
-[size] 1916 508
+[size] 2044 1105
 [pos] -1 -1
 *-7.000000 129 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] i2c_tb.
 [sst_width] 282
 [signals_width] 337
 [sst_expanded] 1
 [sst_vpaned_height] 121
-@28
-sys_clk
-clk_rise
-clk_fall
-@820
-state[103:0]
-@28
-start
-mode[1:0]
-@200
--
-@29
-[color] 7
-pads_scl
-[color] 7
-pads_sda
+@420
+i2c_tb.cc
 [pattern_trace] 1
 [pattern_trace] 0

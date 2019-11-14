@@ -9,6 +9,7 @@ from sys import argv
 from migen import *
 from migen.genlib.misc import timeline
 from litex.soc.interconnect.csr import AutoCSR, CSRStorage, CSRStatus
+from litex.soc.cores import FreqMeter
 from migen.genlib.cdc import BlindTransfer
 from os.path import join, dirname, abspath
 from dds import DDS

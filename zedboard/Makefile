@@ -1,4 +1,5 @@
-TARGETS = hello_LTC
+# TARGETS = hello_LTC
+TARGETS = hello_i2c
 
 all: $(TARGETS).bit.bin
 
