@@ -1,0 +1,71 @@
+[*]
+[*] GTKWave Analyzer v3.3.94 (w)1999-2018 BSI
+[*] Fri Jan  3 04:00:14 2020
+[*]
+[dumpfile] "/home/michael/fpga_wsp/litex_test_project/stream_test/stream_test.vcd"
+[dumpfile_mtime] "Fri Jan  3 03:55:52 2020"
+[dumpfile_size] 40016
+[savefile] "/home/michael/fpga_wsp/litex_test_project/stream_test/stream_test.gtkw"
+[timestart] 8
+[size] 1916 508
+[pos] -1 -1
+*-6.783131 245 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 361
+[signals_width] 347
+[sst_expanded] 1
+[sst_vpaned_height] 121
+@28
+[color] 3
+adc_source_valid
+[color] 3
+adc_source_first
+[color] 3
+adc_source_last
+@24
+[color] 2
+adc_source_payload_data[13:0]
+@200
+-
+@28
+[color] 3
+cordic_source_valid
+[color] 3
+cordic_source_first
+[color] 3
+cordic_source_last
+cordic_busy
+@24
+[color] 2
+cordic_source_payload_mag[20:0]
+[color] 2
+cordic_source_payload_phase[21:0]
+@200
+-
+@28
+[color] 3
+pack_source_valid
+@c00200
+-mag_outputs
+@24
+[color] 2
+pack_source_payload_chunk0_mag[20:0]
+[color] 2
+pack_source_payload_chunk1_mag[20:0]
+[color] 2
+pack_source_payload_chunk2_mag[20:0]
+[color] 2
+pack_source_payload_chunk3_mag[20:0]
+[color] 2
+pack_source_payload_chunk4_mag[20:0]
+[color] 2
+pack_source_payload_chunk5_mag[20:0]
+[color] 2
+pack_source_payload_chunk6_mag[20:0]
+[color] 2
+pack_source_payload_chunk7_mag[20:0]
+@1401200
+-mag_outputs
+@28
+latchN_source_valid
+[pattern_trace] 1
+[pattern_trace] 0
