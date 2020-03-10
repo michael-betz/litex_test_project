@@ -59,12 +59,18 @@ class NewSpi:
     SPI_CONTROL_LENGTH = 8
     SPI_STATUS_DONE = 0
 
-    def __init__(self, r):
+    def __init__(self, r, LEN=24):
+        ''' LEN: bits / transfer '''
         self.r = r
-        self._ctrl = 24 << NewSpi.SPI_CONTROL_LENGTH
+        self._ctrl = LEN << NewSpi.SPI_CONTROL_LENGTH
         r.regs.spi_control.write(self._ctrl)
 
-    def rxtx(self, dat24, cs, isWrite=False):
+    def rxtx(self, dat24, cs, isWrite=None):
+        '''
+        dat24: data to send (LEN bits)
+        cs: when high, enable asserting cs = low during transfer
+        isWrite: ignored
+        '''
         self.r.regs.spi_mosi.write(dat24 << 8)
         self.r.regs.spi_cs.write(cs)
         self.r.regs.spi_control.write(self._ctrl | 1)

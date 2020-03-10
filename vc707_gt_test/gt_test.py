@@ -10,25 +10,28 @@ try:
   python3 gl_test.py <build / synth / config>
 """
 from migen import *
+from collections import namedtuple
 from migen.genlib.io import CRG
 from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 from litex.soc.cores import dna, uart, spi
 from litex.soc.interconnect.csr import AutoCSR
-from litex.soc.integration.soc_core import SoCCore, csr_map_update
+from litex.soc.integration.soc_core import SoCCore
+from jesd204b.phy.gtx import GTXQuadPLL
+from jesd204b.phy import JESD204BPhyTX
 from xdc import vc707
 from sys import path
 path.append("..")
 from common import main
 
 
-class GtTest(SoCCore, AutoCSR):
+class GtTest(SoCCore):
     # Peripherals CSR declaration
     csr_peripherals = [
         "dna",
-        "spi"
+        "spi",
+        "gtphy"
     ]
-    csr_map_update(SoCCore.csr_map, csr_peripherals)
 
     def __init__(self, p, **kwargs):
         print("GtTest: ", p, kwargs)
@@ -36,9 +39,10 @@ class GtTest(SoCCore, AutoCSR):
         # ----------------------------
         #  Litex config
         # ----------------------------
+        sys_clk_freq = int(1e9 / p.default_clk_period)
         SoCCore.__init__(
             self,
-            clk_freq=int(1e9 / p.default_clk_period),
+            clk_freq=sys_clk_freq,
             cpu_type=None,
             csr_data_width=32,
             with_uart=False,
@@ -50,6 +54,9 @@ class GtTest(SoCCore, AutoCSR):
             platform=p,
             **kwargs
         )
+        for c in GtTest.csr_peripherals:
+            self.add_csr(c)
+
         self.submodules += CRG(p.request(p.default_clk_name))
 
         # ----------------------------
@@ -59,6 +66,12 @@ class GtTest(SoCCore, AutoCSR):
             ("AD9174_SERDES", 0,
                 Subsignal("clk_p", Pins("FMC1_HPC:GBTCLK0_M2C_C_P")),
                 Subsignal("clk_n", Pins("FMC1_HPC:GBTCLK0_M2C_C_N")),
+                Subsignal("tx_p",  Pins(" ".join(
+                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in range(8)]
+                ))),
+                Subsignal("tx_n",  Pins(" ".join(
+                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in range(8)]
+                )))
             ),
             ("AD9174_SPI", 0,
                 # FMC_CS1 (AD9174), FMC_CS2 (HMC7044)
@@ -74,16 +87,41 @@ class GtTest(SoCCore, AutoCSR):
         # ----------------------------
         #  Clock blinkers
         # ----------------------------
-        self.clock_domains.dsp = ClockDomain("dsp")
-        self.specials += AsyncResetSynchronizer(self.dsp, ResetSignal('sys'))
+        # self.clock_domains.dsp = ClockDomain("dsp")
+        # self.specials += AsyncResetSynchronizer(self.dsp, ResetSignal('sys'))
         serd_pads = p.request("AD9174_SERDES")
+
+        refclk0 = Signal()
         self.specials += Instance(
             "IBUFDS_GTE2",
             i_CEB=0,
             i_I=serd_pads.clk_p,
             i_IB=serd_pads.clk_n,
-            o_O=ClockSignal('dsp')
+            o_O=refclk0
         )
+
+        self.submodules.qpll0 = GTXQuadPLL(
+            refclk0,
+            128e6,
+            5.12e9
+        )
+        print(self.qpll0)
+
+        PhyPads = namedtuple("PhyPads", "txp txn")
+        self.submodules.gtphy = JESD204BPhyTX(
+            self.qpll0,
+            PhyPads(serd_pads.tx_p[0], serd_pads.tx_n[0]),
+            sys_clk_freq,
+            transceiver="gtx"
+        )
+        print(self.gtphy)
+        # platform.add_period_constraint(phy.transmitter.cd_tx.clk,
+        #         40*1e9/jesd_crg.linerate)
+        # platform.add_false_path_constraints(
+        #     sys_crg.cd_sys.clk,
+        #     jesd_crg.cd_jesd.clk,
+        #     phy.transmitter.cd_tx.clk)
+
 
         # 156.25 MHz / 2**26 = 2.33 Hz
         counter0 = Signal(26)
@@ -92,7 +130,7 @@ class GtTest(SoCCore, AutoCSR):
 
         # 125.00 MHz / 2**26 = 1.86 Hz
         counter1 = Signal(26)
-        self.sync.dsp += counter1.eq(counter1 + 1)
+        self.sync.tx += counter1.eq(counter1 + 1)
         self.comb += p.request("user_led").eq(counter1[-1])
 
         # ----------------------------
@@ -102,7 +140,7 @@ class GtTest(SoCCore, AutoCSR):
         self.comb += spi_pads.spi_en.eq(0)
         self.submodules.spi = spi.SPIMaster(
             spi_pads,
-            16,
+            32,
             self.clk_freq,
             int(1e6)
         )
@@ -110,12 +148,12 @@ class GtTest(SoCCore, AutoCSR):
         # ----------------------------
         #  Serial to Wishbone bridge
         # ----------------------------
-        self.add_cpu(uart.UARTWishboneBridge(
+        self.submodules.uart = uart.UARTWishboneBridge(
             p.request("serial"),
             self.clk_freq,
             baudrate=1152000
-        ))
-        self.add_wb_master(self.cpu.wishbone)
+        )
+        self.add_wb_master(self.uart.wishbone)
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
