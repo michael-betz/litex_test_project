@@ -11,7 +11,7 @@ try:
 """
 from migen import *
 from collections import namedtuple
-from migen.genlib.io import CRG
+from migen.genlib.io import CRG, DifferentialOutput
 from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 from litex.soc.cores import dna, uart, spi
@@ -40,6 +40,9 @@ class GtTest(SoCCore):
         #  Litex config
         # ----------------------------
         sys_clk_freq = int(1e9 / p.default_clk_period)
+        gtx_line_freq = int(5.12e9)
+        tx_clk_freq = int(gtx_line_freq / 4 / 10)
+
         SoCCore.__init__(
             self,
             clk_freq=sys_clk_freq,
@@ -57,7 +60,7 @@ class GtTest(SoCCore):
         for c in GtTest.csr_peripherals:
             self.add_csr(c)
 
-        self.submodules += CRG(p.request(p.default_clk_name))
+        self.submodules.crg = CRG(p.request(p.default_clk_name))
 
         # ----------------------------
         #  Ports
@@ -67,10 +70,10 @@ class GtTest(SoCCore):
                 Subsignal("clk_p", Pins("FMC1_HPC:GBTCLK0_M2C_C_P")),
                 Subsignal("clk_n", Pins("FMC1_HPC:GBTCLK0_M2C_C_N")),
                 Subsignal("tx_p",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in range(8)]
+                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in range(1)]
                 ))),
                 Subsignal("tx_n",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in range(8)]
+                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in range(1)]
                 )))
             ),
             ("AD9174_SPI", 0,
@@ -85,12 +88,11 @@ class GtTest(SoCCore):
         ])
 
         # ----------------------------
-        #  Clock blinkers
+        #  GTX phy
         # ----------------------------
-        # self.clock_domains.dsp = ClockDomain("dsp")
-        # self.specials += AsyncResetSynchronizer(self.dsp, ResetSignal('sys'))
         serd_pads = p.request("AD9174_SERDES")
 
+        # Handle the GTX clock input
         refclk0 = Signal()
         self.specials += Instance(
             "IBUFDS_GTE2",
@@ -102,27 +104,36 @@ class GtTest(SoCCore):
 
         self.submodules.qpll0 = GTXQuadPLL(
             refclk0,
-            128e6,
-            5.12e9
+            tx_clk_freq,
+            gtx_line_freq
         )
         print(self.qpll0)
 
-        PhyPads = namedtuple("PhyPads", "txp txn")
-        self.submodules.gtphy = JESD204BPhyTX(
-            self.qpll0,
-            PhyPads(serd_pads.tx_p[0], serd_pads.tx_n[0]),
-            sys_clk_freq,
-            transceiver="gtx"
+        p.add_period_constraint(
+            self.gtphy.transmitter.cd_tx.clk,
+            1e9 / tx_clk_freq
         )
-        print(self.gtphy)
-        # platform.add_period_constraint(phy.transmitter.cd_tx.clk,
-        #         40*1e9/jesd_crg.linerate)
-        # platform.add_false_path_constraints(
-        #     sys_crg.cd_sys.clk,
-        #     jesd_crg.cd_jesd.clk,
-        #     phy.transmitter.cd_tx.clk)
+
+        # Tell vivado the clocks are async
+        p.add_false_path_constraints(
+            self.crg.cd_sys.clk,
+            self.gtphy.transmitter.cd_tx.clk
+        )
+
+        # Handle the data channels
+        PhyPads = namedtuple("PhyPads", "txp txn")
+        for i in range(4):
+            self.submodules.gtphy = JESD204BPhyTX(
+                self.qpll0,
+                PhyPads(serd_pads.tx_p[0], serd_pads.tx_n[0]),
+                sys_clk_freq,
+                transceiver="gtx"
+            )
 
 
+        # ----------------------------
+        #  Clock blinkers
+        # ----------------------------
         # 156.25 MHz / 2**26 = 2.33 Hz
         counter0 = Signal(26)
         self.sync += counter0.eq(counter0 + 1)
@@ -132,6 +143,11 @@ class GtTest(SoCCore):
         counter1 = Signal(26)
         self.sync.tx += counter1.eq(counter1 + 1)
         self.comb += p.request("user_led").eq(counter1[-1])
+
+        # To observe 128 MHz clock on scope ...
+        sma = p.request("user_sma_clock")
+        self.specials += DifferentialOutput(ClockSignal('tx'), sma.p, sma.n)
+        p.add_platform_command('set_property CLOCK_DEDICATED_ROUTE ANY_CMT_COLUMN [get_nets tx_clk]')
 
         # ----------------------------
         #  SPI master
