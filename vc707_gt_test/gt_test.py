@@ -220,6 +220,7 @@ class GtTest(SoCCore):
         sma = p.request("user_sma_gpio_p")
         self.comb += sma.eq(ClockSignal('jesd'))
         # self.specials += DifferentialOutput(ClockSignal('tx'), sma.p, sma.n)
+        # tell Vivado it's okay to cross the clock region in a sketchy way
         # p.add_platform_command('set_property CLOCK_DEDICATED_ROUTE ANY_CMT_COLUMN [get_nets refclk0]')
         # self.specials += DifferentialInput(
         #     serd_pads.sysref_p,
