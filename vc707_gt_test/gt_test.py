@@ -14,7 +14,7 @@ from collections import namedtuple
 from migen.genlib.io import DifferentialOutput, DifferentialInput
 from migen.genlib.resetsync import AsyncResetSynchronizer
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
-from litex.soc.cores import dna, uart, spi
+from litex.soc.cores import dna, uart, spi, freqmeter
 from litex.soc.interconnect.csr import AutoCSR
 from litex.soc.integration.soc_core import SoCCore
 from jesd204b.phy.gtx import GTXQuadPLL
@@ -47,13 +47,6 @@ class CRG(Module, AutoCSR):
             clk_pads.p, clk_pads.n, self.cd_sys.clk
         )
 
-        # Delay the CSR reset signal such that wishbone can send an ACK
-        # csr_reset_active = Signal()
-        # self.sync += If(self.ctrl.reset, csr_reset_active.eq(1))
-        # self.submodules.rst_delay = WaitTimer(2**16)  # 655 us
-        # self.comb += self.rst_delay.wait.eq(csr_reset_active)
-        # add_rst.append(self.rst_delay.done)
-
         rst_sum = Signal()
         self.comb += rst_sum.eq(reduce(or_, add_rst))
         self.specials += AsyncResetSynchronizer(self.cd_sys, rst_sum)
@@ -74,6 +67,12 @@ class CRG(Module, AutoCSR):
             AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys'))  # self.jreset.storage)
         ]
 
+        # Add a frequency counter to `cd_jesd` (128 MHz) measures in [Hz]
+        self.submodules.f_jesd = freqmeter.FreqMeter(
+            self.sys_clk_freq,
+            clk=ClockSignal('jesd')
+        )
+
         self.submodules.qpll0 = GTXQuadPLL(
             refclk0,
             self.tx_clk_freq,
@@ -87,7 +86,7 @@ class GtTest(SoCCore):
     csr_peripherals = [
         "dna",
         "spi",
-        # "crg",
+        "crg",
         "control",
         "phy0",
         "phy1",
