@@ -1,4 +1,5 @@
 import sys
+import json
 sys.path.append("../..")
 from common import *
 
@@ -187,10 +188,55 @@ class HmcSpi(NewSpi):
 
 
 class AdSpi(NewSpi):
+    def __init__(self, f_json='regs_ad9174.json'):
+        with open('regs_ad9174.json') as f:
+            self.regs = json.load(f)
+        self._make_index()
+
+    def _make_index(self):
+        self.reg_names = dict()
+        self.bit_names = dict()
+        for k, v in self.regs.items():
+            if v['name'] == 'RESERVED':
+                continue
+            if v['name'] in self.reg_names:
+                kk = self.reg_names[v['name']]
+                print('reg {} ({:03x}) already exist ({:03x})'.format(
+                    v['name'], int(k), int(kk))
+                )
+            self.reg_names[v['name']] = k
+            for bk, bv in v['bits'].items():
+                if bv['name'] == 'RESERVED':
+                    continue
+                self.bit_names[bv['name']] = (k, bk)
+
     def rr(self, adr):
         word = (1 << 23) | ((adr & 0x7FFF) << 8)
         return self.rxtx(word, 1, True) & 0xFF
 
     def wr(self, adr, val):
+        if type(adr) is str:
+            adr = int(self.reg_names[adr])
         word = (0 << 23) | ((adr & 0x7FFF) << 8) | (val & 0xFF)
         return self.rxtx(word, 1, True)
+
+    def help(self, s):
+        k = str(s)
+        bit = None
+
+        if s in self.bit_names:
+            k, bit = self.bit_names[s]
+        elif s in self.reg_names:
+            k = self.reg_names[s]
+
+        for bk, bv in self.regs[k]['bits'].items():
+            if bit is None or bk == bit:
+                print('reg 0x{:03x} ({:s}), bit {:s} ({:s}), {:s}, reset 0x{:02x}\n{}\n'.format(
+                    int(k),
+                    self.regs[k]['name'],
+                    bk,
+                    bv['name'],
+                    bv['access'],
+                    bv['reset'],
+                    bv['description']
+                ))
