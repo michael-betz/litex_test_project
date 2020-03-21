@@ -188,7 +188,8 @@ class HmcSpi(NewSpi):
 
 
 class AdSpi(NewSpi):
-    def __init__(self, f_json='regs_ad9174.json'):
+    def __init__(self, r, f_json='regs_ad9174.json'):
+        super().__init__(r)
         with open('regs_ad9174.json') as f:
             self.regs = json.load(f)
         self._make_index()
@@ -211,6 +212,8 @@ class AdSpi(NewSpi):
                 self.bit_names[bv['name']] = (k, bk)
 
     def rr(self, adr):
+        if type(adr) is str:
+            adr = int(self.reg_names[adr])
         word = (1 << 23) | ((adr & 0x7FFF) << 8)
         return self.rxtx(word, 1, True) & 0xFF
 
@@ -229,11 +232,14 @@ class AdSpi(NewSpi):
         elif s in self.reg_names:
             k = self.reg_names[s]
 
-        for bk, bv in self.regs[k]['bits'].items():
+        print('reg 0x{:03x}, {:s}:'.format(
+            int(k),
+            self.regs[k]['name'],
+        ))
+        for bk in sorted(self.regs[k]['bits'], reverse=True):
+            bv = self.regs[k]['bits'][bk]
             if bit is None or bk == bit:
-                print('reg 0x{:03x} ({:s}), bit {:s} ({:s}), {:s}, reset 0x{:02x}\n{}\n'.format(
-                    int(k),
-                    self.regs[k]['name'],
+                print('    bit {:s}, {:s}, {:s}, reset 0x{:02x}\n    {:}\n'.format(
                     bk,
                     bv['name'],
                     bv['access'],
