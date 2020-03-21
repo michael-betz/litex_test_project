@@ -37,8 +37,10 @@ class CRG(Module, AutoCSR):
         self.clock_domains.cd_sys = ClockDomain()
 
         self.sys_clk_freq = int(1e9 / p.default_clk_period)
-        self.gtx_line_freq = int(5.12e9)
-        self.tx_clk_freq = int(self.gtx_line_freq / 4 / 10)
+        # depends on AD9174 JESD / DAC interpolation settings
+        self.gtx_line_freq = int(6.4e9)
+        # depends on f_wenzel and dividers in AD9174 + HMC7044
+        self.tx_clk_freq = int(5.12e9 / 4 / 10)
 
         # # #
 
@@ -61,9 +63,10 @@ class CRG(Module, AutoCSR):
             o_O=refclk0
         )
         self.clock_domains.cd_jesd = ClockDomain()
+        self.comb += self.cd_jesd.clk.eq(ClockSignal("phy0_tx"))
         # self.jreset = CSRStorage(reset=1)
         self.specials += [
-            Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk),
+        #     Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk),
             AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys'))  # self.jreset.storage)
         ]
 
@@ -120,6 +123,7 @@ class GtTest(SoCCore):
         # ----------------------------
         #  Ports
         # ----------------------------
+        N_LANES = 2
         p.add_extension([
             ("AD9174_JESD204", 0,
                 # CLK comes from HMC7044 CLKOUT12, goes to GTX (128 MHz)
@@ -128,10 +132,10 @@ class GtTest(SoCCore):
 
                 # GTX data lanes
                 Subsignal("tx_p",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in range(4)]
+                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in range(N_LANES)]
                 ))),
                 Subsignal("tx_n",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in range(4)]
+                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in range(N_LANES)]
                 ))),
 
                 # JSYNC comes from AD9174 SYNC_OUT_0B, SYNC_OUT_1B
