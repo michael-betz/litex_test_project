@@ -22,6 +22,7 @@ from jesd204b.phy import JESD204BPhyTX
 from jesd204b.common import JESD204BPhysicalSettings, JESD204BTransportSettings, JESD204BSettings
 from jesd204b.core import JESD204BCoreTX, JESD204BCoreTXControl
 from litex.soc.interconnect.csr import CSRStorage
+from litescope import LiteScopeIO, LiteScopeAnalyzer
 from xdc import vc707
 from sys import path
 path.append("..")
@@ -40,7 +41,7 @@ class CRG(Module, AutoCSR):
         # depends on AD9174 JESD / DAC interpolation settings
         self.gtx_line_freq = int(6.4e9)
         # depends on f_wenzel and dividers in AD9174 + HMC7044
-        self.tx_clk_freq = int(5.12e9 / 4 / 10)
+        self.tx_clk_freq = int(5.12e9 / 4 / 8)
 
         # # #
 
@@ -63,10 +64,10 @@ class CRG(Module, AutoCSR):
             o_O=refclk0
         )
         self.clock_domains.cd_jesd = ClockDomain()
-        self.comb += self.cd_jesd.clk.eq(ClockSignal("phy0_tx"))
+        # self.comb += self.cd_jesd.clk.eq(ClockSignal("phy0_tx"))
         # self.jreset = CSRStorage(reset=1)
         self.specials += [
-        #     Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk),
+            Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk),
             AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys'))  # self.jreset.storage)
         ]
 
@@ -94,7 +95,8 @@ class GtTest(SoCCore):
         "phy0",
         "phy1",
         "phy2",
-        "phy3"
+        "phy3",
+        "f_ref"
     ]
 
     def __init__(self, p, **kwargs):
@@ -123,7 +125,7 @@ class GtTest(SoCCore):
         # ----------------------------
         #  Ports
         # ----------------------------
-        N_LANES = 2
+        N_LANES = 1
         p.add_extension([
             ("AD9174_JESD204", 0,
                 # CLK comes from HMC7044 CLKOUT12, goes to GTX (128 MHz)
@@ -131,11 +133,12 @@ class GtTest(SoCCore):
                 Subsignal("clk_n", Pins("FMC1_HPC:GBTCLK0_M2C_C_N")),
 
                 # GTX data lanes
+                # on `AD9172_FMC_EBZ` SERDIN 0 - 3 are of __inverted__ polarity!
                 Subsignal("tx_p",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in range(N_LANES)]
+                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:N_LANES]]
                 ))),
                 Subsignal("tx_n",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in range(N_LANES)]
+                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:N_LANES]]
                 ))),
 
                 # JSYNC comes from AD9174 SYNC_OUT_0B, SYNC_OUT_1B
@@ -145,9 +148,9 @@ class GtTest(SoCCore):
                 # Subsignal("jsync1_p", Pins("FMC1_HPC:LA02_P"), IOStandard("LVDS")),
                 # Subsignal("jsync1_n", Pins("FMC1_HPC:LA02_N"), IOStandard("LVDS")),
 
-                # SYSREF comes from HMC7044 CLKOUT14 (16 MHz)
-                # Subsignal("sysref_p", Pins("FMC1_HPC:LA00_CC_P"), IOStandard("LVDS")),
-                # Subsignal("sysref_n", Pins("FMC1_HPC:LA00_CC_N"), IOStandard("LVDS"))
+                # SYSREF comes from HMC7044 CLKOUT13 (16 MHz)
+                Subsignal("sysref_p", Pins("FMC1_HPC:LA00_CC_P"), IOStandard("LVDS")),
+                Subsignal("sysref_n", Pins("FMC1_HPC:LA00_CC_N"), IOStandard("LVDS"))
             ),
             ("AD9174_SPI", 0,
                 # FMC_CS1 (AD9174), FMC_CS2 (HMC7044)
@@ -174,7 +177,8 @@ class GtTest(SoCCore):
                 self.crg.qpll0,
                 TxPNTuple(tx_p, tx_n),
                 self.crg.sys_clk_freq,
-                transceiver="gtx"
+                transceiver="gtx",
+                polarity=1
             )
             p.add_period_constraint(
                 phy.transmitter.cd_tx.clk,
@@ -188,14 +192,17 @@ class GtTest(SoCCore):
             phys.append(phy)
             setattr(self, 'phy{}'.format(i), phy)
 
-        ps = JESD204BPhysicalSettings(l=4, m=2, n=16, np=16)
-        ts = JESD204BTransportSettings(f=1, s=1, k=32, cs=0)
-        settings = JESD204BSettings(ps, ts, did=0x5a, bid=0x5)
+        # Mode 0 (L = 1, M = 2, F = 4, S = 1, NP = 16, N = 16)
+        # 1 lane, 2 converters (I0, Q0), 4 byte / frame, 1 sample / frame, 16 bit
+        # 32 bit / frame = 1 sample, 128 MSps from FPGA, DAC at 4.096 GSps?
+        ps = JESD204BPhysicalSettings(l=1, m=2, n=16, np=16, subclassv=0)
+        ts = JESD204BTransportSettings(f=4, s=1, k=32, cs=0)
+        settings = JESD204BSettings(ps, ts, did=0x5a, bid=0x05, hd=4)
 
         self.submodules.core = JESD204BCoreTX(
             phys,
             settings,
-            converter_data_width=64
+            converter_data_width=16
         )
         self.submodules.control = JESD204BCoreTXControl(self.core)
 
@@ -205,6 +212,16 @@ class GtTest(SoCCore):
         )
         self.core.register_jsync(jsync)
         self.comb += p.request('user_led').eq(jsync)
+
+        j_ref = Signal()
+        self.specials += DifferentialInput(
+            serd_pads.sysref_p, serd_pads.sysref_n, j_ref
+        )
+        self.core.register_jref(j_ref)
+        self.submodules.f_ref = freqmeter.FreqMeter(
+            self.sys_clk_freq,
+            clk=j_ref
+        )
 
         # ----------------------------
         #  Clock blinkers
@@ -255,6 +272,25 @@ class GtTest(SoCCore):
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
+
+        # Analyzer
+        analyzer_groups = {
+            0: [
+                self.core.ready,
+                self.core.jsync_jesd,
+                self.core.phy_done,
+                self.core.link0.fsm,
+                self.core.link0.source.data,
+                self.core.link0.source.ctrl
+            ]
+        }
+        self.submodules.analyzer = LiteScopeAnalyzer(
+            analyzer_groups,
+            512,
+            csr_csv="build/analyzer.csv",
+            clock_domain='jesd'
+        )
+        self.add_csr("analyzer")
 
 
 if __name__ == '__main__':

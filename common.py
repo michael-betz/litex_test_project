@@ -122,11 +122,11 @@ def main(soc, doc='', **kwargs):
     if "config" in argv:
         prog = soc.platform.create_programmer()
         prog.load_bitstream("build/gateware/{:}.bit".format(tName))
-    print(vns)
+    print('VNS:', vns)
     try:
         soc.do_exit(vns)
-    except:
-        pass
+    except Exception as e:
+        print('do_exit:', e)
     return vns
 
 
