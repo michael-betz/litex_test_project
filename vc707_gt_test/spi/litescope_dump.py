@@ -24,7 +24,7 @@ print("Trigger:", trig)
 analyzer.run(offset=32)
 analyzer.wait_done()
 analyzer.upload()
-analyzer.save("dump.vcd")
+analyzer.save("dump.vcd", samplerate=160e6)
 
 # # #
 

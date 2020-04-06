@@ -64,8 +64,6 @@ class CRG(Module, AutoCSR):
             o_O=refclk0
         )
         self.clock_domains.cd_jesd = ClockDomain()
-        # self.comb += self.cd_jesd.clk.eq(ClockSignal("phy0_tx"))
-        # self.jreset = CSRStorage(reset=1)
         self.specials += [
             Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk),
             AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys'))  # self.jreset.storage)
@@ -195,7 +193,7 @@ class GtTest(SoCCore):
         # Mode 0 (L = 1, M = 2, F = 4, S = 1, NP = 16, N = 16)
         # 1 lane, 2 converters (I0, Q0), 4 byte / frame, 1 sample / frame, 16 bit
         # 32 bit / frame = 1 sample, 128 MSps from FPGA, DAC at 4.096 GSps?
-        ps = JESD204BPhysicalSettings(l=1, m=2, n=16, np=16, subclassv=0)
+        ps = JESD204BPhysicalSettings(l=1, m=2, n=16, np=16, subclassv=1)
         ts = JESD204BTransportSettings(f=4, s=1, k=32, cs=0)
         settings = JESD204BSettings(ps, ts, did=0x5a, bid=0x05, hd=4)
 
@@ -276,17 +274,20 @@ class GtTest(SoCCore):
         # Analyzer
         analyzer_groups = {
             0: [
+                j_ref,
                 self.core.ready,
                 self.core.jsync_jesd,
+                self.core.jsync_sys,
                 self.core.phy_done,
                 self.core.link0.fsm,
+                self.core.link0.jref_rising,
                 self.core.link0.source.data,
                 self.core.link0.source.ctrl
             ]
         }
         self.submodules.analyzer = LiteScopeAnalyzer(
             analyzer_groups,
-            512,
+            4096,
             csr_csv="build/analyzer.csv",
             clock_domain='jesd'
         )
