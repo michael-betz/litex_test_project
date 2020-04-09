@@ -19,8 +19,8 @@ from litex.soc.interconnect.csr import AutoCSR
 from litex.soc.integration.soc_core import SoCCore
 from jesd204b.phy.gtx import GTXQuadPLL
 from jesd204b.phy import JESD204BPhyTX
-from jesd204b.common import JESD204BPhysicalSettings, JESD204BTransportSettings, JESD204BSettings
-from jesd204b.core import JESD204BCoreTX, JESD204BCoreTXControl
+from litejesd204b.common import JESD204BSettings
+from litejesd204b.core import LiteJESD204BCoreTX, LiteJESD204BCoreControl
 from litex.soc.interconnect.csr import CSRStorage
 from litescope import LiteScopeIO, LiteScopeAnalyzer
 from xdc import vc707
@@ -91,9 +91,9 @@ class GtTest(SoCCore):
         "crg",
         "control",
         "phy0",
-        "phy1",
-        "phy2",
-        "phy3",
+        # "phy1",
+        # "phy2",
+        # "phy3",
         "f_ref"
     ]
 
@@ -193,16 +193,28 @@ class GtTest(SoCCore):
         # Mode 0 (L = 1, M = 2, F = 4, S = 1, NP = 16, N = 16)
         # 1 lane, 2 converters (I0, Q0), 4 byte / frame, 1 sample / frame, 16 bit
         # 32 bit / frame = 1 sample, 128 MSps from FPGA, DAC at 4.096 GSps?
-        ps = JESD204BPhysicalSettings(l=1, m=2, n=16, np=16, subclassv=1)
-        ts = JESD204BTransportSettings(f=4, s=1, k=32, cs=0)
-        settings = JESD204BSettings(ps, ts, did=0x5a, bid=0x05, hd=4)
+        settings = JESD204BSettings(
+            L=1,
+            M=2,
+            F=4,
+            S=1,
+            N=16,
+            NP=16,
+            K=32,
+            CS=0,
+            DID=0X5A,
+            BID=0X05,
+            HD=1,
+            fchk_over_octets=True
+        )
+        print(settings)
 
-        self.submodules.core = JESD204BCoreTX(
+        self.submodules.core = LiteJESD204BCoreTX(
             phys,
             settings,
             converter_data_width=16
         )
-        self.submodules.control = JESD204BCoreTXControl(self.core)
+        self.submodules.control = LiteJESD204BCoreControl(self.core)
 
         jsync = Signal()
         self.specials += DifferentialInput(
@@ -274,13 +286,11 @@ class GtTest(SoCCore):
         # Analyzer
         analyzer_groups = {
             0: [
-                j_ref,
                 self.core.ready,
-                self.core.jsync_jesd,
-                self.core.jsync_sys,
-                self.core.phy_done,
+                self.core.jsync,
+                self.core.jref,
                 self.core.link0.fsm,
-                self.core.link0.jref_rising,
+                self.core.link0.lmfc_zero,
                 self.core.link0.source.data,
                 self.core.link0.source.ctrl
             ]
