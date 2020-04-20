@@ -70,7 +70,7 @@ class Ad9174Init():
         settings:
             a Ad9174Settings instance
         '''
-        self.r = r
+        self.regs = r.regs
         self.settings = settings
         self.ad = AdSpi(r)
         self.hmc = HmcSpi(r)
@@ -104,20 +104,21 @@ class Ad9174Init():
         hmc.wr(0x0A8, 0x06)
         hmc.wr(0x0B0, 0x04)
 
-        clk_div = self.dsp_clk_div // 4
+        clk_div = self.settings.dsp_clk_div // 4
         hmc.setupChannel(12, clk_div)        # DEV_CLK = 160 MHz
         hmc.setupChannel(3, clk_div * 100)   # SYSREF (DAC) = 1.6 MHz
         hmc.setupChannel(13, clk_div * 100)  # SYSREF (FPGA) = 1.6 MHz
 
     def init_ad9174(self):
-        r = self.r
+        regs = self.regs
         ad = self.ad
+        s = self.settings
 
         # ------------------------
         #  Reset and general init
         # ------------------------
         # disable GTX transceivers
-        r.regs.control_control.write(0)
+        regs.control_control.write(0)
 
         # Power up sequence, Table 51
         ad.wr(0x000, 0x81)  # Soft reset
@@ -130,7 +131,7 @@ class Ad9174Init():
         print('AD917X_NVM_BLR_DONE:', (ad.rr(0x705) >> 1) & 1)
 
         # reset FPGA jesd clock domain (disables transceivers)
-        r.regs.ctrl_reset.write(1)
+        regs.ctrl_reset.write(1)
 
         # Print product ID (0x9174)
         val = ad.rr('SPI_PRODIDH') << 8 | ad.rr('SPI_PRODIDL')
@@ -183,7 +184,7 @@ class Ad9174Init():
         ad.wr(0x081, 0x03)  # Power down calibration clocks
 
         # Triggers the GTXInit state machine in FPGA
-        r.regs.control_control.write(1)
+        regs.control_control.write(1)
 
         # ---------------------------
         # Table 58, SERDES interface
@@ -260,9 +261,9 @@ class Ad9174Init():
         # JESD init
         # ---------------------
         ad.wr(0x100, 0x00)  # Power up digital datapath clocks
-        ad.wr(0x110, (0 << 5) | self.jesd_mode)  # 0 = single link, jesd mode
+        ad.wr(0x110, (0 << 5) | s.jesd_mode)  # 0 = single link
 
-        ad.wr(0x111, (self.interp_main << 4) | self.interp_ch)
+        ad.wr(0x111, (s.interp_main << 4) | s.interp_ch)
         mode_not_in_table = (ad.rr(0x110) >> 7) & 0x01
         print('MODE_NOT_IN_TABLE:', mode_not_in_table)
         if mode_not_in_table:
@@ -273,7 +274,7 @@ class Ad9174Init():
         ad.wr(0x475, 0x09)  # Soft reset the JESD204B quad-byte deframer
 
         # Write JESD settings blob to AD9174 registers
-        for i, o in enumerate(self.settings.octets):
+        for i, o in enumerate(s.octets):
             ad.wr(0x450 + i, o)
 
         # bit0 checksum method: 0 = sum fields (seems buggy), 1 = sum registers
@@ -285,8 +286,8 @@ class Ad9174Init():
         # TODO: Table 57, setup main datapath
 
     def print_fpga_clocks(self):
-        f_jesd = self.r.regs.crg_f_jesd_value.read()
-        f_ref = self.r.regs.f_ref_value.read()
+        f_jesd = self.regs.crg_f_jesd_value.read()
+        f_ref = self.regs.f_ref_value.read()
         print('f_device = {:.6f} MHz  f_ref = {:.6f} MHz'.format(
             f_jesd / 1e6, f_ref / 1e6
         ))
@@ -343,12 +344,12 @@ class Ad9174Init():
         st('INIT_LANE_SYNC')
 
         print('fpga j_sync errs: {:}'.format(
-            self.r.regs.control_jsync_errors.read()
+            self.regs.control_jsync_errors.read()
         ))
 
     def test_stpl(self, wait_secs=1):
         ad = self.ad
-        self.r.regs.control_stpl_enable.write(1)
+        self.regs.control_stpl_enable.write(1)
 
         sample = 0  # 0 - 15  TODO implement support for multiple samples
         for converter in range(self.settings.M):
@@ -372,4 +373,4 @@ class Ad9174Init():
                 converter, tp, is_fail
             ))
 
-        self.r.regs.control_stpl_enable.write(0)
+        self.regs.control_stpl_enable.write(0)
