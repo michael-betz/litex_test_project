@@ -28,7 +28,15 @@ class Ad9174Settings(JESD204BSettings):
         22: JM(4, 2, 3, 4, 12, 12, 32, 1)
     }
 
-    def __init__(self, jesd_mode, interp_ch, interp_main, **kwargs):
+    def __init__(
+        self,
+        jesd_mode,
+        interp_ch,
+        interp_main,
+        converter_data_width=16,
+        fchk_over_octets=True,
+        **kwargs
+    ):
         '''
         jesd_mode:
             a number defining the set of JESD parameters, as commonly used
@@ -49,7 +57,7 @@ class Ad9174Settings(JESD204BSettings):
         mode_dict = Ad9174Settings.MODES[jesd_mode]._asdict()
         mode_dict.update(**kwargs)
 
-        super().__init__(**mode_dict)
+        super().__init__(converter_data_width, fchk_over_octets, **mode_dict)
 
         # f_DAC / f_PCLK: this is the clock driving the FPGA
         # The division is split over AD9174 (/4) and HMC (/N)

@@ -9,6 +9,9 @@ Demonstrate by blinking a LED
 try:
   python3 gl_test.py <build / synth / config>
 """
+from sys import path
+path.append("spi")
+path.append("..")
 from migen import *
 from collections import namedtuple
 from litex.build.io import DifferentialOutput, DifferentialInput
@@ -25,9 +28,8 @@ from litejesd204b.common import JESD204BSettings
 from litejesd204b.core import LiteJESD204BCoreTX, LiteJESD204BCoreControl
 from litex.soc.interconnect.csr import CSRStorage
 from litescope import LiteScopeIO, LiteScopeAnalyzer
+from ad9174 import Ad9174Settings
 from xdc import vc707
-from sys import path
-path.append("..")
 from common import main
 
 
@@ -66,19 +68,23 @@ class SampleGen(Module, AutoCSR):
             conv = getattr(self.source, 'converter{}'.format(i))
             self.sync.jesd += conv.eq(p1.dat_r[i * 16: (i + 1) * 16])
 
+
 class CRG(Module, AutoCSR):
-    def __init__(self, p, serd_pads, add_rst=[]):
+    def __init__(self, settings, f_wenzel, p, serd_pads, add_rst=[]):
         '''
         add_rst = additional reset signals for sys_clk
           must be active high and will be synchronized with sys_clk
         '''
         self.clock_domains.cd_sys = ClockDomain()
 
+        # System clock from crystal on fpga board
         self.sys_clk_freq = int(1e9 / p.default_clk_period)
-        # depends on AD9174 JESD / DAC interpolation settings
-        self.gtx_line_freq = int(12.8e9 / 2)
+
         # depends on f_wenzel and dividers in AD9174 + HMC7044
-        self.tx_clk_freq = int(5.12e9 / 4 / 4 / 2)
+        self.tx_clk_freq = int(f_wenzel / settings.dsp_clk_div)
+
+        # depends on AD9174 JESD / DAC interpolation settings
+        self.gtx_line_freq = int(f_wenzel / settings.dsp_clk_div * 40)
 
         # # #
 
@@ -106,7 +112,7 @@ class CRG(Module, AutoCSR):
             AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys'))  # self.jreset.storage)
         ]
 
-        # Add a frequency counter to `cd_jesd` (128 MHz) measures in [Hz]
+        # Add a frequency counter to `cd_jesd` (160 MHz) measures in [Hz]
         self.submodules.f_jesd = freqmeter.FreqMeter(
             self.sys_clk_freq,
             clk=ClockSignal('jesd')
@@ -128,20 +134,7 @@ class CRG(Module, AutoCSR):
 
 
 class GtTest(SoCCore):
-    N_LANES = 8
-
-    # Peripherals CSR declaration
-    csr_peripherals = [
-        "dna",
-        "spi",
-        "crg",
-        "control",
-        "f_ref",
-        "s_gen",
-        *["phy{}".format(i) for i in range(N_LANES)]
-    ]
-
-    def __init__(self, p, **kwargs):
+     def __init__(self, p, **kwargs):
         print("GtTest: ", p, kwargs)
 
         # ----------------------------
@@ -161,8 +154,22 @@ class GtTest(SoCCore):
             platform=p,
             **kwargs
         )
-        for c in GtTest.csr_peripherals:
+
+        self.settings = settings = Ad9174Settings(
+            21, 1, 1,
+            fchk_over_octets=True,
+            SCR=1,
+            DID=0x5A,
+            BID=0x05,
+            converter_data_width=16 * 8
+        )
+        print(settings)
+
+        for c in ["control", "dna", "crg", "f_ref", "spi", "s_gen"]:
             self.add_csr(c)
+
+        for i in range(settings.L):
+            self.add_csr("phy{}".format(i))
 
         # ----------------------------
         #  Ports
@@ -175,10 +182,10 @@ class GtTest(SoCCore):
 
                 # GTX data lanes
                 Subsignal("tx_p",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:GtTest.N_LANES]]
+                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:settings.L]]
                 ))),
                 Subsignal("tx_n",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:GtTest.N_LANES]]
+                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:settings.L]]
                 ))),
 
                 # JSYNC comes from AD9174 SYNC_OUT_0B, SYNC_OUT_1B
@@ -205,7 +212,9 @@ class GtTest(SoCCore):
         TxPNTuple = namedtuple("TxPN", "txp txn")
         serd_pads = p.request("AD9174_JESD204")
 
-        self.submodules.crg = CRG(p, serd_pads, [self.ctrl.reset])
+        self.submodules.crg = CRG(
+            settings, 5.12e9 / 2, p, serd_pads, [self.ctrl.reset]
+        )
 
         # ----------------------------
         #  GTX phy
@@ -232,22 +241,6 @@ class GtTest(SoCCore):
             )
             phys.append(phy)
             setattr(self, 'phy{}'.format(i), phy)
-
-
-        settings = JESD204BSettings(
-            # Mode 0
-            # L=1, M=2, F=4, S=1, N=16, NP=16, K=32, CS=0,
-            # Mode 4 (2 samples / clk)
-            # L=4, M=4, F=2, S=1, N=16, NP=16, K=32, CS=0,
-            # Mode 21
-            L=8, M=1, F=2, S=8, N=16, NP=16, K=32, CS=0,
-            DID=0X5A,
-            BID=0X05,
-            HD=1,
-            converter_data_width=16 * 8,
-            fchk_over_octets=True
-        )
-        print(settings)
 
         self.submodules.core = LiteJESD204BCoreTX(
             phys,
