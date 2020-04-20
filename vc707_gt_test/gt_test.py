@@ -13,8 +13,10 @@ from migen import *
 from collections import namedtuple
 from migen.genlib.io import DifferentialOutput, DifferentialInput
 from migen.genlib.resetsync import AsyncResetSynchronizer
+from migen.genlib.cdc import MultiReg
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
 from litex.soc.cores import dna, uart, spi, freqmeter
+from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr import AutoCSR
 from litex.soc.integration.soc_core import SoCCore
 from jesd204b.phy.gtx import GTXQuadPLL
@@ -28,6 +30,41 @@ from sys import path
 path.append("..")
 from common import main
 
+
+class SampleGen(Module, AutoCSR):
+    def __init__(self, soc, jesd_settings):
+        self.source = Record([("converter"+str(i), jesd_settings.converter_data_width)
+            for i in range(jesd_settings.M)])
+
+        # ----------------------------
+        #  Waveform memory
+        # ----------------------------
+        mem = Memory(jesd_settings.M * 16, 4096, init=[0, 1, 2, 3])
+        self.specials += mem
+        self.submodules.sample_ram = wishbone.SRAM(mem)
+        soc.register_mem(
+            "samples",
+            0x10000000,  # [bytes]
+            self.sample_ram.bus,
+            mem.depth * 4  # [bytes]
+        )
+        p1 = mem.get_port(clock_domain="jesd")
+        self.specials += p1
+
+        self.max_ind = CSRStorage(32)
+        max_ind_ = Signal.like(self.max_ind.storage)
+        self.specials += MultiReg(self.max_ind.storage, max_ind_, "jesd")
+
+        self.sync.jesd += [
+            If(p1.adr >= max_ind_,
+                p1.adr.eq(0)
+            ).Else(
+                p1.adr.eq(p1.adr + 1)
+            )
+        ]
+        for i in range(jesd_settings.M):
+            conv = getattr(self.source, 'converter{}'.format(i))
+            self.sync.jesd += conv.eq(p1.dat_r[i * 16: (i + 1) * 16])
 
 class CRG(Module, AutoCSR):
     def __init__(self, p, serd_pads, add_rst=[]):
@@ -91,10 +128,11 @@ class GtTest(SoCCore):
         "crg",
         "control",
         "phy0",
-        # "phy1",
-        # "phy2",
-        # "phy3",
-        "f_ref"
+        "phy1",
+        "phy2",
+        "phy3",
+        "f_ref",
+        "s_gen"
     ]
 
     def __init__(self, p, **kwargs):
@@ -190,29 +228,23 @@ class GtTest(SoCCore):
             phys.append(phy)
             setattr(self, 'phy{}'.format(i), phy)
 
-        # Mode 0 (L = 1, M = 2, F = 4, S = 1, NP = 16, N = 16)
-        # 1 lane, 2 converters (I0, Q0), 4 byte / frame, 1 sample / frame, 16 bit
-        # 32 bit / frame = 1 sample, 128 MSps from FPGA, DAC at 4.096 GSps?
+
         settings = JESD204BSettings(
-            L=1,
-            M=2,
-            F=4,
-            S=1,
-            N=16,
-            NP=16,
-            K=32,
-            CS=0,
+            # Mode 0
+            L=1, M=2, F=4, S=1, N=16, NP=16, K=32, CS=0,
+            # Mode 4 (2 samples / clk)
+            # L=4, M=4, F=2, S=1, N=16, NP=16, K=32, CS=0,
             DID=0X5A,
             BID=0X05,
             HD=1,
+            converter_data_width=16,
             fchk_over_octets=True
         )
         print(settings)
 
         self.submodules.core = LiteJESD204BCoreTX(
             phys,
-            settings,
-            converter_data_width=16
+            settings
         )
         self.submodules.control = LiteJESD204BCoreControl(self.core)
 
@@ -233,6 +265,9 @@ class GtTest(SoCCore):
             clk=j_ref
         )
 
+        self.submodules.s_gen = SampleGen(self, settings)
+        self.comb += self.core.sink.eq(self.s_gen.source)
+
         # ----------------------------
         #  Clock blinkers
         # ----------------------------
@@ -246,7 +281,7 @@ class GtTest(SoCCore):
         self.sync.jesd += counter1.eq(counter1 + 1)
         self.comb += p.request("user_led").eq(counter1[-1])
 
-        # To observe 128 MHz clock on scope ...
+        # To observe 160 MHz DSP clock on scope ...
         sma = p.request("user_sma_gpio_p")
         self.comb += sma.eq(ClockSignal('jesd'))
         # self.specials += DifferentialOutput(ClockSignal('tx'), sma.p, sma.n)
@@ -291,6 +326,7 @@ class GtTest(SoCCore):
                 self.core.jref,
                 self.core.link0.fsm,
                 self.core.link0.lmfc_zero,
+                self.core.link0.sink.data,
                 self.core.link0.source.data,
                 self.core.link0.source.ctrl
             ]

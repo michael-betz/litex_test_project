@@ -4,52 +4,6 @@ sys.path.append("../..")
 from common import *
 
 
-class OldSpi:
-    '''
-    supports 3 wire SPI with the old ../zedboard/spi.py
-    '''
-    # config bit offsets for Litex SPI core
-    OFFLINE = 0      # all pins high-z (reset=1)
-    CS_POLARITY = 3  # active level of chip select (reset=0)
-    CLK_POLARITY = 4  # idle level of clk (reset=0)
-    CLK_PHASE = 5    # first edge after cs assertion to sample data on(reset=0)
-    LSB_FIRST = 6    # LSB is the first bit on the wire (reset=0)
-    HALF_DUPLEX = 7  # 3-wire SPI, in/out on mosi (reset=0)
-    DIV_READ = 16    # SPI read clk divider (reset=0)
-    DIV_WRITE = 24   # f_clk / f_spi_write == div_write + 2
-    # xfer bit offsets
-    CS_MASK = 0      # Active high bit mask of chip selects to assert (reset=0)
-    WRITE_LENGTH = 16  # How many bits to write and ...
-    READ_LENGTH = 24  # when to switch over in half duplex mode
-
-    def __init__(self, r):
-        self.r = r
-        r.regs.spi_config.write(
-            (1 << OldSpi.HALF_DUPLEX) |
-            (0xFF << OldSpi.DIV_WRITE) |
-            (0xFF << OldSpi.DIV_READ)
-        )
-
-    def rxtx(dat24, cs, isWrite=False):
-        if isWrite:
-            # 16 bit write + 8 bit write transfer (3 wire SPI)
-            r.regs.spi_xfer.write(
-                (cs << OldSpi.CS_MASK) |
-                (16 + 8 << OldSpi.WRITE_LENGTH) |
-                (0 << OldSpi.READ_LENGTH)
-            )
-        else:
-            # 16 bit write + 8 bit read transfer (3 wire SPI)
-            r.regs.spi_xfer.write(
-                (cs << OldSpi.CS_MASK) |
-                (16 << OldSpi.WRITE_LENGTH) |
-                (8 << OldSpi.READ_LENGTH)
-            )
-        self.r.regs.spi_mosi_data.write(dat24)
-        self.r.regs.spi_start.write(1)
-        return self.r.regs.spi_miso_data.read()
-
-
 class NewSpi:
     '''
     only supports 4 wire SPI with
