@@ -154,11 +154,11 @@ class AdSpi(NewSpi):
         for k, v in self.regs.items():
             if v['name'] == 'RESERVED':
                 continue
-            if v['name'] in self.reg_names:
-                kk = self.reg_names[v['name']]
-                print('reg {} ({:03x}) already exist ({:03x})'.format(
-                    v['name'], int(k), int(kk))
-                )
+            # if v['name'] in self.reg_names:
+            #     kk = self.reg_names[v['name']]
+            #     print('reg {} ({:03x}) already exist ({:03x})'.format(
+            #         v['name'], int(k), int(kk))
+            #     )
             self.reg_names[v['name']] = k
             for bk, bv in v['bits'].items():
                 if bv['name'] == 'RESERVED':
@@ -166,18 +166,21 @@ class AdSpi(NewSpi):
                 self.bit_names[bv['name']] = (k, bk)
 
     def rr(self, adr):
+        ''' read register @ adr, which can be integer or reg. name '''
         if type(adr) is str:
             adr = int(self.reg_names[adr])
         word = (1 << 23) | ((adr & 0x7FFF) << 8)
         return self.rxtx(word, 1, True) & 0xFF
 
     def wr(self, adr, val):
+        ''' write register @ adr, which can be integer or reg. name '''
         if type(adr) is str:
             adr = int(self.reg_names[adr])
         word = (0 << 23) | ((adr & 0x7FFF) << 8) | (val & 0xFF)
         return self.rxtx(word, 1, True)
 
     def help(self, s):
+        ''' lookup a register address or name in the datasheet '''
         k = str(s)
         bit = None
 

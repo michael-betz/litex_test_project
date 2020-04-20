@@ -5,7 +5,7 @@ from litejesd204b.common import JESD204BSettings
 from litejesd204b.transport import seed_to_data
 
 
-class Ad9174:
+class Ad9174Settings(JESD204BSettings):
     JM = namedtuple('JESD_MODE', 'L M F S NP N K HD')
     MODES = {
          0: JM(1, 2, 4, 1, 16, 16, 32, 1),
@@ -28,22 +28,52 @@ class Ad9174:
         22: JM(4, 2, 3, 4, 12, 12, 32, 1)
     }
 
-    def __init__(self, r, jesd_mode, interp_ch, interp_main, **kwargs):
-        self.r = r
-        self.jesd_mode = jesd_mode
-        self.spi = AdSpi(r)
-        self.hmc = HmcSpi(r)
-        temp = Ad9174.MODES[jesd_mode]._asdict()
-        temp.update(**kwargs)
-        self.settings = s = JESD204BSettings(**temp)
+    def __init__(self, jesd_mode, interp_ch, interp_main, **kwargs):
+        '''
+        jesd_mode:
+            a number defining the set of JESD parameters, as commonly used
+            by Analog Devices.
+
+        interp_ch:
+            channelizer datapath interpolation factor
+
+        interp_main:
+            main datapath interpolation factor
+
+        kwargs:
+            individually overwrite JESD parameters
+        '''
         self.interp_ch = interp_ch
         self.interp_main = interp_main
+        self.jesd_mode = jesd_mode
+        mode_dict = Ad9174Settings.MODES[jesd_mode]._asdict()
+        mode_dict.update(**kwargs)
+
+        super().__init__(**mode_dict)
 
         # f_DAC / f_PCLK: this is the clock driving the FPGA
         # The division is split over AD9174 (/4) and HMC (/N)
-        self.dsp_clk_div = s.L * 32 * interp_ch * interp_main // s.M // s.NP
+        self.dsp_clk_div = self.L * 32 * interp_ch * interp_main // \
+            self.M // self.NP
+
+        # Assume frequency divider by 4 in hmc7044 is hard-coded
         if (self.dsp_clk_div % 4) > 0:
             raise ValueError('invalid clocking')
+
+
+class Ad9174Init():
+    def __init__(self, r, settings):
+        '''
+        r:
+            a litex_remote_server handle for register access
+
+        settings:
+            a Ad9174Settings instance
+        '''
+        self.r = r
+        self.settings = settings
+        self.ad = AdSpi(r)
+        self.hmc = HmcSpi(r)
 
     def init_hmc7044(self):
         hmc = self.hmc
@@ -81,7 +111,7 @@ class Ad9174:
 
     def init_ad9174(self):
         r = self.r
-        ad = self.spi
+        ad = self.ad
 
         # ------------------------
         #  Reset and general init
@@ -262,7 +292,7 @@ class Ad9174:
         ))
 
     def print_phy_snapshot(self):
-        ad = self.spi
+        ad = self.ad
         ad.wr('PHY_PRBS_TEST_EN', 0xFF)  # Needed: clock to test module
         ad.wr('PHY_PRBS_TEST_CTRL', 0b01)  # rst
 
@@ -286,8 +316,8 @@ class Ad9174:
         chk_rx = 0
         chk_prog = 0
         for i in range(0x400, 0x40E):
-            rx_val = self.spi.rr(i)
-            prog_val = self.spi.rr(i + 0x50)
+            rx_val = self.ad.rr(i)
+            prog_val = self.ad.rr(i + 0x50)
             if (i >= 0x400) and (i <= 0x40a):
                 chk_rx += rx_val
                 chk_prog += prog_val
@@ -296,7 +326,7 @@ class Ad9174:
 
     def print_lane_status(self):
         def st(n, fmt='08b'):
-            print('{:>16s}: {:{:}}'.format(n, self.spi.rr(n), fmt))
+            print('{:>16s}: {:{:}}'.format(n, self.ad.rr(n), fmt))
 
         print('\nIRQ status bits:')
         st('JESD_IRQ_STATUSA')
@@ -317,7 +347,7 @@ class Ad9174:
         ))
 
     def test_stpl(self, wait_secs=1):
-        ad = self.spi
+        ad = self.ad
         self.r.regs.control_stpl_enable.write(1)
 
         sample = 0  # 0 - 15  TODO implement support for multiple samples
