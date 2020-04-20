@@ -11,7 +11,7 @@ try:
 """
 from migen import *
 from collections import namedtuple
-from migen.genlib.io import DifferentialOutput, DifferentialInput
+from litex.build.io import DifferentialOutput, DifferentialInput
 from migen.genlib.resetsync import AsyncResetSynchronizer
 from migen.genlib.cdc import MultiReg
 from litex.build.generic_platform import Subsignal, Pins, IOStandard, Misc
@@ -19,8 +19,8 @@ from litex.soc.cores import dna, uart, spi, freqmeter
 from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr import AutoCSR
 from litex.soc.integration.soc_core import SoCCore
-from jesd204b.phy.gtx import GTXQuadPLL
-from jesd204b.phy import JESD204BPhyTX
+from litejesd204b.phy.gtx import GTXQuadPLL
+from litejesd204b.phy import JESD204BPhyTX
 from litejesd204b.common import JESD204BSettings
 from litejesd204b.core import LiteJESD204BCoreTX, LiteJESD204BCoreControl
 from litex.soc.interconnect.csr import CSRStorage

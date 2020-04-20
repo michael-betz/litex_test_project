@@ -129,16 +129,6 @@ _io = [
         Subsignal("sda", Pins("AU32"), IOStandard("LVCMOS18")),
     ),
     ("i2c_mux_reset", 0, Pins("AY42"), IOStandard("LVCMOS18")),
-    ("XADC", {
-        "GPIO_0": "BA21",
-        "GPIO_1": "BB21",
-        "GPIO_2": "BB24",
-        "GPIO_3": "BB23",
-        "VAUX0_N": "AP38",
-        "VAUX0_P": "AN38",
-        "VAUX8_N": "AM42",
-        "VAUX8_P": "AM41",
-    }),
     ("serial", 0,
         Subsignal("rx", Pins("AU33"), IOStandard("LVCMOS18")),
         Subsignal("rts", Pins("AR34"), IOStandard("LVCMOS18")),
@@ -218,6 +208,16 @@ _io = [
 # Connectors ------------------------------------------------------------------
 
 _connectors = [
+    ("XADC", {
+        "GPIO_0": "BA21",
+        "GPIO_1": "BB21",
+        "GPIO_2": "BB24",
+        "GPIO_3": "BB23",
+        "VAUX0_N": "AP38",
+        "VAUX0_P": "AN38",
+        "VAUX8_N": "AM42",
+        "VAUX8_P": "AM41"
+    }),
     ("FMC1_HPC", {
         "CLK0_M2C_N": "L40",
         "CLK0_M2C_P": "L39",
