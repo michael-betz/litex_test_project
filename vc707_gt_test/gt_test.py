@@ -76,9 +76,9 @@ class CRG(Module, AutoCSR):
 
         self.sys_clk_freq = int(1e9 / p.default_clk_period)
         # depends on AD9174 JESD / DAC interpolation settings
-        self.gtx_line_freq = int(6.4e9)
+        self.gtx_line_freq = int(12.8e9 / 2)
         # depends on f_wenzel and dividers in AD9174 + HMC7044
-        self.tx_clk_freq = int(5.12e9 / 4 / 8)
+        self.tx_clk_freq = int(5.12e9 / 4 / 4 / 2)
 
         # # #
 
@@ -119,20 +119,26 @@ class CRG(Module, AutoCSR):
         )
         print(self.qpll0)
 
+        self.submodules.qpll1 = GTXQuadPLL(
+            refclk0,
+            self.tx_clk_freq,
+            self.gtx_line_freq
+        )
+        print(self.qpll1)
+
 
 class GtTest(SoCCore):
+    N_LANES = 8
+
     # Peripherals CSR declaration
     csr_peripherals = [
         "dna",
         "spi",
         "crg",
         "control",
-        "phy0",
-        "phy1",
-        "phy2",
-        "phy3",
         "f_ref",
-        "s_gen"
+        "s_gen",
+        *["phy{}".format(i) for i in range(N_LANES)]
     ]
 
     def __init__(self, p, **kwargs):
@@ -161,7 +167,6 @@ class GtTest(SoCCore):
         # ----------------------------
         #  Ports
         # ----------------------------
-        N_LANES = 1
         p.add_extension([
             ("AD9174_JESD204", 0,
                 # CLK comes from HMC7044 CLKOUT12, goes to GTX (128 MHz)
@@ -169,12 +174,11 @@ class GtTest(SoCCore):
                 Subsignal("clk_n", Pins("FMC1_HPC:GBTCLK0_M2C_C_N")),
 
                 # GTX data lanes
-                # on `AD9172_FMC_EBZ` SERDIN 0 - 3 are of __inverted__ polarity!
                 Subsignal("tx_p",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:N_LANES]]
+                    ["FMC1_HPC:DP{}_C2M_P".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:GtTest.N_LANES]]
                 ))),
                 Subsignal("tx_n",  Pins(" ".join(
-                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:N_LANES]]
+                    ["FMC1_HPC:DP{}_C2M_N".format(i) for i in [5, 6, 4, 7, 3, 2, 1, 0][:GtTest.N_LANES]]
                 ))),
 
                 # JSYNC comes from AD9174 SYNC_OUT_0B, SYNC_OUT_1B
@@ -210,11 +214,12 @@ class GtTest(SoCCore):
         phys = []
         for i, (tx_p, tx_n) in enumerate(zip(serd_pads.tx_p, serd_pads.tx_n)):
             phy = JESD204BPhyTX(
-                self.crg.qpll0,
+                self.crg.qpll0 if i <= 3 else self.crg.qpll1,
                 TxPNTuple(tx_p, tx_n),
                 self.crg.sys_clk_freq,
                 transceiver="gtx",
-                polarity=1
+                # on `AD9172_FMC_EBZ` SERDIN 0 - 3 are of __inverted__ polarity!
+                polarity=1 if i <= 3 else 0
             )
             p.add_period_constraint(
                 phy.transmitter.cd_tx.clk,
@@ -231,13 +236,15 @@ class GtTest(SoCCore):
 
         settings = JESD204BSettings(
             # Mode 0
-            L=1, M=2, F=4, S=1, N=16, NP=16, K=32, CS=0,
+            # L=1, M=2, F=4, S=1, N=16, NP=16, K=32, CS=0,
             # Mode 4 (2 samples / clk)
             # L=4, M=4, F=2, S=1, N=16, NP=16, K=32, CS=0,
+            # Mode 21
+            L=8, M=1, F=2, S=8, N=16, NP=16, K=32, CS=0,
             DID=0X5A,
             BID=0X05,
             HD=1,
-            converter_data_width=16,
+            converter_data_width=16 * 8,
             fchk_over_octets=True
         )
         print(settings)
@@ -324,11 +331,26 @@ class GtTest(SoCCore):
                 self.core.ready,
                 self.core.jsync,
                 self.core.jref,
+
                 self.core.link0.fsm,
                 self.core.link0.lmfc_zero,
-                self.core.link0.sink.data,
                 self.core.link0.source.data,
-                self.core.link0.source.ctrl
+                self.core.link0.source.ctrl,
+
+                self.core.link1.fsm,
+                self.core.link1.lmfc_zero,
+                self.core.link1.source.data,
+                self.core.link1.source.ctrl,
+
+                self.core.link2.fsm,
+                self.core.link2.lmfc_zero,
+                self.core.link2.source.data,
+                self.core.link2.source.ctrl,
+
+                self.core.link3.fsm,
+                self.core.link3.lmfc_zero,
+                self.core.link3.source.data,
+                self.core.link3.source.ctrl
             ]
         }
         self.submodules.analyzer = LiteScopeAnalyzer(

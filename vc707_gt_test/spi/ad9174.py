@@ -2,7 +2,7 @@ from time import sleep
 from collections import namedtuple
 from spi_helper import AdSpi, HmcSpi
 from litejesd204b.common import JESD204BSettings
-from jesd204b.transport import seed_to_data
+from litejesd204b.transport import seed_to_data
 
 
 class Ad9174:
@@ -229,9 +229,8 @@ class Ad9174:
         # ---------------------
         # JESD init
         # ---------------------
-        ad.wr(0x201, 0x00)  # Power down no PHYs
         ad.wr(0x100, 0x00)  # Power up digital datapath clocks
-        ad.wr(0x110, (0 << 5) | self.jesd_mode)
+        ad.wr(0x110, (0 << 5) | self.jesd_mode)  # 0 = single link, jesd mode
 
         ad.wr(0x111, (self.interp_main << 4) | self.interp_ch)
         mode_not_in_table = (ad.rr(0x110) >> 7) & 0x01
@@ -261,6 +260,22 @@ class Ad9174:
         print('f_device = {:.6f} MHz  f_ref = {:.6f} MHz'.format(
             f_jesd / 1e6, f_ref / 1e6
         ))
+
+    def print_phy_snapshot(self):
+        ad = self.spi
+        ad.wr('PHY_PRBS_TEST_EN', 0xFF)  # Needed: clock to test module
+        ad.wr('PHY_PRBS_TEST_CTRL', 0b01)  # rst
+
+        print('PHY_SNAPSHOT_DATA:')
+        for lane in range(8):
+            ad.wr('PHY_PRBS_TEST_CTRL', (lane << 4))
+            ad.wr('PHY_DATA_SNAPSHOT_CTRL', 0x01)
+            ad.wr('PHY_DATA_SNAPSHOT_CTRL', 0x00)
+            val = 0
+            for i in range(5):
+                val = (val << 8) | ad.rr(0x323 - i)
+            bVal = '{:040b}'.format(val)
+            print('{0:}: 0x{1:010x}, 0b{2:}'.format(lane, val, bVal))
 
     def print_ilas(self):
         print("JESD settings, received on lane 0 vs (programmed):")
