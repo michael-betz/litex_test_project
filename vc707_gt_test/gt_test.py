@@ -163,6 +163,7 @@ class GtTest(SoCCore):
             BID=0x05,
             converter_data_width=16 * 8
         )
+        settings.calc_fchk()
         print(settings)
 
         for c in ["control", "dna", "crg", "f_ref", "spi", "s_gen"]:
