@@ -35,8 +35,9 @@ from common import main
 
 class SampleGen(Module, AutoCSR):
     def __init__(self, soc, jesd_settings):
-        self.source = Record([("converter"+str(i), jesd_settings.converter_data_width)
-            for i in range(jesd_settings.M)])
+        cw = jesd_settings.frames_per_clock * jesd_settings.S * jesd_settings.N
+        self.source = Record([("converter" + str(m), cw)
+            for m in range(jesd_settings.M)])
 
         # ----------------------------
         #  Waveform memory
@@ -160,8 +161,7 @@ class GtTest(SoCCore):
             fchk_over_octets=True,
             SCR=1,
             DID=0x5A,
-            BID=0x05,
-            converter_data_width=16 * 8
+            BID=0x05
         )
         settings.calc_fchk()
         print(settings)

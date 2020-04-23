@@ -31,9 +31,8 @@ class Ad9174Settings(JESD204BSettings):
     def __init__(
         self,
         jesd_mode,
-        interp_ch,
-        interp_main,
-        converter_data_width=16,
+        interp_ch=None,
+        interp_main=None,
         fchk_over_octets=True,
         **kwargs
     ):
@@ -57,16 +56,26 @@ class Ad9174Settings(JESD204BSettings):
         mode_dict = Ad9174Settings.MODES[jesd_mode]._asdict()
         mode_dict.update(**kwargs)
 
-        super().__init__(converter_data_width, fchk_over_octets, **mode_dict)
+        super().__init__(fchk_over_octets, **mode_dict)
 
-        # f_DAC / f_PCLK: this is the clock driving the FPGA
-        # The division is split over AD9174 (/4) and HMC (/N)
-        self.dsp_clk_div = self.L * 32 * interp_ch * interp_main // \
-            self.M // self.NP
+        if interp_ch is not None and interp_main is not None:
+            # f_DAC / f_PCLK: this is the clock driving the FPGA
+            # The division is split over AD9174 (/4) and HMC (/N)
+            self.dsp_clk_div = self.L * 32 * interp_ch * interp_main // \
+                self.M // self.NP
 
-        # Assume frequency divider by 4 in hmc7044 is hard-coded
-        if (self.dsp_clk_div % 4) > 0:
-            raise ValueError('invalid clocking')
+            # Assume frequency divider by 4 in hmc7044 is hard-coded
+            if (self.dsp_clk_div % 4) > 0:
+                raise ValueError('invalid clocking')
+
+        self.calc_fchk()  # first one comes for free
+
+    def __repr__(self):
+        s = '----------------\n'
+        s += ' JESD mode {}\n'.format(self.jesd_mode)
+        s += '----------------\n'
+        s += super().__repr__()
+        return s
 
 
 class Ad9174Init():
