@@ -33,7 +33,6 @@ class Ad9174Settings(JESD204BSettings):
         JESD_MODE=0,
         INTERP_CH=None,
         INTERP_MAIN=None,
-        FCHK_OVER_OCTETS=True,
         json_file=None,
         **kwargs
     ):
@@ -65,7 +64,7 @@ class Ad9174Settings(JESD204BSettings):
         mode_dict = Ad9174Settings.MODES[JESD_MODE]._asdict()
         mode_dict.update(**kwargs)
 
-        super().__init__(FCHK_OVER_OCTETS, **mode_dict)
+        super().__init__(**mode_dict)
 
         self.DSP_CLK_DIV = 0
         if INTERP_CH is not None and INTERP_MAIN is not None:

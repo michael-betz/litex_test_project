@@ -157,8 +157,8 @@ class GtTest(SoCCore):
         )
 
         self.settings = settings = Ad9174Settings(
-            2, 4, 8,
-            fchk_over_octets=True,
+            11, 1, 2,
+            FCHK_OVER_OCTETS=True,
             SCR=1,
             DID=0x5A,
             BID=0x05
@@ -331,9 +331,14 @@ class GtTest(SoCCore):
                 self.core.jref,
 
                 self.core.link0.fsm,
-                self.core.link0.lmfc_zero,
                 self.core.link0.source.data,
                 self.core.link0.source.ctrl,
+
+                self.core.lmfc.count,
+                self.core.lmfc.zero,
+                self.core.lmfc.jref,
+                self.core.lmfc.is_load
+
 
                 # self.core.link1.fsm,
                 # self.core.link1.lmfc_zero,
