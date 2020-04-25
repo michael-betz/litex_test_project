@@ -3,8 +3,8 @@ TARGET = gt_test
 
 all: build/gateware/$(TARGET).bit
 
-upload: $(TARGET).py
-	python3 $^ config
+upload: build/gateware/$(TARGET).bit
+	xc3sprog -v -c jtaghs1_fast $^
 
 server:
 	litex_server --uart --uart-port /dev/ttyUSB0 --uart-baudrate 1152000
