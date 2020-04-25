@@ -121,13 +121,16 @@ class Ad9174Init():
         hmc.init_hmc7044()
 
         clk_div = self.settings.DSP_CLK_DIV // 4
-        hmc.setup_channel(12, clk_div)        # DEV_CLK = 160 MHz
-        hmc.setup_channel(3, clk_div * 100)   # SYSREF (DAC) = 1.6 MHz
-        hmc.setup_channel(13, clk_div * 100)  # SYSREF (FPGA) = 1.6 MHz
+        hmc.setup_channel(12, clk_div)        # DEV_CLK to the FPGA
+        
+        # for litejesd, SYSREF must be an integer multiple of the LMFC
+        lmfc_cycles = self.settings.K // self.settings.FR_CLK
+        hmc.setup_channel(3, clk_div * lmfc_cycles * 10)   # SYSREF (DAC)
+        hmc.setup_channel(13, clk_div * lmfc_cycles * 10)  # SYSREF (FPGA)
 #         hmc.trigger_reseed()
         self.hmc.trigger_div_reset()
 
-    def init_ad9174(self):
+    def init_ad9174(self, lmfc_cycles):
         regs = self.regs
         ad = self.ad
         s = self.settings
@@ -177,6 +180,7 @@ class Ad9174Init():
         self.hmc.trigger_div_reset()
         # reset FPGA jesd clock domain (disables transceivers)
         regs.ctrl_reset.write(1)
+        regs.control_lmfc.write(lmfc_cycles)
         # Reset CDRs
         ad.wr(0x206, 0x00)
         ad.wr(0x206, 0x01)
@@ -276,10 +280,10 @@ class Ad9174Init():
             raise RuntimeError("SERDES PLL not locked")
 
         # Setup deterministic latency buffer release delay
-#         ad.wr(0x304, 0x03)  # LMFC_DELAY_0 for link0 [PCLK cycles]
-#         ad.wr(0x305, 0x03)  # LMFC_DELAY_1 for link1 [PCLK cycles]
-#         ad.wr(0x306, 0x0C)  # LMFC_VAR_0  variable delay buffer, max is 0x0C
-#         ad.wr(0x307, 0x0C)  # LMFC_VAR_1
+        ad.wr(0x304, 0x00)  # LMFC_DELAY_0 for link0 [PCLK cycles], max is 0x3F
+        ad.wr(0x305, 0x00)  # LMFC_DELAY_1 for link1 [PCLK cycles]
+        ad.wr(0x306, 0x0C)  # LMFC_VAR_0  variable delay buffer, max is 0x0C
+        ad.wr(0x307, 0x0C)  # LMFC_VAR_1
 
         # Enable all interrupts
         ad.wr('JESD_IRQ_ENABLEA', 0xFF)
@@ -476,30 +480,33 @@ class Ad9174Init():
         ))
 
     def test_stpl(self, wait_secs=1):
+        ''' retruns true on failure '''
         print('STPL test:')
+        test_fail = False
         ad = self.ad
         self.regs.control_stpl_enable.write(1)
 
-        sample = 0  # 0 - 15  TODO implement support for multiple samples
         for converter in range(self.settings.M):
-            channel = converter // 2  # 0 - 2
-            i_q = converter % 2
-            tp = seed_to_data((converter << 8) | sample)
-            # tp = 0x597A  # I
-            # tp = 0xD27A  # Q
+            for sample in range(self.settings.S):
+                channel = converter // 2  # 0 - 2
+                i_q = converter % 2
+                tp = seed_to_data((converter << 8) | sample)
+                # tp = 0x597A  # I
+                # tp = 0xD27A  # Q
 
-            cfg = (sample << 4) | (channel << 2)
-            ad.wr(0x32c, cfg)         # select sample and chanel, disable
-            ad.wr(0x32e, tp >> 8)
-            ad.wr(0x32d, tp & 0xFF)
-            ad.wr(0x32f, (i_q << 6))    # 0: I,  1: Q
-            ad.wr(0x32c, cfg | 0x01)  # enable
-            ad.wr(0x32c, cfg | 0x03)  # reset
-            ad.wr(0x32c, cfg | 0x01)  # run
-            sleep(wait_secs)
-            is_fail = ad.rr('SHORT_TPL_TEST_3') & 1
-            print('converter: {:}, tp: {:04x}, fail: {:}'.format(
-                converter, tp, is_fail
-            ))
-
+                cfg = (sample << 4) | (channel << 2)
+                ad.wr(0x32c, cfg)         # select sample and chanel, disable
+                ad.wr(0x32e, tp >> 8)
+                ad.wr(0x32d, tp & 0xFF)
+                ad.wr(0x32f, (i_q << 6))    # 0: I,  1: Q
+                ad.wr(0x32c, cfg | 0x01)  # enable
+                ad.wr(0x32c, cfg | 0x03)  # reset
+                ad.wr(0x32c, cfg | 0x01)  # run
+                sleep(wait_secs)
+                is_fail = ad.rr('SHORT_TPL_TEST_3') & 1
+                test_fail |= is_fail
+                print('converter: {:}, sample: {:}, tp: {:04x}, fail: {:}'.format(
+                    converter, sample, tp, is_fail
+                ))
         self.regs.control_stpl_enable.write(0)
+        return test_fail
