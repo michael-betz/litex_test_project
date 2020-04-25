@@ -30,10 +30,11 @@ class Ad9174Settings(JESD204BSettings):
 
     def __init__(
         self,
-        JESD_MODE,
+        JESD_MODE=0,
         INTERP_CH=None,
         INTERP_MAIN=None,
-        fchk_over_octets=True,
+        FCHK_OVER_OCTETS=True,
+        json_file=None,
         **kwargs
     ):
         '''
@@ -49,14 +50,22 @@ class Ad9174Settings(JESD204BSettings):
 
         kwargs:
             individually overwrite JESD parameters
+
+        json_file:
+            .json file to import jesd parameters from.
+            If this is given all other init parameters are ignored.
         '''
+        if json_file is not None:
+            super().__init__(json_file=json_file)
+            return
+
         self.INTERP_CH = INTERP_CH
         self.INTERP_MAIN = INTERP_MAIN
         self.JESD_MODE = JESD_MODE
         mode_dict = Ad9174Settings.MODES[JESD_MODE]._asdict()
         mode_dict.update(**kwargs)
 
-        super().__init__(fchk_over_octets, **mode_dict)
+        super().__init__(FCHK_OVER_OCTETS, **mode_dict)
 
         self.DSP_CLK_DIV = 0
         if INTERP_CH is not None and INTERP_MAIN is not None:
