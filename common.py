@@ -105,7 +105,9 @@ def main(soc, doc='', **kwargs):
         )
     if "build" in argv:
         builder = Builder(
-            soc, output_dir="build", csr_csv="build/csr.csv",
+            soc, output_dir="build",
+            csr_csv="build/csr.csv",
+            csr_json="build/csr.json",
             compile_gateware=False, compile_software=False
         )
         vns = builder.build(
@@ -115,7 +117,9 @@ def main(soc, doc='', **kwargs):
         system('cp ./build/gateware/mem*.init .')
     if "synth" in argv:
         builder = Builder(
-            soc, output_dir="build", csr_csv="build/csr.csv",
+            soc, output_dir="build",
+            csr_csv="build/csr.csv",
+            csr_json="build/csr.json",
             compile_gateware=True, compile_software=True
         )
         vns = builder.build(build_name=tName)

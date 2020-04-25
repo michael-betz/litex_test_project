@@ -30,55 +30,67 @@ class Ad9174Settings(JESD204BSettings):
 
     def __init__(
         self,
-        jesd_mode,
-        interp_ch=None,
-        interp_main=None,
+        JESD_MODE,
+        INTERP_CH=None,
+        INTERP_MAIN=None,
         fchk_over_octets=True,
         **kwargs
     ):
         '''
-        jesd_mode:
+        JESD_MODE:
             a number defining the set of JESD parameters, as commonly used
             by Analog Devices.
 
-        interp_ch:
+        INTERP_CH:
             channelizer datapath interpolation factor
 
-        interp_main:
+        INTERP_MAIN:
             main datapath interpolation factor
 
         kwargs:
             individually overwrite JESD parameters
         '''
-        self.interp_ch = interp_ch
-        self.interp_main = interp_main
-        self.jesd_mode = jesd_mode
-        mode_dict = Ad9174Settings.MODES[jesd_mode]._asdict()
+        self.INTERP_CH = INTERP_CH
+        self.INTERP_MAIN = INTERP_MAIN
+        self.JESD_MODE = JESD_MODE
+        mode_dict = Ad9174Settings.MODES[JESD_MODE]._asdict()
         mode_dict.update(**kwargs)
 
         super().__init__(fchk_over_octets, **mode_dict)
 
-        if interp_ch is not None and interp_main is not None:
+        self.DSP_CLK_DIV = 0
+        if INTERP_CH is not None and INTERP_MAIN is not None:
             # f_DAC / f_PCLK: this is the clock driving the FPGA
             # The division is split over AD9174 (/4) and HMC7044 (/N)
-            self.dsp_clk_div = self.L * 32 * interp_ch * interp_main // \
+            self.DSP_CLK_DIV = self.L * 32 * INTERP_CH * INTERP_MAIN // \
                 self.M // self.NP
 
             # Assume frequency divider by 4 in hmc7044 is hard-coded
-            if (self.dsp_clk_div % 4) > 0:
+            if (self.DSP_CLK_DIV % 4) > 0:
                 raise ValueError('invalid clocking')
 
         self.calc_fchk()  # first one comes for free
 
     def __repr__(self):
         s = '----------------\n'
-        s += ' JESD mode {}\n'.format(self.jesd_mode)
+        s += ' JESD mode {}\n'.format(self.JESD_MODE)
         s += '----------------\n'
-        s += 'interp_ch: {}  interp_main: {}  dsp_clk_div: {}\n'.format(
-            self.interp_ch, self.interp_main, self.dsp_clk_div
+        s += 'INTERP_CH: {}  INTERP_MAIN: {}  DSP_CLK_DIV: {}\n'.format(
+            self.INTERP_CH, self.INTERP_MAIN, self.DSP_CLK_DIV
         )
         s += super().__repr__()
         return s
+
+    def export_constants(self, soc):
+        '''
+        export all settings as litex constants, which will be written to
+        csr.csv / csr.json
+        '''
+        super().export_constants(soc)
+        soc.add_constant('JESD_JESD_MODE', self.JESD_MODE)
+        soc.add_constant('JESD_INTERP_CH', self.INTERP_CH)
+        soc.add_constant('JESD_INTERP_MAIN', self.INTERP_MAIN)
+        soc.add_constant('JESD_DSP_CLK_DIV', self.DSP_CLK_DIV)
 
 
 class Ad9174Init():
@@ -99,7 +111,7 @@ class Ad9174Init():
         hmc = self.hmc
         hmc.init_hmc7044()
 
-        clk_div = self.settings.dsp_clk_div // 4
+        clk_div = self.settings.DSP_CLK_DIV // 4
         hmc.setup_channel(12, clk_div)        # DEV_CLK = 160 MHz
         hmc.setup_channel(3, clk_div * 100)   # SYSREF (DAC) = 1.6 MHz
         hmc.setup_channel(13, clk_div * 100)  # SYSREF (FPGA) = 1.6 MHz
@@ -159,7 +171,7 @@ class Ad9174Init():
         # Reset CDRs
         ad.wr(0x206, 0x00)
         ad.wr(0x206, 0x01)
-        
+
         # Delay Lock Loop (DLL) Configuration
         ad.wr(0x0C0, 0x00)  # Power-up delay line.
         ad.wr(0x0DB, 0x00)  # Update DLL settings to circuitry.
@@ -214,7 +226,7 @@ class Ad9174Init():
 
         # Power down the unused PHYs
         # when L is 3, the first 3 lanes stay powered up
-        ad.wr(0x201, 0xFF - 2**s.L + 1)  
+        ad.wr(0x201, 0xFF - 2**s.L + 1)
         ad.wr(0x203, 0x00)  # don't power down sync0, sync1
         ad.wr(0x253, 0x01)  # Sync0: 0 = CMOS, 1 = LVDS
         ad.wr(0x254, 0x01)  # Sync1: 0 = CMOS, 1 = LVDS
@@ -261,7 +273,7 @@ class Ad9174Init():
 #         ad.wr(0x307, 0x0C)  # LMFC_VAR_1
 
         # Enable all interrupts
-        ad.wr('JESD_IRQ_ENABLEA', 0xFF)  
+        ad.wr('JESD_IRQ_ENABLEA', 0xFF)
         ad.wr('JESD_IRQ_ENABLEB', 1)  # config mismatch interrupt
         ad.wr('IRQ_ENABLE', 0xFF)
         ad.wr('IRQ_ENABLE0', 0xFF)
@@ -272,9 +284,9 @@ class Ad9174Init():
         # JESD init
         # ---------------------
         ad.wr(0x100, 0x00)  # Power up digital datapath clocks
-        ad.wr(0x110, (0 << 5) | s.jesd_mode)  # 0 = single link
+        ad.wr(0x110, (0 << 5) | s.JESD_MODE)  # 0 = single link
 
-        ad.wr(0x111, (s.interp_main << 4) | s.interp_ch)
+        ad.wr(0x111, (s.INTERP_MAIN << 4) | s.INTERP_CH)
         mode_not_in_table = (ad.rr(0x110) >> 7) & 0x01
         print('MODE_NOT_IN_TABLE:', mode_not_in_table)
         if mode_not_in_table:
@@ -292,14 +304,14 @@ class Ad9174Init():
         ad.wr('CTRLREG1', 0x11)
         ad.wr('ERRORTHRES', 0x01)  # Error threshold
         ad.wr(0x475, 1)  # Bring the JESD204B quad-byte deframer out of reset.
-        
+
         # Enable the sync logic, and set the rotation mode to reset
         # the synchronization logic upon a sync reset trigger.
         ad.wr(0x03B, 0xF1)  # enable sync circuit (no datapath ramping)
         ad.wr(0x039, 0x01)  # Allowed ref jitter window (DAC clocks)
         ad.wr(0x036, 0xFF)  # ignore the first 255 sysref edges
         self.trigger_jref_sync()
-        
+
         # Reset all status interrupts
         ad.wr('JESD_IRQ_STATUSA', 0xFF)
         ad.wr('JESD_IRQ_STATUSB', 1)
@@ -307,12 +319,12 @@ class Ad9174Init():
         ad.wr('IRQ_STATUS0', 0xFF)
         ad.wr('IRQ_STATUS1', 0xFF)
         ad.wr('IRQ_STATUS2', 0xFF)
-        
+
         # TODO: Table 56, setup channel datapath
         # TODO: Table 57, setup main datapath
 
     def trigger_jref_sync(self):
-        ''' 
+        '''
         Re-aligns the LMFC with the sysref signal.
         Will also shutdown and re-initialize the link.
         '''
@@ -324,9 +336,9 @@ class Ad9174Init():
         if not sync_done:
             raise RuntimeError('Sync. of LMFC with JREF failed. JREF missing?')
         print('DYN_LINK_LATENCY {:2d} cycles'.format(ad.rr(0x302)))
-        
+
     def print_irq_flags(self, reset=False):
-        ''' 
+        '''
         print the status of the latched error flags
         and optionally resets them.
         returns True on error
@@ -343,7 +355,7 @@ class Ad9174Init():
             if reset:
                 self.ad.wr(name, 0xFF)
             return isErr
-                
+
         isErr = p('JESD_IRQ_STATUSA', reset, [
             'Code Group Sync. failed',
             'Frame Sync. failed',
@@ -354,11 +366,11 @@ class Ad9174Init():
             'Not in table > threshold',
             'Bad disparity > threshold'
         ])
-            
+
         isErr |= p('JESD_IRQ_STATUSB', reset, [
             'lane0 ILAS config mismatch'
         ])
-            
+
         isErr |= p('IRQ_STATUS', reset, [
             'DAC0 PRBS error',
             'DAC1 PRBS error',
@@ -366,19 +378,19 @@ class Ad9174Init():
             'JESD204x receiver not ready',
             'SYSREF jitter too large'
         ])
-        
+
         isErr |= p('IRQ_STATUS0', reset, [
             'DAC0 Power Amplifier error',
             None, None,
             'DAC0 calibration not done'
         ])
-        
+
         isErr |= p('IRQ_STATUS1', reset, [
             'DAC1 Power Amplifier error',
             None, None,
             'DAC1 calibration not done'
         ])
-        
+
         isErr |= p('IRQ_STATUS2', reset, [
             'DAC PLL locked',
             'DAC PLL lock lost',
@@ -388,7 +400,7 @@ class Ad9174Init():
         ])
 
         return isErr
-        
+
     def print_fpga_clocks(self):
         ''' Print measured clock frequency in FPGA '''
         f_jesd = self.regs.crg_f_jesd_value.read()

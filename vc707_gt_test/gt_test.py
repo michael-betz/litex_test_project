@@ -82,10 +82,10 @@ class CRG(Module, AutoCSR):
         self.sys_clk_freq = int(1e9 / p.default_clk_period)
 
         # depends on f_wenzel and dividers in AD9174 + HMC7044
-        self.tx_clk_freq = int(f_wenzel / settings.dsp_clk_div)
+        self.tx_clk_freq = int(f_wenzel / settings.DSP_CLK_DIV)
 
         # depends on AD9174 JESD / DAC interpolation settings
-        self.gtx_line_freq = int(f_wenzel / settings.dsp_clk_div * 40)
+        self.gtx_line_freq = int(f_wenzel / settings.DSP_CLK_DIV * 40)
 
         # # #
 
@@ -157,7 +157,7 @@ class GtTest(SoCCore):
         )
 
         self.settings = settings = Ad9174Settings(
-            0, 2, 8,
+            2, 4, 8,
             fchk_over_octets=True,
             SCR=1,
             DID=0x5A,
@@ -214,7 +214,7 @@ class GtTest(SoCCore):
         serd_pads = p.request("AD9174_JESD204")
 
         self.submodules.crg = CRG(
-            settings, 5.12e9 / 2, p, serd_pads, [self.ctrl.reset]
+            settings, 5.12e9, p, serd_pads, [self.ctrl.reset]
         )
 
         # ----------------------------
@@ -266,8 +266,8 @@ class GtTest(SoCCore):
             clk=j_ref
         )
 
-        self.submodules.s_gen = SampleGen(self, settings)
-        self.comb += self.core.sink.eq(self.s_gen.source)
+        # self.submodules.s_gen = SampleGen(self, settings)
+        # self.comb += self.core.sink.eq(self.s_gen.source)
 
         # ----------------------------
         #  Clock blinkers
@@ -318,6 +318,10 @@ class GtTest(SoCCore):
 
         # FPGA identification
         self.submodules.dna = dna.DNA()
+
+        settings.LID = 0
+        settings.calc_fchk()
+        settings.export_constants(self)
 
         # Analyzer
         analyzer_groups = {
