@@ -1,45 +1,38 @@
 [*]
-[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
-[*] Mon Apr  6 02:41:12 2020
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Fri Apr 24 02:09:52 2020
 [*]
-[dumpfile] "/home/michael/fpga_wsp/litex_test_project/vc707_gt_test/spi/dump.vcd"
-[dumpfile_mtime] "Mon Apr  6 02:36:44 2020"
-[dumpfile_size] 87480
-[savefile] "/home/michael/fpga_wsp/litex_test_project/vc707_gt_test/spi/debug.gtkw"
-[timestart] 659220
-[size] 1916 504
+[dumpfile] "/home/michael/sshfs/litex_test_project/vc707_gt_test/spi/dump.vcd"
+[dumpfile_mtime] "Fri Apr 24 02:07:55 2020"
+[dumpfile_size] 662930
+[savefile] "/home/michael/sshfs/litex_test_project/vc707_gt_test/spi/debug.gtkw"
+[timestart] 0
+[size] 1916 507
 [pos] -1 -1
-*-14.000000 710090 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
-[sst_width] 213
+*-20.000000 387500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 214
 [signals_width] 433
 [sst_expanded] 1
-[sst_vpaned_height] 126
+[sst_vpaned_height] 60
 @28
-scope_clk
-@200
--
-@28
-[color] 6
-jsync_jesd
+[color] 1
+core_jsync
 @24
+[color] 2
 analyzer_state[1:0]
 @200
 -
 @28
-[color] 2
-resetinserter_source_source_ctrl[3:0]
+core_jref
+core_link_lmfc_zero
+@200
+-
 @23
-[color] 2
-resetinserter_source_source_data[31:0]
-@200
--
+core_link_source_source_ctrl0[3:0]
+@22
+core_link_source_source_data0[31:0]
 @28
-j_ref
-resetinserter_jref_rising
-@200
--
-@28
-phy_done0
-ready0
+core_ready
+scope_clk
 [pattern_trace] 1
 [pattern_trace] 0

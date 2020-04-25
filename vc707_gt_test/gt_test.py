@@ -157,7 +157,7 @@ class GtTest(SoCCore):
         )
 
         self.settings = settings = Ad9174Settings(
-            21, 1, 1,
+            0, 2, 8,
             fchk_over_octets=True,
             SCR=1,
             DID=0x5A,
@@ -331,20 +331,20 @@ class GtTest(SoCCore):
                 self.core.link0.source.data,
                 self.core.link0.source.ctrl,
 
-                self.core.link1.fsm,
-                self.core.link1.lmfc_zero,
-                self.core.link1.source.data,
-                self.core.link1.source.ctrl,
+                # self.core.link1.fsm,
+                # self.core.link1.lmfc_zero,
+                # self.core.link1.source.data,
+                # self.core.link1.source.ctrl,
 
-                self.core.link2.fsm,
-                self.core.link2.lmfc_zero,
-                self.core.link2.source.data,
-                self.core.link2.source.ctrl,
+                # self.core.link2.fsm,
+                # self.core.link2.lmfc_zero,
+                # self.core.link2.source.data,
+                # self.core.link2.source.ctrl,
 
-                self.core.link3.fsm,
-                self.core.link3.lmfc_zero,
-                self.core.link3.source.data,
-                self.core.link3.source.ctrl
+                # self.core.link3.fsm,
+                # self.core.link3.lmfc_zero,
+                # self.core.link3.source.data,
+                # self.core.link3.source.ctrl
             ]
         }
         self.submodules.analyzer = LiteScopeAnalyzer(

@@ -30,6 +30,11 @@ class NewSpi:
 
 
 class HmcSpi(NewSpi):
+    def __init__(self, r):
+        self.reg001 = (1 << 6) | (1 << 5)
+        self.reg004 = 0
+        super().__init__(r)
+    
     def wr(self, adr, val):
         # R/W + W1 + W0 + A[13] + D[8]
         word = (0 << 23) | ((adr & 0x1FFF) << 8) | (val & 0xFF)
@@ -46,15 +51,78 @@ class HmcSpi(NewSpi):
         word <<= 8
         return self.rxtx(word, 2, False) & 0xFF
 
-    def setupChannel(self, chId, f_div=1):
+    def init_hmc7044(self):
+        self.wr(0x000, 1)  # reset
+        self.wr(0x000, 0)
+        self.wr(0x054, 0)  # Disable SDATA driver (uni-direct. buffer)
+
+        self.reg001 = (1 << 6) | (1 << 5)
+        self.wr(0x001, self.reg001)  # High performance dividers / PLL
+        
+        # VCO Selection
+        # 0 Internal disabled/external
+        # 1 High
+        # 2 Low
+        VCO_SELECT = 3
+        self.wr(0x003, (0 << VCO_SELECT))
+
+        # set global enable for channel
+        self.reg004 = 0
+        self.wr(0x004, self.reg004)
+
+        # clkin1 as external VCO input
+        self.wr(0x005, (1 << 5))
+
+        # Updates from datasheet Table 74 for `optimum performance` :p
+        self.wr(0x09F, 0x4D)
+        self.wr(0x0A0, 0xDF)
+        self.wr(0x0A5, 0x06)
+        self.wr(0x0A8, 0x06)
+        self.wr(0x0B0, 0x04)
+
+        # Disable all channels
+        for chId in range(14):
+            reg0 = 0xC8 + 10 * chId
+            self.wr(reg0, 0x00)
+            self.wr(reg0 + 8, 0x00)
+
+    def trigger_reseed(self):
+        '''
+        Requests the centralized resync timer and FSM to reseed any of the
+        output dividers that are programmed to pay attention to sync events.
+        This signal is only acknowledged if the resync FSM has completed all
+        events (has finished any previous pulse generator and/or sync events,
+        and is in the done state; SYSREF FSM State[3:0] = 0010).
+        '''
+        self.wr(0x001, self.reg001 | 0x80)
+        self.wr(0x001, self.reg001)
+
+    def trigger_div_reset(self):
+        '''
+        Resets all dividers and FSMs. Does not affect configuration registers.
+        '''
+        self.wr(0x001, self.reg001 | 0x02)
+        self.wr(0x001, self.reg001)
+
+    def setup_channel(
+        self, chId, f_div=1, sync_en=True, fine_delay=0, coarse_delay=0
+    ):
         '''
             set a channel up for CML mode,
             100 Ohm termination,
             no delays
 
-            chId: channel Id starting at 0
-            f_div: frequency divison factor starting at 1
+            chId:
+                channel Id starting at 0
+            f_div:
+                frequency divison factor from 1 to 4094
+            sync_en:
+                channel will be suspectible to sync events if enabled
         '''
+        # set global enable for channel
+        self.reg004 |= (1 << (chId // 2))
+        self.wr(0x004, self.reg004)
+        
         reg0 = 0xC8 + 10 * chId
 
         HP_MODE_EN = 7
@@ -69,6 +137,8 @@ class HmcSpi(NewSpi):
             # bias to improve swing/phase noise at the expense of
             # power.
             (1 << HP_MODE_EN) |
+
+            (sync_en << SYNC_EN) |
             # Configures the channel to normal mode with
             # asynchronous startup, or to a pulse generator mode
             # with dynamic start-up. Note that this must be set to
@@ -92,14 +162,12 @@ class HmcSpi(NewSpi):
 
         # 24 fine delay steps. Step size = 25 ps. Values greater
         # than 23 have no effect on analog delay
-        fine_delay = 0
         self.wr(reg0 + 3, fine_delay & 0x1F)
 
         # 17 coarse delay steps. Step size = 1/2 VCO cycle. This flip
         # flop (FF)-based digital delay does not increase noise
         # level at the expense of power. Values greater than 17
         # have no effect on coarse delay.
-        coarse_delay = 0
         self.wr(reg0 + 4, coarse_delay & 0x1F)
 
         # 12-bit multislip digital delay amount LSB.
@@ -120,6 +188,7 @@ class HmcSpi(NewSpi):
         #   be generated with 12-Bit Channel Divider[11:0] = 1.
         self.wr(reg0 + 7, 0)
 
+        DRIVER_IMPEDANCE = 0
         DRIVER_MODE = 3
         self.wr(
             reg0 + 8,
@@ -128,7 +197,7 @@ class HmcSpi(NewSpi):
             # 1 Internal 100 Ω resistor enable per output pin.
             # 2 Reserved.
             # 3 Internal 50 Ω resistor enable per output pin.
-            1 |
+            (1 << DRIVER_IMPEDANCE) |
             # Output driver mode selection.
             # 0 CML mode.
             # 1 LVPECL mode.

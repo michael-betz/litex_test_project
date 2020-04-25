@@ -19,7 +19,8 @@ analyzer = LiteScopeAnalyzerDriver(
 analyzer.configure_subsampler(1)
 analyzer.configure_group(0)
 trig = sys.argv[1]
-analyzer.add_rising_edge_trigger(trig)
+if trig != 'snapshot':
+    analyzer.add_rising_edge_trigger(trig)
 print("Trigger:", trig)
 analyzer.run(offset=32)
 analyzer.wait_done()
