@@ -337,8 +337,13 @@ class GtTest(SoCCore):
                 self.core.lmfc.count,
                 self.core.lmfc.zero,
                 self.core.lmfc.jref,
-                self.core.lmfc.is_load
+                self.core.lmfc.is_load,
 
+                self.control.status.fields.phy_ready
+
+                # *[p.transmitter.init.done for p in phys],
+                # *[p.transmitter.init.restart for p in phys],
+                # *[p.transmitter.init.startup_fsm for p in phys]
 
                 # self.core.link1.fsm,
                 # self.core.link1.lmfc_zero,
