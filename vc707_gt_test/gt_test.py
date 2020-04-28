@@ -23,51 +23,86 @@ from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr import AutoCSR
 from litex.soc.integration.soc_core import SoCCore
 from litejesd204b.phy.gtx import GTXQuadPLL
+from litejesd204b.phy.prbs import PRBS15Generator
 from litejesd204b.phy import JESD204BPhyTX
 from litejesd204b.common import JESD204BSettings
 from litejesd204b.core import LiteJESD204BCoreTX, LiteJESD204BCoreControl
-from litex.soc.interconnect.csr import CSRStorage
+from litex.soc.interconnect.csr import CSRStorage, CSRField
 from litescope import LiteScopeIO, LiteScopeAnalyzer
 from ad9174 import Ad9174Settings
 from xdc import vc707
 from common import main
 
 
+class PRBSGen(Module, AutoCSR):
+    def __init__(self, soc, settings):
+        ''' don't bother, doesn't work !!! '''
+        # TODO reverse engineer the AD9174 datapath PRBS format :(
+        self.sink = Record(settings.get_dsp_layout())
+        self.source = Record(settings.get_dsp_layout())
+
+        self.sample_prbs_en = CSRStorage(1)
+        self.submodules.prbs = PRBS15Generator(settings.N)
+
+        # Bypass if PRBS disabled (gets overridden if enabled)
+        self.comb += self.source.eq(self.sink)
+
+        for i, (conv, _) in enumerate(self.source.iter_flat()):
+            for s in range(settings.FR_CLK * settings.S):
+                self.comb += If(
+                    self.sample_prbs_en.storage,
+                    conv[s * settings.N: (s + 1) * settings.N].eq(
+                        self.prbs.o
+                    )
+                )
+
+
 class SampleGen(Module, AutoCSR):
-    def __init__(self, soc, jesd_settings):
-        cw = jesd_settings.frames_per_clock * jesd_settings.S * jesd_settings.N
-        self.source = Record([("converter" + str(m), cw)
-            for m in range(jesd_settings.M)])
+    def __init__(self, soc, settings, depth=256):
+        '''
+        Blast out samples from Memory.
+        1 Memory for each converter for each parallel sample
+        '''
+        self.source = Record(settings.get_dsp_layout())
 
-        # ----------------------------
-        #  Waveform memory
-        # ----------------------------
-        mem = Memory(jesd_settings.M * 16, 4096, init=[0, 1, 2, 3])
-        self.specials += mem
-        self.submodules.sample_ram = wishbone.SRAM(mem)
-        soc.register_mem(
-            "samples",
-            0x10000000,  # [bytes]
-            self.sample_ram.bus,
-            mem.depth * 4  # [bytes]
-        )
-        p1 = mem.get_port(clock_domain="jesd")
-        self.specials += p1
-
-        self.max_ind = CSRStorage(32)
+        self.max_ind = CSRStorage(16)
         max_ind_ = Signal.like(self.max_ind.storage)
         self.specials += MultiReg(self.max_ind.storage, max_ind_, "jesd")
-
+        adr = Signal.like(self.max_ind.storage)
         self.sync.jesd += [
-            If(p1.adr >= max_ind_,
-                p1.adr.eq(0)
+            If(adr >= max_ind_,
+                adr.eq(0)
             ).Else(
-                p1.adr.eq(p1.adr + 1)
+                adr.eq(adr + 1)
             )
         ]
-        for i in range(jesd_settings.M):
-            conv = getattr(self.source, 'converter{}'.format(i))
-            self.sync.jesd += conv.eq(p1.dat_r[i * 16: (i + 1) * 16])
+
+
+        adr_offset = 0x10000000
+
+        # TODO can't convince Vivado to infer Block ram for this :(
+        for m, (conv, _) in enumerate(self.source.iter_flat()):
+            for s in range(settings.FR_CLK * settings.S):
+                name = "m{:}_s{:}".format(m, s)
+                mem = Memory(settings.N, depth, name=name)
+                # setattr(self, name, mem)
+                self.specials += mem
+                sram = wishbone.SRAM(mem, we_gran=0)
+                self.submodules += sram
+                soc.register_mem(
+                    name,
+                    adr_offset,  # [bytes]
+                    sram.bus,
+                    mem.depth * 4  # [bytes]
+                )
+                p1 = mem.get_port(clock_domain="jesd")
+                self.specials += p1
+                adr_offset += 0x10000
+
+                self.sync.jesd += [
+                    p1.adr.eq(adr),
+                    conv[s * settings.N: (s + 1) * settings.N].eq(p1.dat_r)
+                ]
 
 
 class CRG(Module, AutoCSR):
@@ -96,7 +131,6 @@ class CRG(Module, AutoCSR):
 
         rst_sum = Signal()
         self.comb += rst_sum.eq(reduce(or_, add_rst))
-        self.specials += AsyncResetSynchronizer(self.cd_sys, rst_sum)
 
         # Handle the GTX clock input
         refclk0 = Signal()
@@ -108,9 +142,11 @@ class CRG(Module, AutoCSR):
             o_O=refclk0
         )
         self.clock_domains.cd_jesd = ClockDomain()
+
         self.specials += [
-            Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk),
-            AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys'))  # self.jreset.storage)
+            AsyncResetSynchronizer(self.cd_sys, rst_sum),
+            AsyncResetSynchronizer(self.cd_jesd, ResetSignal('sys')),
+            Instance("BUFG", i_I=refclk0, o_O=self.cd_jesd.clk)
         ]
 
         # Add a frequency counter to `cd_jesd` (160 MHz) measures in [Hz]
@@ -119,6 +155,8 @@ class CRG(Module, AutoCSR):
             clk=ClockSignal('jesd')
         )
 
+        # The two GTX quad PLLs for up to 8 lanes
+        # These are taken care of and reset by GTXInit()
         self.submodules.qpll0 = GTXQuadPLL(
             refclk0,
             self.tx_clk_freq,
@@ -126,12 +164,13 @@ class CRG(Module, AutoCSR):
         )
         print(self.qpll0)
 
-        self.submodules.qpll1 = GTXQuadPLL(
-            refclk0,
-            self.tx_clk_freq,
-            self.gtx_line_freq
-        )
-        print(self.qpll1)
+        if settings.L > 4:
+            self.submodules.qpll1 = GTXQuadPLL(
+                refclk0,
+                self.tx_clk_freq,
+                self.gtx_line_freq
+            )
+            print(self.qpll1)
 
 
 class GtTest(SoCCore):
@@ -157,7 +196,7 @@ class GtTest(SoCCore):
         )
 
         self.settings = settings = Ad9174Settings(
-            11, 1, 2,
+            2, 4, 8,
             FCHK_OVER_OCTETS=True,
             SCR=1,
             DID=0x5A,
@@ -166,7 +205,9 @@ class GtTest(SoCCore):
         settings.calc_fchk()
         print(settings)
 
-        for c in ["control", "dna", "crg", "f_ref", "spi", "s_gen"]:
+        for c in [
+            "control", "dna", "crg", "f_ref", "spi", "sample_gen", "prbs_gen"
+        ]:
             self.add_csr(c)
 
         for i in range(settings.L):
@@ -247,7 +288,7 @@ class GtTest(SoCCore):
             phys,
             settings
         )
-        self.submodules.control = LiteJESD204BCoreControl(self.core)
+        self.submodules.control = LiteJESD204BCoreControl(self.core, phys)
 
         jsync = Signal()
         self.specials += DifferentialInput(
@@ -266,33 +307,15 @@ class GtTest(SoCCore):
             clk=j_ref
         )
 
-        # self.submodules.s_gen = SampleGen(self, settings)
-        # self.comb += self.core.sink.eq(self.s_gen.source)
-
         # ----------------------------
-        #  Clock blinkers
+        #  Application layer
         # ----------------------------
-        # 156.25 MHz / 2**26 = 2.33 Hz
-        counter0 = Signal(26)
-        self.sync += counter0.eq(counter0 + 1)
-        self.comb += p.request("user_led").eq(counter0[-1])
-
-        # 125.00 MHz / 2**26 = 1.86 Hz
-        counter1 = Signal(26)
-        self.sync.jesd += counter1.eq(counter1 + 1)
-        self.comb += p.request("user_led").eq(counter1[-1])
-
-        # To observe 160 MHz DSP clock on scope ...
-        sma = p.request("user_sma_gpio_p")
-        self.comb += sma.eq(ClockSignal('jesd'))
-        # self.specials += DifferentialOutput(ClockSignal('tx'), sma.p, sma.n)
-        # tell Vivado it's okay to cross the clock region in a sketchy way
-        # p.add_platform_command('set_property CLOCK_DEDICATED_ROUTE ANY_CMT_COLUMN [get_nets refclk0]')
-        # self.specials += DifferentialInput(
-        #     serd_pads.sysref_p,
-        #     serd_pads.sysref_n,
-        #     p.request("user_sma_gpio_n")
-        # )
+        self.submodules.prbs_gen = PRBSGen(self, settings)
+        self.submodules.sample_gen = SampleGen(self, settings, 64)
+        self.comb += [
+            self.prbs_gen.sink.eq(self.sample_gen.source),  # has a bypass mode
+            self.core.sink.eq(self.prbs_gen.source)
+        ]
 
         # ----------------------------
         #  SPI master
@@ -337,28 +360,7 @@ class GtTest(SoCCore):
                 self.core.lmfc.count,
                 self.core.lmfc.zero,
                 self.core.lmfc.jref,
-                self.core.lmfc.is_load,
-
-                self.control.status.fields.phy_ready
-
-                # *[p.transmitter.init.done for p in phys],
-                # *[p.transmitter.init.restart for p in phys],
-                # *[p.transmitter.init.startup_fsm for p in phys]
-
-                # self.core.link1.fsm,
-                # self.core.link1.lmfc_zero,
-                # self.core.link1.source.data,
-                # self.core.link1.source.ctrl,
-
-                # self.core.link2.fsm,
-                # self.core.link2.lmfc_zero,
-                # self.core.link2.source.data,
-                # self.core.link2.source.ctrl,
-
-                # self.core.link3.fsm,
-                # self.core.link3.lmfc_zero,
-                # self.core.link3.source.data,
-                # self.core.link3.source.ctrl
+                self.core.lmfc.is_load
             ]
         }
         self.submodules.analyzer = LiteScopeAnalyzer(

@@ -34,7 +34,7 @@ class HmcSpi(NewSpi):
         self.reg001 = (1 << 6) | (1 << 5)
         self.reg004 = 0
         super().__init__(r)
-    
+
     def wr(self, adr, val):
         # R/W + W1 + W0 + A[13] + D[8]
         word = (0 << 23) | ((adr & 0x1FFF) << 8) | (val & 0xFF)
@@ -58,7 +58,7 @@ class HmcSpi(NewSpi):
 
         self.reg001 = (1 << 6) | (1 << 5)
         self.wr(0x001, self.reg001)  # High performance dividers / PLL
-        
+
         # VCO Selection
         # 0 Internal disabled/external
         # 1 High
@@ -118,11 +118,15 @@ class HmcSpi(NewSpi):
                 frequency divison factor from 1 to 4094
             sync_en:
                 channel will be suspectible to sync events if enabled
+            fine_delay:
+                noisy analog phase delay in 25 ps steps (max. value 23)
+            coarse_delay:
+                phase delay in 1/2 input clock cycles (max. value 17)
         '''
         # set global enable for channel
         self.reg004 |= (1 << (chId // 2))
         self.wr(0x004, self.reg004)
-        
+
         reg0 = 0xC8 + 10 * chId
 
         HP_MODE_EN = 7

@@ -20,7 +20,10 @@ analyzer.configure_subsampler(1)
 analyzer.configure_group(0)
 trig = sys.argv[1]
 if trig != 'snapshot':
-    analyzer.add_rising_edge_trigger(trig)
+    if trig[0] == '~':
+        analyzer.add_falling_edge_trigger(trig[1:])
+    else:
+        analyzer.add_rising_edge_trigger(trig)
 print("Trigger:", trig)
 analyzer.run(offset=32)
 analyzer.wait_done()

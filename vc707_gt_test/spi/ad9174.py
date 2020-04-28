@@ -120,25 +120,24 @@ class Ad9174Init():
         hmc.init_hmc7044()
 
         clk_div = self.settings.DSP_CLK_DIV // 4
-        hmc.setup_channel(12, clk_div)        # DEV_CLK to the FPGA
-        
+        hmc.setup_channel(12, clk_div, sync_en=False)     # DEV_CLK to the FPGA
+
         # for litejesd, SYSREF must be an integer multiple of the LMFC
         lmfc_cycles = self.settings.K // self.settings.FR_CLK
         hmc.setup_channel(3, clk_div * lmfc_cycles * 10)   # SYSREF (DAC)
         hmc.setup_channel(13, clk_div * lmfc_cycles * 10)  # SYSREF (FPGA)
-#         hmc.trigger_reseed()
+        # hmc.trigger_reseed()
         self.hmc.trigger_div_reset()
 
-    def init_ad9174(self, lmfc_cycles):
-        regs = self.regs
+    def init_ad9174(self):
         ad = self.ad
         s = self.settings
 
         # ------------------------
         #  Reset and general init
         # ------------------------
-        # disable GTX transceivers
-        regs.control_control.write(0)
+        # put GTX PHYs and jesd core in reset
+        self.regs.control_control.write(0b01)
 
         # Power up sequence, Table 51
         ad.wr(0x000, 0x81)  # Soft reset
@@ -165,7 +164,7 @@ class Ad9174Init():
         ad.wr(0x790, 0xFF)  # DACPLL_POWER_DOWN
         ad.wr(0x791, 0x1F)
 
-        # ADC clock output divider = /4
+        # ADC clock output divider = /4  (max. output freq = 3 GHz)
         #   0: Divide by 1
         #   1: Divide by 2
         #   2: Divide by 3
@@ -173,13 +172,6 @@ class Ad9174Init():
         BIT_ADC_CLK_DIVIDER = 6
         ad.wr(0x799, (3 << BIT_ADC_CLK_DIVIDER) | 8)
 
-        # As the clock to the HMC744 is stable now,
-        # it's a good time to reset its clock dividers
-#         self.hmc.trigger_reseed()  # TODO does not seem to give reproducible delays, why?
-        self.hmc.trigger_div_reset()
-        # reset FPGA jesd clock domain (disables transceivers)
-        regs.ctrl_reset.write(1)
-        regs.control_lmfc.write(lmfc_cycles)
         # Reset CDRs
         ad.wr(0x206, 0x00)
         ad.wr(0x206, 0x01)
@@ -211,16 +203,15 @@ class Ad9174Init():
         if cal_stat != 1:
             raise RuntimeError('Calibration failed :(')
 
-        # Triggers the GTXInit state machine in FPGA
-        regs.control_control.write(1)
-
         # ---------------------------
         # Table 58, SERDES interface
         # ---------------------------
         # disable serdes PLL, clear sticky loss of lock bit
         ad.wr(0x280, 0x04)
         ad.wr(0x280, 0x00)
-        ad.wr(0x200, 0x01)  # Power down the entire JESD204b receiver analog (all eight channels and bias)
+        # Power down the entire JESD204b receiver analog
+        # (all eight lanes and bias)
+        ad.wr(0x200, 0x01)
 
         # EQ settings for < 11 dB insertion loss
         ad.wr(0x240, 0xAA)
@@ -279,10 +270,10 @@ class Ad9174Init():
             raise RuntimeError("SERDES PLL not locked")
 
         # Setup deterministic latency buffer release delay
-        ad.wr(0x304, 0x00)  # LMFC_DELAY_0 for link0 [PCLK cycles], max is 0x3F
-        ad.wr(0x305, 0x00)  # LMFC_DELAY_1 for link1 [PCLK cycles]
-        ad.wr(0x306, 0x0C)  # LMFC_VAR_0  variable delay buffer, max is 0x0C
-        ad.wr(0x307, 0x0C)  # LMFC_VAR_1
+        ad.wr(0x304, 10)  # LMFC_DELAY_0 for link0 [PCLK cycles], max is 0x3F
+        ad.wr(0x305, 10)  # LMFC_DELAY_1 for link1 [PCLK cycles]
+#         ad.wr(0x306, 3)  # LMFC_VAR_0  variable delay buffer, max is 0x0C
+#         ad.wr(0x307, 3)  # LMFC_VAR_1
 
         # Enable all interrupts
         ad.wr('JESD_IRQ_ENABLEA', 0xFF)
@@ -321,16 +312,7 @@ class Ad9174Init():
         # the synchronization logic upon a sync reset trigger.
         ad.wr(0x03B, 0xF1)  # enable sync circuit (no datapath ramping)
         ad.wr(0x039, 0x01)  # Allowed ref jitter window (DAC clocks)
-        ad.wr(0x036, 0xFF)  # ignore the first 255 sysref edges
-        self.trigger_jref_sync()
-
-        # Reset all status interrupts
-        ad.wr('JESD_IRQ_STATUSA', 0xFF)
-        ad.wr('JESD_IRQ_STATUSB', 1)
-        ad.wr('IRQ_STATUS', 0xFF)
-        ad.wr('IRQ_STATUS0', 0xFF)
-        ad.wr('IRQ_STATUS1', 0xFF)
-        ad.wr('IRQ_STATUS2', 0xFF)
+        ad.wr(0x036, 0x10)  # ignore the first 16 sysref edges
 
         # TODO: Table 56, setup channel datapath
         # TODO: Table 57, setup main datapath
@@ -349,7 +331,7 @@ class Ad9174Init():
             raise RuntimeError('Sync. of LMFC with JREF failed. JREF missing?')
         print('DYN_LINK_LATENCY {:2d} cycles'.format(ad.rr(0x302)))
 
-    def print_irq_flags(self, reset=False):
+    def print_irq_flags(self, reset=False, silent=False):
         '''
         print the status of the latched error flags
         and optionally resets them.
@@ -360,7 +342,7 @@ class Ad9174Init():
             isErr = False
             for i, b_str in enumerate(bit_strs):
                 if b_str is not None:
-                    if val & 1:
+                    if val & 1 and not silent:
                         print('{:}: {:}'.format(name, b_str))
                         isErr = True
                 val >>= 1
@@ -413,21 +395,28 @@ class Ad9174Init():
 
         return isErr
 
-    def print_fpga_clocks(self):
+    def fpga_print_clocks(self):
         ''' Print measured clock frequency in FPGA '''
         f_jesd = self.regs.crg_f_jesd_value.read()
         f_ref = self.regs.f_ref_value.read()
-        print('f_device = {:.6f} MHz  f_ref = {:.6f} MHz'.format(
+        print('f_jesd = {:.6f} MHz  f_ref = {:.6f} MHz'.format(
             f_jesd / 1e6, f_ref / 1e6
         ))
 
-    def print_phy_snapshot(self):
-        ''' print one received word of the AD9174 JESD PHYs '''
+    def fpga_set_tp(self, on=True, tp=0b1111111101111111111100000000000000000000):
+        ''' set test-pattern mode and 40 bit pattern for all GTX phys '''
+        for i in range(self.settings.L):
+            getattr(self.regs, 'phy{:}_transmitter_tp_on'.format(i)).write(on)
+            getattr(self.regs, 'phy{:}_transmitter_tp'.format(i)).write(tp)
+
+    def get_phy_snapshot(self, silent=False):
+        ''' print and return snapshot of received PHY data for each active lane '''
         ad = self.ad
         ad.wr('PHY_PRBS_TEST_EN', 0xFF)  # Needed: clock to test module
         ad.wr('PHY_PRBS_TEST_CTRL', 0b01)  # rst
-
-        print('PHY_SNAPSHOT_DATA:')
+        vals = []
+        if not silent:
+            print('PHY_SNAPSHOT_DATA:')
         for lane in range(self.settings.L):
             ad.wr('PHY_PRBS_TEST_CTRL', (lane << 4))
             ad.wr('PHY_DATA_SNAPSHOT_CTRL', 0x01)
@@ -435,10 +424,36 @@ class Ad9174Init():
             val = 0
             for i in range(5):
                 val = (val << 8) | ad.rr(0x323 - i)
-            bVal = '{:040b}'.format(val)
-            print('{0:}: 0x{1:010x}, 0b{2:}'.format(lane, val, bVal))
+            vals.append(val)
+            if not silent:
+                print('{0:}: 0x{1:010x}, 0b{1:040b}'.format(lane, val))
+        return vals
+
+    def phy_pattern_test(self, tp=0b1111111101111111111100000000000000000000):
+        '''
+        apply 40 bit test-pattern `tp` on GTX phy and verify received values
+        on AD9174 PHY match for each lane (except for some bit shift).
+        returns True on error
+        '''
+        isFailed = False
+        bTp = '{:040b}'.format(tp)
+
+        self.fpga_set_tp(True, tp)
+        vals = self.get_phy_snapshot(True)
+        self.fpga_set_tp(False)
+
+        for i, v in enumerate(vals):
+            bVal = '{:040b}'.format(v)
+            isMatch = bTp in (bVal + bVal)
+            isFailed |= not isMatch
+            print('{0:}: 0x{1:010x}, 0b{1:040b}, match: {2:}'.format(i, v, isMatch))
+
+        return isFailed
 
     def print_ilas(self):
+        '''
+        returns True on error
+        '''
         print("JESD settings, received on lane 0 vs (programmed):")
         # FCHK_N = 1:
         # Checksum is calculated by summing the registers containing the packed
@@ -457,6 +472,7 @@ class Ad9174Init():
             if rx_val != prog_val:
                 cfg_mismatch = True
         print('CHK: {:02x} ({:02x}) {:}'.format(chk_rx & 0xFF, chk_prog & 0xFF, 'config mismatch!' if cfg_mismatch else ''))
+        return cfg_mismatch
 
     def print_lane_status(self):
         def st(n, fmt='08b'):
@@ -486,7 +502,7 @@ class Ad9174Init():
         self.regs.control_stpl_enable.write(1)
 
         for converter in range(self.settings.M):
-            for sample in range(self.settings.S):
+            for sample in range(self.settings.S * self.settings.FR_CLK):
                 channel = converter // 2  # 0 - 2
                 i_q = converter % 2
                 tp = seed_to_data((converter << 8) | sample)
