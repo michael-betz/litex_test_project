@@ -5,6 +5,15 @@ from litejesd204b.common import JESD204BSettings
 from litejesd204b.transport import seed_to_data
 
 
+def hd(dat):
+    ''' print a hex-dump '''
+    for i, d in enumerate(dat):
+        if i % 8 == 0 and len(dat) > 8:
+            print('\n{:04x}: '.format(i), end='')
+        print('{:02x} '.format(d), end='')
+    print()
+
+
 class Ad9174Settings(JESD204BSettings):
     JM = namedtuple('JESD_MODE', 'L M F S NP N K HD')
     MODES = {
@@ -130,7 +139,8 @@ class Ad9174Init():
         self.hmc.trigger_div_reset()
 
     def init_ad9174(self):
-        ad = self.ad
+        wr = self.ad.wr
+        rr = self.ad.rr
         s = self.settings
 
         # ------------------------
@@ -140,29 +150,29 @@ class Ad9174Init():
         self.regs.control_control.write(0b01)
 
         # Power up sequence, Table 51
-        ad.wr(0x000, 0x81)  # Soft reset
-        ad.wr(0x000, 0x3C)  # 4 - wire SPI mode + ADDRINC
+        wr(0x000, 0x81)  # Soft reset
+        wr(0x000, 0x3C)  # 4 - wire SPI mode + ADDRINC
 
-        ad.wr(0x091, 0x00)  # Power up clock RX
-        ad.wr(0x206, 0x01)  # Bring CDR out of reset
-        ad.wr(0x705, 0x01)  # LOAD NVRAM FACTORY SETTINGS
-        ad.wr(0x090, 0x00)  # Power on DACs and bias supply
-        print('AD917X_NVM_BLR_DONE:', (ad.rr(0x705) >> 1) & 1)
+        wr(0x091, 0x00)  # Power up clock RX
+        wr(0x206, 0x01)  # Bring CDR out of reset
+        wr(0x705, 0x01)  # LOAD NVRAM FACTORY SETTINGS
+        wr(0x090, 0x00)  # Power on DACs and bias supply
+        print('AD917X_NVM_BLR_DONE:', (rr(0x705) >> 1) & 1)
 
         # Print product ID (0x9174)
-        val = ad.rr('SPI_PRODIDH') << 8 | ad.rr('SPI_PRODIDL')
+        val = rr('SPI_PRODIDH') << 8 | rr('SPI_PRODIDL')
         print('PROD_ID: 0x{:04x}'.format(val))
-        val = ad.rr('SPI_CHIPGRADE')
+        val = rr('SPI_CHIPGRADE')
         print('PROD_GRADE: {:x}  DEV_REVISION: {:x}'.format(
             val >> 8, val & 0xF
         ))
 
-        ad.wr(0x100, 0x01)  # Put digital datapath in reset
+        wr(0x100, 0x01)  # Put digital datapath in reset
 
         # Disable DAC PLL and config for external clock, Table 52
-        ad.wr(0x095, 0x01)
-        ad.wr(0x790, 0xFF)  # DACPLL_POWER_DOWN
-        ad.wr(0x791, 0x1F)
+        wr(0x095, 0x01)
+        wr(0x790, 0xFF)  # DACPLL_POWER_DOWN
+        wr(0x791, 0x1F)
 
         # ADC clock output divider = /4  (max. output freq = 3 GHz)
         #   0: Divide by 1
@@ -170,35 +180,31 @@ class Ad9174Init():
         #   2: Divide by 3
         #   3: Divide by 4
         BIT_ADC_CLK_DIVIDER = 6
-        ad.wr(0x799, (3 << BIT_ADC_CLK_DIVIDER) | 8)
-
-        # Reset CDRs
-        ad.wr(0x206, 0x00)
-        ad.wr(0x206, 0x01)
+        wr(0x799, (3 << BIT_ADC_CLK_DIVIDER) | 8)
 
         # Delay Lock Loop (DLL) Configuration
-        ad.wr(0x0C0, 0x00)  # Power-up delay line.
-        ad.wr(0x0DB, 0x00)  # Update DLL settings to circuitry.
-        ad.wr(0x0DB, 0x01)
-        ad.wr(0x0DB, 0x00)
-        ad.wr(0x0C1, 0x68)  # set search mode for f_DAC > 4.5 GHz
-        ad.wr(0x0C1, 0x69)  # set DLL_ENABLE
-        ad.wr(0x0C7, 0x01)  # Enable DLL read status.
-        dll_lock = ad.rr(0x0C3) & 0x01
+        wr(0x0C0, 0x00)  # Power-up delay line.
+        wr(0x0DB, 0x00)  # Update DLL settings to circuitry.
+        wr(0x0DB, 0x01)
+        wr(0x0DB, 0x00)
+        wr(0x0C1, 0x68)  # set search mode for f_DAC > 4.5 GHz
+        wr(0x0C1, 0x69)  # set DLL_ENABLE
+        wr(0x0C7, 0x01)  # Enable DLL read status.
+        dll_lock = rr(0x0C3) & 0x01
         print('DLL locked:', dll_lock)
         if dll_lock < 1:
             raise RuntimeError('Delay locked loop not locked :(')
 
-        ad.wr(0x008, (0b01 << 6) | 0b000001)  # Select DAC0, channel0
-        print('SPI_PAGEINDX: 0b{:08b}'.format(ad.rr('SPI_PAGEINDX')))
+        wr(0x008, (0b01 << 6) | 0b000001)  # Select DAC0, channel0
+        print('SPI_PAGEINDX: 0b{:08b}'.format(rr('SPI_PAGEINDX')))
 
         # Magic numbers from Table 54 (calibration)
-        ad.wr(0x050, 0x2A)
-        ad.wr(0x061, 0x68)
-        ad.wr(0x051, 0x82)
-        ad.wr(0x051, 0x83)
-        cal_stat = ad.rr(0x052)
-        ad.wr(0x081, 0x03)  # Power down calibration clocks
+        wr(0x050, 0x2A)
+        wr(0x061, 0x68)
+        wr(0x051, 0x82)
+        wr(0x051, 0x83)
+        cal_stat = rr(0x052)
+        wr(0x081, 0x03)  # Power down calibration clocks
         print('CAL_STAT:', cal_stat)  # 1 = success
         if cal_stat != 1:
             raise RuntimeError('Calibration failed :(')
@@ -207,115 +213,189 @@ class Ad9174Init():
         # Table 58, SERDES interface
         # ---------------------------
         # disable serdes PLL, clear sticky loss of lock bit
-        ad.wr(0x280, 0x04)
-        ad.wr(0x280, 0x00)
+        wr(0x280, 0x04)
+        wr(0x280, 0x00)
         # Power down the entire JESD204b receiver analog
         # (all eight lanes and bias)
-        ad.wr(0x200, 0x01)
+        wr(0x200, 0x01)
 
         # EQ settings for < 11 dB insertion loss
-        ad.wr(0x240, 0xAA)
-        ad.wr(0x241, 0xAA)
-        ad.wr(0x242, 0x55)
-        ad.wr(0x243, 0x55)
-        ad.wr(0x244, 0x1F)
-        ad.wr(0x245, 0x1F)
-        ad.wr(0x246, 0x1F)
-        ad.wr(0x247, 0x1F)
-        ad.wr(0x248, 0x1F)
-        ad.wr(0x249, 0x1F)
-        ad.wr(0x24A, 0x1F)
-        ad.wr(0x24B, 0x1F)
+        wr(0x240, 0xAA)
+        wr(0x241, 0xAA)
+        wr(0x242, 0x55)
+        wr(0x243, 0x55)
+        wr(0x244, 0x1F)
+        wr(0x245, 0x1F)
+        wr(0x246, 0x1F)
+        wr(0x247, 0x1F)
+        wr(0x248, 0x1F)
+        wr(0x249, 0x1F)
+        wr(0x24A, 0x1F)
+        wr(0x24B, 0x1F)
 
         # Power down the unused PHYs
         # when L is 3, the first 3 lanes stay powered up
-        ad.wr(0x201, 0xFF - 2**s.L + 1)
-        ad.wr(0x203, 0x00)  # don't power down sync0, sync1
-        ad.wr(0x253, 0x01)  # Sync0: 0 = CMOS, 1 = LVDS
-        ad.wr(0x254, 0x01)  # Sync1: 0 = CMOS, 1 = LVDS
+        wr(0x201, 0xFF - 2**s.L + 1)
+        wr(0x203, 0x00)  # don't power down sync0, sync1
+        wr(0x253, 0x01)  # Sync0: 0 = CMOS, 1 = LVDS
+        wr(0x254, 0x01)  # Sync1: 0 = CMOS, 1 = LVDS
 
         # SERDES required register write.
-        ad.wr(0x210, 0x16)
-        ad.wr(0x216, 0x05)
-        ad.wr(0x212, 0xFF)
-        ad.wr(0x212, 0x00)
-        ad.wr(0x210, 0x87)
-        ad.wr(0x210, 0x87)
-        ad.wr(0x216, 0x11)
-        ad.wr(0x213, 0x01)
-        ad.wr(0x213, 0x00)
-        ad.wr(0x200, 0x00)  # Power up the SERDES circuitry blocks.
+        wr(0x210, 0x16)
+        wr(0x216, 0x05)
+        wr(0x212, 0xFF)
+        wr(0x212, 0x00)
+        wr(0x210, 0x87)
+        wr(0x210, 0x87)
+        wr(0x216, 0x11)
+        wr(0x213, 0x01)
+        wr(0x213, 0x00)
+        wr(0x200, 0x00)  # Power up the SERDES circuitry blocks.
         sleep(0.1)
 
         # SERDES required register write.
-        ad.wr(0x210, 0x86)
-        ad.wr(0x216, 0x40)
-        ad.wr(0x213, 0x01)
-        ad.wr(0x213, 0x00)
-        ad.wr(0x210, 0x86)
-        ad.wr(0x216, 0x00)
-        ad.wr(0x213, 0x01)
-        ad.wr(0x213, 0x00)
-        ad.wr(0x210, 0x87)
-        ad.wr(0x216, 0x01)
-        ad.wr(0x213, 0x01)
-        ad.wr(0x213, 0x00)
-        ad.wr(0x280, 0x05)
+        wr(0x210, 0x86)
+        wr(0x216, 0x40)
+        wr(0x213, 0x01)
+        wr(0x213, 0x00)
+        wr(0x210, 0x86)
+        wr(0x216, 0x00)
+        wr(0x213, 0x01)
+        wr(0x213, 0x00)
+        wr(0x210, 0x87)
+        wr(0x216, 0x01)
+        wr(0x213, 0x01)
+        wr(0x213, 0x00)
+        wr(0x280, 0x05)
 
         # Start up SERDES PLL and initiate calibration
-        ad.wr(0x280, 0x01)
-        pll_locked = ad.rr(0x281) & 0x01
+        wr(0x280, 0x01)
+        pll_locked = rr(0x281) & 0x01
         print('SERDES PLL locked:', pll_locked)
         if pll_locked != 1:
             raise RuntimeError("SERDES PLL not locked")
 
         # Setup deterministic latency buffer release delay
-        ad.wr(0x304, 10)  # LMFC_DELAY_0 for link0 [PCLK cycles], max is 0x3F
-        ad.wr(0x305, 10)  # LMFC_DELAY_1 for link1 [PCLK cycles]
-#         ad.wr(0x306, 3)  # LMFC_VAR_0  variable delay buffer, max is 0x0C
-#         ad.wr(0x307, 3)  # LMFC_VAR_1
+        wr(0x304, 0)  # LMFC_DELAY_0 for link0 [PCLK cycles], max is 0x3F
+        wr(0x305, 0)  # LMFC_DELAY_1 for link1 [PCLK cycles]
+#         wr(0x306, 3)  # LMFC_VAR_0  variable delay buffer, max is 0x0C
+#         wr(0x307, 3)  # LMFC_VAR_1
 
         # Enable all interrupts
-        ad.wr('JESD_IRQ_ENABLEA', 0xFF)
-        ad.wr('JESD_IRQ_ENABLEB', 1)  # config mismatch interrupt
-        ad.wr('IRQ_ENABLE', 0xFF)
-        ad.wr('IRQ_ENABLE0', 0xFF)
-        ad.wr('IRQ_ENABLE1', 0xFF)
-        ad.wr('IRQ_ENABLE2', 0xFF)
+        wr('JESD_IRQ_ENABLEA', 0xFF)
+        wr('JESD_IRQ_ENABLEB', 1)  # config mismatch interrupt
+        wr('IRQ_ENABLE', 0xFF)
+        wr('IRQ_ENABLE0', 0xFF)
+        wr('IRQ_ENABLE1', 0xFF)
+        wr('IRQ_ENABLE2', 0xFF)
 
         # ---------------------
         # JESD init
         # ---------------------
-        ad.wr(0x100, 0x00)  # Power up digital datapath clocks
-        ad.wr(0x110, (0 << 5) | s.JESD_MODE)  # 0 = single link
+        wr(0x100, 0x00)  # Power up digital datapath clocks
+        wr(0x110, (0 << 5) | s.JESD_MODE)  # 0 = single link
 
-        ad.wr(0x111, (s.INTERP_MAIN << 4) | s.INTERP_CH)
-        mode_not_in_table = (ad.rr(0x110) >> 7) & 0x01
+        wr(0x111, (s.INTERP_MAIN << 4) | s.INTERP_CH)
+        mode_not_in_table = (rr(0x110) >> 7) & 0x01
         print('MODE_NOT_IN_TABLE:', mode_not_in_table)
         if mode_not_in_table:
             raise RuntimeError('JESD mode / interpolation factors not valid')
 
-        ad.wr(0x084, (0 << 6))  # SYSREF_PD: 0 = AC couple, don't power down
-        ad.wr(0x300, 0b0001)  # select single link, page link0, enable link0
-        ad.wr(0x475, 0x09)  # Soft reset the JESD204B quad-byte deframer
+        wr(0x084, (0 << 6))  # SYSREF_PD: 0 = AC couple, don't power down
+        wr(0x300, 0b0001)  # select single link, page link0, enable link0
+        wr(0x475, 0x09)  # Soft reset the JESD204B quad-byte deframer
 
         # Write JESD settings blob to AD9174 registers
         for i, o in enumerate(s.octets):
-            ad.wr(0x450 + i, o)
+            wr(0x450 + i, o)
 
         # bit0 checksum method: 0 = sum fields (seems buggy), 1 = sum registers
-        ad.wr('CTRLREG1', 0x11)
-        ad.wr('ERRORTHRES', 0x01)  # Error threshold
-        ad.wr(0x475, 1)  # Bring the JESD204B quad-byte deframer out of reset.
+        wr('CTRLREG1', 0x11)
+        wr('ERRORTHRES', 0x01)  # Error threshold
+        wr(0x475, 1)  # Bring the JESD204B quad-byte deframer out of reset.
 
         # Enable the sync logic, and set the rotation mode to reset
         # the synchronization logic upon a sync reset trigger.
-        ad.wr(0x03B, 0xF1)  # enable sync circuit (no datapath ramping)
-        ad.wr(0x039, 0x01)  # Allowed ref jitter window (DAC clocks)
-        ad.wr(0x036, 0x10)  # ignore the first 16 sysref edges
+        wr(0x03B, 0xF1)  # enable sync circuit (no datapath ramping)
+        wr(0x039, 0x01)  # Allowed ref jitter window (DAC clocks)
+        wr(0x036, 0x10)  # ignore the first 16 sysref edges
 
         # TODO: Table 56, setup channel datapath
         # TODO: Table 57, setup main datapath
+
+
+    def setTone(
+        self,
+        dac_select=1,
+        f_out=None,
+        ampl=None,
+        del_a=None,
+        mod_b=None,
+        phase=None,
+        f_ref=5125e6
+    ):
+        '''
+        dac_select: 1 = first DAC, 2 = second DAC, 3 = both DACs
+        '''
+        wr = self.ad.wr
+        rr = self.ad.rr
+        s = self.settings
+
+        # Setup DDSes
+        wr(0x1E6, (1 << 1))             # Enable DDSM_EN_CAL_DC_INPUT (see Fig. 80) (tone on / off)
+        wr(0x112, (1 << 3) | (1 << 2))  # Enable NCO + Modulus
+        wr(0x596, (1 << 3) | (1 << 2))  # Turn ON Transmit enable
+
+        # Select a DAC main datapath
+        dac_select &= 0x03
+
+        if ampl is not None:
+            # Set DC amplitude level (2 bytes), 0x50FF is full-scale tone
+            # Updates immediately without the need for DDSM_FTW_LOAD_REQ
+            # TODO: not clear if synchronized to 16 bit write
+            ampl_b = int(min(ampl, 1.0) * 0x50FF).to_bytes(2, 'little')
+            wr(0x008, dac_select)  # need to use __CHANNEL_PAGE_ !!!!
+            wr(0x148, ampl_b)
+            print('DC_CAL_TONE: ', end='')
+            hd(rr(0x148, 2))
+
+        # All other regs are on MAINDAC_PAGE
+        wr(0x008, (dac_select << 6))
+
+        if f_out is not None:
+            # ftw updates on posedge DDSM_FTW_LOAD_REQ
+            ftw_b = int(f_out / f_ref * 2**48).to_bytes(6, 'little')  # [Hz]
+            wr(0x114, ftw_b)  # Write 6 bytes FTW into main NCO
+            print('DDSM_FTW: ', end='')
+            hd(rr(0x114, 6))
+
+        if phase is not None:
+            # DDSM_NCO_PHASE_OFFSET updates immediately without DDSM_FTW_LOAD_REQ
+            # However it updates after each 8th risign edge on the SPI clock (see scope shot)
+            # it does not synchronize to the 16 bit register width :(
+            # --> phase jump of ~1.4 degree on register rollover is unavoidable :(
+            phase_b = int(phase / 180 * 2**15).to_bytes(2, 'little', signed=True)  # [deg]
+            wr(0x11C, phase_b)  # Write 2 bytes
+            print('DDSM_NCO_PHASE_OFFSET: ', end='')
+            hd(rr(0x11C, 2))
+
+        if del_a is not None:
+            # Modulus and Delta are updated after posedge DDSM_FTW_LOAD_REQ
+            # confirmed by scope measurement
+            wr(0x12A, del_a.to_bytes(6, 'little'))  # Write 6 bytes Delta [A]
+            print('DDSM_ACC_DELTA: ', end='')
+            hd(rr(0x12A, 6))
+
+            wr(0x124, mod_b.to_bytes(6, 'little'))  # Write 6 bytes Modulus [B]
+            print('DDSM_ACC_MODULUS: ', end='')
+            hd(rr(0x124, 6))
+
+        if f_out is not None or del_a is not None:
+            # Positive edge on DDSM_FTW_LOAD_REQ applies the FTW and causes a phase glitch!
+            # Random phase jump -pi .. pi on selected DAC
+            wr(0x113, 0x01)  # Update settings
+            print('DDSM_FTW_LOAD_ACK:', (rr(0x113) >> 1) & 0x01)
+            wr(0x113, 0x00)
 
     def trigger_jref_sync(self):
         '''
