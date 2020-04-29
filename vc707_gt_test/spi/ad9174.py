@@ -341,11 +341,6 @@ class Ad9174Init():
         rr = self.ad.rr
         s = self.settings
 
-        # Setup DDSes
-        wr(0x1E6, (1 << 1))             # Enable DDSM_EN_CAL_DC_INPUT (see Fig. 80) (tone on / off)
-        wr(0x112, (1 << 3) | (1 << 2))  # Enable NCO + Modulus
-        wr(0x596, (1 << 3) | (1 << 2))  # Turn ON Transmit enable
-
         # Select a DAC main datapath
         dac_select &= 0x03
 
