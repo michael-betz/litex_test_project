@@ -1,5 +1,6 @@
 import sys
 import json
+from collections import Iterable
 
 class NewSpi:
     '''
@@ -235,10 +236,12 @@ class AdSpi(NewSpi):
                     continue
                 self.bit_names[bv['name']] = (k, bk)
 
-    def rr(self, adr):
+    def rr(self, adr, length=1):
         ''' read register @ adr, which can be integer or reg. name '''
         if type(adr) is str:
             adr = int(self.reg_names[adr])
+        if length > 1:
+            return [self.rr(adr + i) for i in range(length)]
         word = (1 << 23) | ((adr & 0x7FFF) << 8)
         return self.rxtx(word, 1, True) & 0xFF
 
@@ -246,6 +249,10 @@ class AdSpi(NewSpi):
         ''' write register @ adr, which can be integer or reg. name '''
         if type(adr) is str:
             adr = int(self.reg_names[adr])
+        if isinstance(val, Iterable):
+            for i, v in enumerate(val):
+                self.wr(adr + i, v)
+            return
         word = (0 << 23) | ((adr & 0x7FFF) << 8) | (val & 0xFF)
         return self.rxtx(word, 1, True)
 
