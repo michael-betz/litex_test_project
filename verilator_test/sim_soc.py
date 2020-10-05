@@ -14,9 +14,7 @@ from litex.build.sim.config import SimConfig
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
-from litex.soc.cores import uart
-
-from litex.soc.interconnect.wishbonebridge import WishboneStreamingBridge
+from litex.soc.cores.uart import Stream2Wishbone, RS232PHYModel
 
 
 class SimPins(Pins):
@@ -40,19 +38,17 @@ _io = [
 
 
 class SimSoC(SoCCore):
-    csr_map_update(SoCCore.csr_map, {"dut"})
-
     def __init__(
         self,
         **kwargs
     ):
         # Setting sys_clk_freq too low will cause wishbone timeouts !!!
-        sys_clk_freq = int(8e6)
+        sys_clk_freq = int(20e6)
+        print(kwargs)
         SoCCore.__init__(
             self,
             SimPlatform("SIM", _io),
             clk_freq=sys_clk_freq,
-            cpu_type=None,
             integrated_rom_size=0x0,
             integrated_sram_size=0x0,
             ident="LiteX Simulation",
@@ -66,27 +62,21 @@ class SimSoC(SoCCore):
         # ----------------------------
         #  Virtual serial to Wishbone bridge
         # ----------------------------
-        # virtual serial phy
-        self.submodules.uart_phy = uart.RS232PHYModel(
-            self.platform.request("serial")
-        )
         # bridge virtual serial phy as wishbone master
-        self.add_cpu(WishboneStreamingBridge(
-            self.uart_phy, sys_clk_freq
-        ))
-        self.add_wb_master(self.cpu.wishbone)
+        self.submodules.uart_phy = RS232PHYModel(self.platform.request("serial"))
+        self.submodules.uartbone = \
+            Stream2Wishbone(self.uart_phy, clk_freq=self.clk_freq)
+        self.bus.add_master(name="uartbone", master=self.uartbone.wishbone)
 
 
 def main(soc):
     parser = argparse.ArgumentParser(description="LiteX SoC Simulation test")
     builder_args(parser)
     parser.add_argument("--trace", action="store_true",
-                        help="enable VCD tracing")
-    parser.add_argument("--trace-start", default=0,
-                        help="cycle to start VCD tracing")
-    parser.add_argument("--trace-end", default=-1,
-                        help="cycle to end VCD tracing")
+                        help="engage VCD tracing on power up")
     args = parser.parse_args()
+
+    soc.platform.add_debug(soc, reset=args.trace)
 
     builder_kwargs = builder_argdict(args)
     builder_kwargs['output_dir'] = 'out'
@@ -101,11 +91,10 @@ def main(soc):
     builder.build(
         run=False,
         sim_config=sim_config,
-        trace=args.trace,
-        trace_start=int(args.trace_start),
-        trace_end=int(args.trace_end)
+        trace=True,  # compile in trace support
+        # trace_fst=True  # alternative to .vcd format
     )
 
 
 if __name__ == "__main__":
-    main(SimSoC())
+    main(SimSoC(cpu_type=None))

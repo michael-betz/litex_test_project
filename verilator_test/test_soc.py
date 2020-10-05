@@ -15,8 +15,23 @@ or just:
     $ make test_soc.vcd
 '''
 import sys
+from litex import RemoteClient
 sys.path.append('..')
-from common import conLitexServer
+from common import getId
+
+def main():
+    port = 1234
+    r = RemoteClient(csr_csv='out/csr.csv', debug=False, port=port)
+    r.open()
+
+    print('\nTesting reads ...')
+    print(getId(r))
+
+    print('\nTesting writes ...')
+    for i in range(6, 30):
+        r.regs.ctrl_scratch.write(i)
+        print(r.regs.ctrl_scratch.read())
 
 
-r = conLitexServer(csr_csv='out/csr.csv', port=1234)
+if __name__ == "__main__":
+    main()

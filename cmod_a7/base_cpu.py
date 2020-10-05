@@ -18,25 +18,8 @@ from litex.soc.cores import dna, xadc, uart
 from ios import Led, RGBLed, Button
 from sys import argv, exit
 
-def csr_map_update(csr_map, csr_peripherals):
-    csr_map.update(dict((n, v)
-        for v, n in enumerate(csr_peripherals, start=max(csr_map.values()) + 1)))
-
 # create our soc (fpga description)
 class BaseSoC(SoCCore):
-    # Peripherals CSR declaration
-    csr_peripherals = [
-        "dna",
-        "xadc",
-        "rgbled",
-        "leds",
-        # "switches",
-        "buttons"
-        # "adxl362",
-        # "display"
-    ]
-    csr_map_update(SoCCore.csr_map, csr_peripherals)
-
     def __init__(self, platform, **kwargs):
         sys_clk_freq = int(1 / platform.default_clk_period * 1000000000)
         SoCCore.__init__(self, platform, sys_clk_freq,
@@ -47,16 +30,24 @@ class BaseSoC(SoCCore):
             csr_data_width=32,
             integrated_rom_size=0x8000,
             integrated_main_ram_size=16 * 1024,
-            with_uart=False,
             ident="Wir trampeln durchs Getreide ...", ident_version=True
         )
+
+        for c in [
+            "dna",
+            "xadc",
+            "rgbled",
+            "leds",
+            # "switches",
+            "buttons"
+            # "adxl362",
+            # "display"
+        ]:
+            self.add_csr(c)
 
         # self.submodules.bridge = uart.UARTWishboneBridge(platform.request("serial"), sys_clk_freq, baudrate=115200)
         # self.add_wb_master(self.bridge.wishbone)
         # self.register_mem("vexriscv_debug", 0xf00f0000, self.cpu_or_bridge.debug_bus, 0x10)
-
-        self.submodules.uart_phy = uart.RS232PHY(platform.request("serial"), sys_clk_freq, baudrate=115200)
-        self.submodules.uart = ResetInserter()(uart.UART(self.uart_phy))
 
         # Clock Reset Generation
         self.submodules.crg = CRG(platform.request("clk12"), platform.request("user_btn"))
