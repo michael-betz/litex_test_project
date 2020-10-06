@@ -1,4 +1,5 @@
 # Messing around with litex ...
+a bunch of random experiments with litex
 
 ## my setup
 starting from the beginning on debian
