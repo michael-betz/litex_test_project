@@ -53,9 +53,7 @@ p.getGroup('eth', (
 ))
 
 # Tunable VCXO
-p.getGroup('clk20', (
-    ('p', 'CLK20_VCXO'),
-))
+p.getGpios('clk20', 'CLK20_VCXO')
 
 p.getGroup('clk125', (
     ('p', 'DDR_REF_CLK_C_P'),
@@ -133,7 +131,7 @@ class Platform(XilinxPlatform):
             "set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]"
         ]
         self.toolchain.additional_commands = [
-            "write_cfgmem -force -format bin -interface spix4 -size 16 -loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin"
+            "write_cfgmem -force -format bin -interface spix4 -size 16 -loadbit \\"up 0x0 {build_name}.bit\\" -file {build_name}.bin"
         ]
         self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 35]")
         self.add_platform_command("set_property CFGBVS VCCO [current_design]")

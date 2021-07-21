@@ -149,11 +149,12 @@ class XdcParser:
         except Exception:
             ios = ''
             pass
-        print('Subsignal("{:}", Pins("{:}"){:}),'.format(
+        s = '("{:}", Pins("{:}"){:}),'.format(
             liteName,
             pins,
             ios
-        ))
+        )
+        return s
 
     def getGroup(self, name, tuples):
         '''
@@ -174,6 +175,5 @@ class XdcParser:
         '''
         print('    ("{:}", 0,'.format(name))
         for t in tuples:
-            print('        ', end='')
-            self.getSubSignal(*t)
+            print('        Subsignal' + self.getSubSignal(*t))
         print('    ),')
