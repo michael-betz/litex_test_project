@@ -22,12 +22,16 @@ _io = [
 
     ("eth", 0,
         Subsignal("rst_n", Pins("B9"), IOStandard("LVCMOS25")),
-        Subsignal("rx_dv", Pins("J11"), IOStandard("LVCMOS25")),
+        Subsignal("rx_ctl", Pins("J11"), IOStandard("LVCMOS25")),
         Subsignal("rx_data", Pins("J10 J8 H8 H9"), IOStandard("LVCMOS25")),
-        Subsignal("tx_en", Pins("C9"), IOStandard("LVCMOS25")),
-        Subsignal("tx_data", Pins("J10 J8 H8 H9"), IOStandard("LVCMOS25")),
+        Subsignal("tx_ctl", Pins("C9"), IOStandard("LVCMOS25")),
+        Subsignal("tx_data", Pins("H11 H12 D8 D9"), IOStandard("LVCMOS25")),
     ),
-    # Tunable VCXO connected to non clock-capable pin :(
+    ("eth_clocks", 0,
+        Subsignal("tx", Pins("F10"), IOStandard("LVCMOS25")),
+        Subsignal("rx", Pins("E11"), IOStandard("LVCMOS25")),
+    ),
+    # PCB bug: Tunable VCXO connected to non clock-capable pin :(
     ("clk20", 0, Pins("W11"), IOStandard("LVCMOS15")),
     ("clk125", 0,
         Subsignal("p", Pins("AC9"), IOStandard("DIFF_SSTL15")),
@@ -55,9 +59,15 @@ _io = [
     ("user_led", 1, Pins("V12"), IOStandard("LVCMOS15")),
     # USB UART
     ("serial", 0,
-        Subsignal("rx", Pins("K15"), IOStandard("LVCMOS25")),
+        Subsignal("tx", Pins("K15"), IOStandard("LVCMOS25")),
         Subsignal("rts", Pins("M16"), IOStandard("LVCMOS25")),
-        Subsignal("tx", Pins("C16"), IOStandard("LVCMOS25")),
+        Subsignal("rx", Pins("C16"), IOStandard("LVCMOS25")),
+    ),
+    # I2C multiplexer for system control
+    ("i2c_fpga", 0,
+        Subsignal("scl", Pins("B16"), IOStandard("LVCMOS25")),
+        Subsignal("sda", Pins("A17"), IOStandard("LVCMOS25")),
+        Subsignal("rst", Pins("B19"), IOStandard("LVCMOS25")),
     ),
     # DDR3 module
     ("ddram", 0,

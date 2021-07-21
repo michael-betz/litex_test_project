@@ -13,7 +13,14 @@ def main():
     module = Module()
     # 125 MHz / 2**27 = 0.93 Hz
     counter = Signal(27)
+
+    # Blink LED
     module.comb += led.eq(counter[-1])
+
+    # Demo the RTS signal
+    # ser_pads = p.request('serial')
+    # module.comb += led.eq(ser_pads.rts)
+
     module.sync += counter.eq(counter + 1)
     p.build(module)
 

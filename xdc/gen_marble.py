@@ -46,10 +46,15 @@ _io = [
 
 p.getGroup('eth', (
     ('rst_n', r'PHY_RSTn'),
-    ('rx_dv', r'RGMII_RX_DV'),
+    ('rx_ctl', r'RGMII_RX_DV'),
     ('rx_data', r'RGMII_RXD\d'),
-    ('tx_en', r'RGMII_TX_EN'),
-    ('tx_data', r'RGMII_RXD\d')
+    ('tx_ctl', r'RGMII_TX_EN'),
+    ('tx_data', r'RGMII_TXD\d')
+))
+
+p.getGroup('eth_clocks', (
+    ('tx', r'RGMII_TX_CLK'),
+    ('rx', r'RGMII_RX_CLK')
 ))
 
 print('    # Tunable VCXO connected to non clock-capable pin :(')
@@ -72,9 +77,16 @@ p.getGpios('user_led', r'LD1[67]')
 
 print('    # USB UART')
 p.getGroup('serial', (
-    ('rx', 'FPGA_RxD'),
+    ('tx', 'FPGA_RxD'),
     ('rts', 'FPGA_RTS'),
-    ('tx', 'FPGA_TxD'),
+    ('rx', 'FPGA_TxD'),
+))
+
+print('    # I2C multiplexer for system control')
+p.getGroup('i2c_fpga', (
+    ('scl', 'I2C_FPGA_SCL'),
+    ('sda', 'I2C_FPGA_SDA'),
+    ('rst', 'I2C_FPGA_SW_RST'),
 ))
 
 print('    # DDR3 module')
