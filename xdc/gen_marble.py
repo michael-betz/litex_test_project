@@ -52,7 +52,7 @@ p.getGroup('eth', (
     ('tx_data', r'RGMII_RXD\d')
 ))
 
-# Tunable VCXO
+print('    # Tunable VCXO connected to non clock-capable pin :(')
 p.getGpios('clk20', 'CLK20_VCXO')
 
 p.getGroup('clk125', (
@@ -60,24 +60,24 @@ p.getGroup('clk125', (
     ('n', 'DDR_REF_CLK_C_N'),
 ))
 
-# 4x Multi gigabit clocks from cross-point switch, source configured by MMC
+print('    # 4x Multi gigabit clocks from cross-point switch, source configured by MMC')
 for i in range(4):
     p.getGroup(f'clkmgt{i}', (
         ('p', f'MGT_CLK_{i}_P'),
         ('n', f'MGT_CLK_{i}_N'),
     ))
 
-# 2x LED: LD16 and LD17
+print('    # 2x LED: LD16 and LD17')
 p.getGpios('user_led', r'LD1[67]')
 
-# USB UART
+print('    # USB UART')
 p.getGroup('serial', (
     ('rx', 'FPGA_RxD'),
     ('rts', 'FPGA_RTS'),
     ('tx', 'FPGA_TxD'),
 ))
 
-# DDR3 module
+print('    # DDR3 module')
 p.getGroup('ddram', (
     ('a', r'DDR3_A\d+', 16),
     ('ba', r'DDR3_BA\d', 3),
@@ -122,8 +122,8 @@ print('''\
 # Platform -----------------------------------------------------------------------------------------
 
 class Platform(XilinxPlatform):
-    default_clk_name   = "clk20"
-    default_clk_period = 1e9 / 20e6
+    default_clk_name   = "clk125"
+    default_clk_period = 1e9 / 125e6
 
     def __init__(self):
         XilinxPlatform.__init__(self, "xc7k160t-ffg676-2", _io, _connectors, toolchain="vivado")
@@ -133,9 +133,14 @@ class Platform(XilinxPlatform):
         self.toolchain.additional_commands = [
             "write_cfgmem -force -format bin -interface spix4 -size 16 -loadbit \\"up 0x0 {build_name}.bit\\" -file {build_name}.bin"
         ]
-        self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 35]")
+
+        # from pin_map.csv: This is a frequency source, not a phase source, so having it enter on a non-CC pin is OK.
+        self.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk20_IBUF]")
+        self.add_platform_command("set_property CONFIG_VOLTAGE 2.5 [current_design]")
         self.add_platform_command("set_property CFGBVS VCCO [current_design]")
-        self.add_platform_command("set_property CONFIG_VOLTAGE 3.3 [current_design]")
+
+        # TODO
+        # self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 35]")
 
     def create_programmer(self):
         return OpenOCD("openocd_marblemini.cfg")

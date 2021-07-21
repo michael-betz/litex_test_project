@@ -27,11 +27,13 @@ _io = [
         Subsignal("tx_en", Pins("C9"), IOStandard("LVCMOS25")),
         Subsignal("tx_data", Pins("J10 J8 H8 H9"), IOStandard("LVCMOS25")),
     ),
+    # Tunable VCXO connected to non clock-capable pin :(
     ("clk20", 0, Pins("W11"), IOStandard("LVCMOS15")),
     ("clk125", 0,
         Subsignal("p", Pins("AC9"), IOStandard("DIFF_SSTL15")),
         Subsignal("n", Pins("AD9"), IOStandard("DIFF_SSTL15")),
     ),
+    # 4x Multi gigabit clocks from cross-point switch, source configured by MMC
     ("clkmgt0", 0,
         Subsignal("p", Pins("D6"), IOStandard("DIFF_SSTL15")),
         Subsignal("n", Pins("D5"), IOStandard("DIFF_SSTL15")),
@@ -48,13 +50,16 @@ _io = [
         Subsignal("p", Pins("K6"), IOStandard("DIFF_SSTL15")),
         Subsignal("n", Pins("K5"), IOStandard("DIFF_SSTL15")),
     ),
+    # 2x LED: LD16 and LD17
     ("user_led", 0, Pins("Y13"), IOStandard("LVCMOS15")),
     ("user_led", 1, Pins("V12"), IOStandard("LVCMOS15")),
+    # USB UART
     ("serial", 0,
         Subsignal("rx", Pins("K15"), IOStandard("LVCMOS25")),
         Subsignal("rts", Pins("M16"), IOStandard("LVCMOS25")),
         Subsignal("tx", Pins("C16"), IOStandard("LVCMOS25")),
     ),
+    # DDR3 module
     ("ddram", 0,
         Subsignal("a", Pins("AC8 AB10 AA9 AA10 AD10 AC12 AB11 AC11 AF13 AE13 AE10 AD11 AA12 AE8 AB12 AD13"), IOStandard("SSTL15")),
         Subsignal("ba", Pins("AF10 AD8 AC13"), IOStandard("SSTL15")),
@@ -281,8 +286,8 @@ _connectors = [
 # Platform -----------------------------------------------------------------------------------------
 
 class Platform(XilinxPlatform):
-    default_clk_name   = "clk20"
-    default_clk_period = 1e9 / 20e6
+    default_clk_name   = "clk125"
+    default_clk_period = 1e9 / 125e6
 
     def __init__(self):
         XilinxPlatform.__init__(self, "xc7k160t-ffg676-2", _io, _connectors, toolchain="vivado")
@@ -292,9 +297,14 @@ class Platform(XilinxPlatform):
         self.toolchain.additional_commands = [
             "write_cfgmem -force -format bin -interface spix4 -size 16 -loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin"
         ]
-        self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 35]")
+
+        # from pin_map.csv: This is a frequency source, not a phase source, so having it enter on a non-CC pin is OK.
+        self.add_platform_command("set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets clk20_IBUF]")
+        self.add_platform_command("set_property CONFIG_VOLTAGE 2.5 [current_design]")
         self.add_platform_command("set_property CFGBVS VCCO [current_design]")
-        self.add_platform_command("set_property CONFIG_VOLTAGE 3.3 [current_design]")
+
+        # TODO
+        # self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 35]")
 
     def create_programmer(self):
         return OpenOCD("openocd_marblemini.cfg")

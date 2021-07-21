@@ -11,8 +11,8 @@ p = Platform()
 def main():
     led = p.request("user_led")
     module = Module()
-    # 20 MHz / 2**24 = 1.19 Hz
-    counter = Signal(24)
+    # 125 MHz / 2**27 = 0.93 Hz
+    counter = Signal(27)
     module.comb += led.eq(counter[-1])
     module.sync += counter.eq(counter + 1)
     p.build(module)
