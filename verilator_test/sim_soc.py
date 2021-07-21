@@ -49,8 +49,8 @@ class SimSoC(SoCCore):
             self,
             SimPlatform("SIM", _io),
             clk_freq=sys_clk_freq,
-            integrated_rom_size=0x0,
-            integrated_sram_size=0x0,
+            integrated_rom_size=0,
+            integrated_sram_size=0,
             ident="LiteX Simulation",
             ident_version=True,
             with_uart=False,
@@ -89,7 +89,7 @@ def main(soc):
 
     builder = Builder(soc, **builder_kwargs)
     builder.build(
-        run=False,
+        run=True,
         sim_config=sim_config,
         trace=True,  # compile in trace support
         # trace_fst=True  # alternative to .vcd format

@@ -8,26 +8,40 @@ class XdcParser:
         '''
         fName is a Xilinx Master .xdc file from their website
         '''
+        re_key = r'set_property\s(\w*)\s"?(\w*)"?\s\[get_ports\s"?([\w\[\]]*)"?\]'
+        re_keys = r'set_property\s-dict\s\{([\w\s"]*)\}\s\[get_ports\s"?([\w\[\]]*)"?\]'
+
         with open(fName) as f:
             lines = f.readlines()
+
+        # lines = (
+        #     'set_property IOSTANDARD LVCMOS18 [get_ports USB_SMSC_NXT]',
+        #     'set_property PACKAGE_PIN R5 [get_ports "DDR_RAS_n"]',
+        #     'set_property PIO_DIRECTION "BIDIR" [get_ports "MIO[53]"]',
+        #     'set_property -dict {PACKAGE_PIN A8 IOSTANDARD DIFF_HSTL_II_25} [get_ports FMC1_LA_24_N]'
+        # )
 
         self.props = defaultdict(dict)
         for line in lines:
             line = line.strip()
             if line.startswith('#'):
                 continue
-            # line = 'set_property PACKAGE_PIN R5 [get_ports "DDR_RAS_n"]'
-            # line = 'set_property PIO_DIRECTION "BIDIR" [get_ports "MIO[53]"]'
-            m = re.fullmatch(
-                r'set_property\s+(\w+)\s+"?(\w+)"?\s+\[get_ports\s+"?([\w\[\]]+)"?\s*]',
-                line
-            )
-            if m is None or len(m.groups()) != 3:
-                print('sorry, parser is too dumb for this:\n', line)
+            dat = re.findall(re_key, line)
+            if len(dat) == 1:
+                dat_key, dat_value, dat_group = dat[0]
+                self.props[dat_group][dat_key] = dat_value
                 continue
-            parts = m.groups()
-            # parts = ('PACKAGE_PIN', 'R5', 'DDR_RAS_n')
-            self.props[parts[2]][parts[0]] = parts[1]
+
+            dat = re.findall(re_keys, line)
+            if len(dat) == 1:
+                dat_items, dat_group = dat[0]
+                dat_items = dat_items.split()
+                for (k, v) in zip(dat_items[0::2], dat_items[1::2]):
+                    self.props[dat_group][k] = v.replace('"', '')
+                continue
+            else:
+                print('sorry, parser is too dumb for this:\n', line)
+
         self.sortKeys()
 
     def sortKeys(self):
@@ -59,14 +73,23 @@ class XdcParser:
                 self.props[k]["IOSTANDARD"]
             ))
 
-    def getConnector(self, fmcName='FMC1_HPC', nameReplace=None):
+    def getConnector(
+        self,
+        namePrefix='FMC1_HPC_',
+        pinReplace=None,
+        noKeys=False,
+        namePattern='.*',
+        outName=None
+    ):
         '''
         makes up litexNames from xilinx naming scheme
+
+        noKeys: print a list instead of key/value pairs
 
         example:
             p.getConnector(
                 "XADC",
-                nameReplace=(('N_R', '_N'), ('P_R', '_P'))
+                pinReplace=(('N_R', '_N'), ('P_R', '_P'))
             )
 
         prints:
@@ -81,18 +104,26 @@ class XdcParser:
                 "VAUX8_P": "AM41",
             }),
         '''
-        fmcName_ = fmcName + '_'
-        print('    ("{:}", {{'.format(fmcName))
-        for k in self.filterKeys(fmcName_ + '.*'):
-            pinName = k.replace(fmcName_, '')
-            if nameReplace:
-                for rep in nameReplace:
-                    pinName = pinName.replace(*rep)
-            print('        "{:}": "{:}",'.format(
-                pinName,
-                self.props[k]['PACKAGE_PIN'])
-            )
-        print('    }),')
+        if outName is None:
+            outName = namePrefix.strip('_')
+        ks = self.filterKeys(namePrefix + namePattern)
+        print('    ("{:}", '.format(outName), end='')
+
+        if noKeys:
+            pins = [self.props[k]['PACKAGE_PIN'] for k in ks]
+            print('"{:}"),'.format(' '.join(pins)))
+        else:
+            print('{')
+            for k in ks:
+                pinName = k.replace(namePrefix, '').strip('_')
+                if pinReplace:
+                    for rep in pinReplace:
+                        pinName = pinName.replace(*rep)
+                print('        "{:}": "{:}",'.format(
+                    pinName,
+                    self.props[k]['PACKAGE_PIN'])
+                )
+            print('    }),')
 
     def getSubSignal(self, liteName, xilRegex, maxPins=None):
         '''
