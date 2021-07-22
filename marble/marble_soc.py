@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 '''
 Give the 1gE interface of the Marble board a test drive
+
+# ethernet and DDR3
+marble_soc.py --with-ethernet --with-bist --build
+
+# mini config
+marble_soc.py --integrated-main-ram-size 32768 --cpu-type serv --build
 '''
 
 import os
@@ -50,7 +56,7 @@ class _CRG(Module):
 
 class BaseSoC(SoCCore):
     def __init__(self, sys_clk_freq=int(125e6), with_ethernet=False, with_led_chaser=True,
-                 with_bist=False, **kwargs):
+                 **kwargs):
         platform = marble.Platform()
 
         # SoCCore ----------------------------------------------------------------------------------
@@ -89,6 +95,7 @@ class BaseSoC(SoCCore):
                 tx_delay=0
             )
             self.add_ethernet(phy=self.ethphy)
+            # self.add_etherbone(phy=self.ethphy, buffer_depth=255)
 
         # System I2C (behing multiplexer) ----------------------------------------------------------
         i2c_pads = platform.request('i2c_fpga')
