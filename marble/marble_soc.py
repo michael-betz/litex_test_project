@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
 '''
-Give the 1gE interface of the Marble board a test drive
+---------------------
+ LiteX SoC on Marble
+---------------------
+with support for SO-DIMM DDR3, ethernet and uart.
 
-# ethernet and DDR3
-marble_soc.py --with-ethernet --with-bist --build
+-----------------
+ Example configs
+-----------------
+with ethernet and DDR3
+  marble_soc.py --with-ethernet --with-bist --spd-dump VR7PU286458FBAMJT.txt
 
-# mini config
-marble_soc.py --integrated-main-ram-size 32768 --cpu-type serv --build
+lightweight config
+  marble_soc.py --integrated-main-ram-size 16384 --cpu-type serv
+
+etherbone: access wishbone over ethernet
+  marble_soc.py --with-etherbone
 '''
 
 import os
@@ -22,7 +31,7 @@ from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
 from litex.soc.cores.bitbang import I2CMaster
 
-from litedram.modules import MT8JTF12864, MT41J256M8
+from litedram.modules import MT8JTF12864, parse_spd_hexdump, SDRAMModule
 from litedram.phy import s7ddrphy
 
 from liteeth.phy.s7rgmii import LiteEthPHYRGMII
@@ -77,11 +86,19 @@ class BaseSoC(SoCCore):
                 nphases      = 4,
                 sys_clk_freq = sys_clk_freq
             )
+
+            if kwargs['spd_dump'] is not None:
+                ram_spd = parse_spd_hexdump(kwargs['spd_dump'])
+                ram_module = SDRAMModule.from_spd_data(ram_spd, sys_clk_freq)
+                print('DDR3: loaded config from', kwargs['spd_dump'])
+            else:
+                ram_module = MT8JTF12864(sys_clk_freq, "1:4")  # KC705 chip, 1 GB
+                print('DDR3: No spd data specified, falling back to MT8JTF12864')
+
             self.add_sdram(
                 "sdram",
                 phy = self.ddrphy,
-                module = MT8JTF12864(sys_clk_freq, "1:4"),  # KC705 chip, 1 GB
-                # module = MT41J256M8(sys_clk_freq, "1:4"),  # 2 GB, too big for default address space
+                module = ram_module,
                 # size=0x40000000,  # Limit its size to 1 GB
                 l2_cache_size = kwargs.get("l2_size", 8192),
                 with_bist = kwargs.get("with_bist", False)
@@ -110,12 +127,16 @@ class BaseSoC(SoCCore):
 # Build --------------------------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="LiteX SoC on Marble")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument("--build",         action="store_true", help="Build bitstream")
     parser.add_argument("--load",          action="store_true", help="Load bitstream")
     parser.add_argument("--sys-clk-freq",  default=125e6,       help="System clock frequency (default: 125MHz)")
     parser.add_argument("--with-ethernet", action="store_true", help="Enable Ethernet support")
     parser.add_argument("--with-bist",     action="store_true", help="Add DDR3 BIST Generator/Checker")
+    parser.add_argument("--spd-dump", type=str, help="DDR3 configuration file, dumped using the `spdread` command in LiteX BIOS")
     builder_args(parser)
     soc_core_args(parser)
     args = parser.parse_args()
@@ -124,6 +145,7 @@ def main():
         sys_clk_freq  = int(float(args.sys_clk_freq)),
         with_ethernet = args.with_ethernet,
         with_bist = args.with_bist,
+        spd_dump = args.spd_dump,
         **soc_core_argdict(args)
     )
     builder = Builder(soc, **builder_argdict(args))
