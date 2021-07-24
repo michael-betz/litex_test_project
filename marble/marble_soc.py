@@ -3,19 +3,25 @@
 ---------------------
  LiteX SoC on Marble
 ---------------------
-with support for SO-DIMM DDR3, ethernet and uart.
+with support for SO-DIMM DDR3, ethernet and UART.
+To synthesize, add --build, to configure the FPGA over jtag, add --load.
 
 -----------------
  Example configs
 -----------------
-with ethernet and DDR3
-  marble_soc.py --with-ethernet --with-bist --spd-dump VR7PU286458FBAMJT.txt
+with ethernet and DDR3, default IP: 192.168.1.50/24
+  ./marble_soc.py --with-ethernet --with-bist --spd-dump VR7PU286458FBAMJT.txt
 
 lightweight config
-  marble_soc.py --integrated-main-ram-size 16384 --cpu-type serv
+  ./marble_soc.py --integrated-main-ram-size 16384 --cpu-type serv
 
 etherbone: access wishbone over ethernet
-  marble_soc.py --with-etherbone
+  ./marble_soc.py --with-etherbone --csr-csv build/csr.csv
+
+make sure reset is not asserted (RTS signal), set PC IP to 192.168.1.100/24,
+then test and benchmark the etherbone link:
+  cd build
+  litex/liteeth/bench/test_etherbone.py --udp --ident --access --sram --speed
 '''
 
 import os
@@ -64,8 +70,16 @@ class _CRG(Module):
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
-    def __init__(self, sys_clk_freq=int(125e6), with_ethernet=False, with_led_chaser=True,
-                 **kwargs):
+    def __init__(
+        self,
+        sys_clk_freq=int(125e6),
+        with_ethernet=False,
+        with_etherbone=False,
+        with_rts_reset=False,
+        with_led_chaser=True,
+        spd_dump=None,
+        **kwargs
+    ):
         platform = marble.Platform()
 
         # SoCCore ----------------------------------------------------------------------------------
@@ -75,8 +89,11 @@ class BaseSoC(SoCCore):
             **kwargs)
 
         # CRG, resettable over USB serial RTS signal -----------------------------------------------
-        ser_pads = platform.lookup_request('serial')
-        self.submodules.crg = _CRG(platform, sys_clk_freq, [ser_pads.rts])
+        resets = []
+        if with_rts_reset:
+            ser_pads = platform.lookup_request('serial')
+            resets.append(ser_pads.rts)
+        self.submodules.crg = _CRG(platform, sys_clk_freq, resets)
 
         # DDR3 SDRAM -------------------------------------------------------------------------------
         if not self.integrated_main_ram_size:
@@ -87,10 +104,10 @@ class BaseSoC(SoCCore):
                 sys_clk_freq = sys_clk_freq
             )
 
-            if kwargs['spd_dump'] is not None:
-                ram_spd = parse_spd_hexdump(kwargs['spd_dump'])
+            if spd_dump is not None:
+                ram_spd = parse_spd_hexdump(spd_dump)
                 ram_module = SDRAMModule.from_spd_data(ram_spd, sys_clk_freq)
-                print('DDR3: loaded config from', kwargs['spd_dump'])
+                print('DDR3: loaded config from', spd_dump)
             else:
                 ram_module = MT8JTF12864(sys_clk_freq, "1:4")  # KC705 chip, 1 GB
                 print('DDR3: No spd data specified, falling back to MT8JTF12864')
@@ -105,14 +122,22 @@ class BaseSoC(SoCCore):
             )
 
         # Ethernet ---------------------------------------------------------------------------------
-        if with_ethernet:
+        if with_ethernet or with_etherbone:
             self.submodules.ethphy = LiteEthPHYRGMII(
                 clock_pads = self.platform.request("eth_clocks"),
                 pads = self.platform.request("eth"),
                 tx_delay=0
             )
-            self.add_ethernet(phy=self.ethphy)
-            # self.add_etherbone(phy=self.ethphy, buffer_depth=255)
+
+        if with_ethernet:
+            self.add_ethernet(
+                phy=self.ethphy,
+                dynamic_ip=True,
+                software_debug=False
+            )
+
+        if with_etherbone:
+            self.add_etherbone(phy=self.ethphy, buffer_depth=255)
 
         # System I2C (behing multiplexer) ----------------------------------------------------------
         i2c_pads = platform.request('i2c_fpga')
@@ -135,6 +160,8 @@ def main():
     parser.add_argument("--load",          action="store_true", help="Load bitstream")
     parser.add_argument("--sys-clk-freq",  default=125e6,       help="System clock frequency (default: 125MHz)")
     parser.add_argument("--with-ethernet", action="store_true", help="Enable Ethernet support")
+    parser.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support")
+    parser.add_argument("--with-rts-reset", action="store_true", help="Connect UART RTS line to sys_clk reset")
     parser.add_argument("--with-bist",     action="store_true", help="Add DDR3 BIST Generator/Checker")
     parser.add_argument("--spd-dump", type=str, help="DDR3 configuration file, dumped using the `spdread` command in LiteX BIOS")
     builder_args(parser)
@@ -144,6 +171,7 @@ def main():
     soc = BaseSoC(
         sys_clk_freq  = int(float(args.sys_clk_freq)),
         with_ethernet = args.with_ethernet,
+        with_etherbone = args.with_etherbone,
         with_bist = args.with_bist,
         spd_dump = args.spd_dump,
         **soc_core_argdict(args)
