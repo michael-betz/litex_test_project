@@ -156,7 +156,7 @@ class XdcParser:
         )
         return s
 
-    def getGroup(self, name, tuples):
+    def getGroup(self, name, tuples, index=0):
         '''
         tuples should be:
             ('litexName', r'xilinx regex', 'max. number of pins')
@@ -173,7 +173,7 @@ class XdcParser:
                 Subsignal("sda", Pins("AU32"), IOStandard("LVCMOS18")),
             ),
         '''
-        print('    ("{:}", 0,'.format(name))
+        print('    ("{:s}", {:d},'.format(name, index))
         for t in tuples:
             print('        Subsignal' + self.getSubSignal(*t))
         print('    ),')
