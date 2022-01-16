@@ -1,3 +1,23 @@
+# TODO: QSFP+ control lines:
+#   * ModSelL=0 to enable I2C interface
+#   * LPMode=0 to disable low power mode (ignored?)
+#   * ModPrsL reads 0 when QSFP module is inserted
+#   * IntL reads 0 on fault / critical status (to be read over I2C then)
+#
+# Options to get the 156.25 MHz transceiver clock on Marble:
+# 1. Modify CDCM61004RHBT configuration
+#   * strapping pins: PR0 PR1  OD0 OD1 OD2  OS1 OS0, internal pullup!
+#   * 0R resistors:   R96 R97  R98 R99 R100 R101 R102
+#   * default is: 4 20 4, 11 110 11, 125.00 MHz
+#   * modified:   3 25 4, 01 110 11, 156.25 MHz
+#   * Modification: add 0R resistor to R96
+#   * Will loose 125 MHz clock (maybe needed for GbE)
+# 2. Program the Si570 over I2C
+#   * I2C_APP bus, port 6 of multiplexer
+#   * No HW modification needed
+#   * By default routed on ADN4600ACPZ: Si570, INP3 --> OP1, MGT_CLK_1
+#   * Or maybe modify the MMC firmware to setup Si570
+
 from sys import argv
 from migen import *
 from litex.soc.integration.builder import Builder
@@ -20,6 +40,13 @@ def add_ip(platform, name, module_name, config={}, synth=True):
 
 class Test(Module):
     def __init__(self, platform):
+        self.xgmii_txd = Signal(64)
+        self.xgmii_txc = Signal(8)
+        self.xgmii_rxd = Signal(64)
+        self.xgmii_rxc = Signal(8)
+
+        ###
+
         add_ip(
             platform,
             "ten_gig_eth_pcs_pma",
@@ -27,46 +54,105 @@ class Test(Module):
             {
                 "MDIO_Management": False,
                 "SupportLevel": 1,
-                "DClkRate": 156.25
+                "baser32": "64bit",
+                "refclkrate": 156.25,
+                "DClkRate": 156.25,
+                "SupportLevel": 1  # Add shared logic to core
             }
         )
 
-        xgmii_txd = Signal(64)
-        xgmii_txc = Signal(8)
-        configuration_vector = Signal(536)
         clkmgt_pads = platform.request("clkmgt", 0)
         qsfp_pads = platform.request("qsfp", 0)
 
+        coreclk_out = Signal()
+        areset_datapathclk_out = Signal()
+
+        # TODO: attach config / status word to CSR bus
+        configuration_vector = Signal(536)
+        status_vector = Signal(448)
+
+        # TODO: make sure DRP is accessible by JTAG or attach to wishbone
+        drp_gnt = Signal()
+        drp_den_i = Signal()
+        drp_dwe_i = Signal()
+        drp_daddr_i = Signal(16)
+        drp_di_i = Signal(16)
+        drp_drdy_i = Signal()
+        drp_drpdo_i = Signal(16)
+        drp_req = Signal()
+        drp_den_o = Signal()
+        drp_dwe_o = Signal()
+        drp_daddr_o = Signal(16)
+        drp_di_o = Signal(16)
+        drp_drdy_o = Signal()
+        drp_drpdo_o = Signal(16)
+
         self.specials.pcs_pma = Instance(
             "pcs_pma",
-            i_dclk=ClockSignal(),
+            i_xgmii_txd=self.xgmii_txd,
+            i_xgmii_txc=self.xgmii_txc,
+            o_xgmii_rxd=self.xgmii_rxd,
+            o_xgmii_rxc=self.xgmii_rxc,
+
+            # Transceiver clock / reset
             i_refclk_p=clkmgt_pads.p,
             i_refclk_n=clkmgt_pads.n,
-            i_sim_speedup_control=0,
-            i_reset=0,
-            i_xgmii_txd=xgmii_txd,
-            i_xgmii_txc=xgmii_txc,
+            i_reset=ResetSignal(),  # Asynchronous Master Reset
+            # o_resetdone_out=  # in coreclk_out domain
+            o_coreclk_out=coreclk_out,  # clock for the TX-datapath + managem.
+            # reset signal sync. to coreclk_out
+            o_areset_datapathclk_out=areset_datapathclk_out,
 
             # SFP+ SERDES lane
             o_txp=qsfp_pads.tx_p,
             o_txn=qsfp_pads.tx_n,
             i_rxp=qsfp_pads.rx_p,
             i_rxn=qsfp_pads.rx_n,
+            i_sim_speedup_control=0,
 
-            i_configuration_vector=configuration_vector,
-
-            i_signal_detect=0,
+            # SFP+ transceiver status pins
+            i_signal_detect=1,
             i_tx_fault=0,
-            i_drp_gnt=0,
+            # o_tx_disable=
 
-            i_drp_den_i=0,
-            i_drp_dwe_i=0,
-            i_drp_daddr_i=0,
-            i_drp_di_i=0,
-            i_drp_drdy_i=0,
-            i_drp_drpdo_i=0,
-            i_pma_pmd_type=0
+            # MDIO configuration / status word
+            i_configuration_vector=configuration_vector,
+            o_status_vector=status_vector,
+            # o_core_status=  # Bit 0 = PCS Block Lock, Bits [7:1] are reserved
+
+            # DRP port
+            i_dclk=ClockSignal(),
+            i_drp_gnt=drp_gnt,
+            i_drp_den_i=drp_den_i,
+            i_drp_dwe_i=drp_dwe_i,
+            i_drp_daddr_i=drp_daddr_i,
+            i_drp_di_i=drp_di_i,
+            i_drp_drdy_i=drp_drdy_i,
+            i_drp_drpdo_i=drp_drpdo_i,
+            o_drp_req=drp_req,
+            o_drp_den_o=drp_den_o,
+            o_drp_dwe_o=drp_dwe_o,
+            o_drp_daddr_o=drp_daddr_o,
+            o_drp_di_o=drp_di_o,
+            o_drp_drdy_o=drp_drdy_o,
+            o_drp_drpdo_o=drp_drpdo_o,
+
+            # 0b111 = 10GBASE-SR, 0b110= 10GBASE-LR, 0b101 = 10GBASE-ER
+            i_pma_pmd_type=0b111,
         )
+
+        self.comb += [
+            # If no arbitration is required on the GT DRP ports then connect
+            # REQ to GNT and connect other signals i <= o;
+            drp_gnt.eq(drp_req),
+            drp_den_i.eq(drp_den_o),
+            drp_dwe_i.eq(drp_dwe_o),
+            drp_daddr_i.eq(drp_daddr_o),
+            drp_di_i.eq(drp_di_o),
+            drp_drdy_i.eq(drp_drdy_o),
+            drp_drpdo_i.eq(drp_drpdo_o)
+        ]
+
 
 
 class TestSoc(BaseSoC):
@@ -87,7 +173,7 @@ class TestSoc(BaseSoC):
 
 def main():
     soc = TestSoc()
-    soc.platform.name = 'hello_udp'
+    soc.platform.name = 'hello_10G'
     builder = Builder(
         soc,
         compile_gateware='synth' in argv,
