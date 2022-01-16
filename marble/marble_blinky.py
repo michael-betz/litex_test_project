@@ -3,7 +3,7 @@ Hello world (blinking LED) example for the Marble board with litex
 """
 import sys
 from migen import *
-from marble import Platform
+from litex_boards.platforms.berkeleylab_marble import Platform
 
 p = Platform()
 
