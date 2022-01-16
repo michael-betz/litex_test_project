@@ -79,11 +79,43 @@ p.getGroup('clk125', (
 ))
 
 print('    # 4x Multi gigabit clocks from cross-point switch, source configured by MMC')
+
 for i in range(4):
+    # Nuke the IOSTANDARD for these GTX transceiver pins (avoids synth. error)
+    p.props[f'MGT_CLK_{i}_P'].pop("IOSTANDARD")
+    p.props[f'MGT_CLK_{i}_N'].pop("IOSTANDARD")
     p.getGroup('clkmgt', index=i, tuples=(
         ('p', f'MGT_CLK_{i}_P'),
         ('n', f'MGT_CLK_{i}_N'),
     ))
+
+print('''\
+    # 4x GTX hardwired to first QSFP slot
+    ("qsfp", 0,
+        Subsignal("tx_p", Pins("F2")),
+        Subsignal("tx_n", Pins("F1")),
+        Subsignal("rx_p", Pins("G4")),
+        Subsignal("rx_n", Pins("G3")),
+    ),
+    ("qsfp", 1,
+        Subsignal("tx_p", Pins("D2")),
+        Subsignal("tx_n", Pins("D1")),
+        Subsignal("rx_p", Pins("E4")),
+        Subsignal("rx_n", Pins("E3")),
+    ),
+    ("qsfp", 2,
+        Subsignal("tx_p", Pins("B2")),
+        Subsignal("tx_n", Pins("B1")),
+        Subsignal("rx_p", Pins("C4")),
+        Subsignal("rx_n", Pins("C3")),
+    ),
+    ("qsfp", 3,
+        Subsignal("tx_p", Pins("A4")),
+        Subsignal("tx_n", Pins("A3")),
+        Subsignal("rx_p", Pins("B6")),
+        Subsignal("rx_n", Pins("B5")),
+    ),
+''')
 
 print('    # 2x LED: LD16 and LD17')
 p.getGpios('user_led', r'LD1[67]')
