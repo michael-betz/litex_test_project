@@ -20,8 +20,10 @@
 
 from sys import argv
 from migen import *
+from litex.soc.interconnect.csr import *
 from litex.soc.integration.builder import Builder
 from litex_boards.targets.berkeleylab_marble import BaseSoC
+from litex.soc.cores.freqmeter import FreqMeter
 
 
 def add_ip(platform, name, module_name, config={}, synth=True):
@@ -38,7 +40,7 @@ def add_ip(platform, name, module_name, config={}, synth=True):
     platform.toolchain.pre_synthesis_commands += ip_tcl
 
 
-class Test(Module):
+class Test(Module, AutoCSR):
     def __init__(self, platform):
         self.xgmii_txd = Signal(64)
         self.xgmii_txc = Signal(8)
@@ -46,6 +48,8 @@ class Test(Module):
         self.xgmii_rxc = Signal(8)
 
         ###
+
+        self.platform = platform
 
         add_ip(
             platform,
@@ -64,12 +68,12 @@ class Test(Module):
         clkmgt_pads = platform.request("clkmgt", 0)
         qsfp_pads = platform.request("qsfp", 0)
 
-        coreclk_out = Signal()
+        self.coreclk_out = Signal()
         areset_datapathclk_out = Signal()
 
         # TODO: attach config / status word to CSR bus
-        configuration_vector = Signal(536)
-        status_vector = Signal(448)
+        self.configuration_vector = Signal(536)
+        self.status_vector = Signal(448)
 
         # TODO: make sure DRP is accessible by JTAG or attach to wishbone
         drp_gnt = Signal()
@@ -94,12 +98,12 @@ class Test(Module):
             o_xgmii_rxd=self.xgmii_rxd,
             o_xgmii_rxc=self.xgmii_rxc,
 
-            # Transceiver clock / reset
+            # 156.25 MHz transceiver clock / reset
             i_refclk_p=clkmgt_pads.p,
             i_refclk_n=clkmgt_pads.n,
             i_reset=ResetSignal(),  # Asynchronous Master Reset
             # o_resetdone_out=  # in coreclk_out domain
-            o_coreclk_out=coreclk_out,  # clock for the TX-datapath + managem.
+            o_coreclk_out=self.coreclk_out,  # clock for the TX-datapath
             # reset signal sync. to coreclk_out
             o_areset_datapathclk_out=areset_datapathclk_out,
 
@@ -116,8 +120,8 @@ class Test(Module):
             # o_tx_disable=
 
             # MDIO configuration / status word
-            i_configuration_vector=configuration_vector,
-            o_status_vector=status_vector,
+            i_configuration_vector=self.configuration_vector,
+            o_status_vector=self.status_vector,
             # o_core_status=  # Bit 0 = PCS Block Lock, Bits [7:1] are reserved
 
             # DRP port
@@ -141,6 +145,14 @@ class Test(Module):
             i_pma_pmd_type=0b111,
         )
 
+        # Create clock-domains
+        # self.clock_domains.cd_eth_rx = ClockDomain()
+        self.clock_domains.cd_eth_tx = ClockDomain()
+        self.comb += [
+            # self.cd_eth_rx.clk.eq(self.coreclk_out),
+            self.cd_eth_tx.clk.eq(self.coreclk_out)
+        ]
+
         self.comb += [
             # If no arbitration is required on the GT DRP ports then connect
             # REQ to GNT and connect other signals i <= o;
@@ -153,6 +165,21 @@ class Test(Module):
             drp_drpdo_i.eq(drp_drpdo_o)
         ]
 
+    def add_csr(self):
+        # Add frequency-meter to 156.25 MHz reference clock
+        self.submodules.f_coreclk = FreqMeter(
+            period=int(125e6),
+            width=4,
+            clk=ClockSignal('eth_tx')
+        )
+
+        # Config / Status CSRs. 536 bit config reg is challenging for synth.
+        self.status = CSRStatus(len(self.status_vector))
+        # self.configuration = CSRStorage(len(self.configuration_vector))
+        self.comb += [
+            self.status.status.eq(self.status_vector),
+            # self.configuration_vector.eq(self.configuration.storage)
+        ]
 
 
 class TestSoc(BaseSoC):
@@ -169,6 +196,12 @@ class TestSoc(BaseSoC):
             uart_baudrate=1152000  # not a typo
         )
         self.submodules.t = Test(self.platform)
+        self.t.add_csr()
+        self.platform.add_false_path_constraints(
+            self.crg.cd_sys.clk,
+            self.t.cd_eth_tx.clk,
+            # self.t.cd_eth_rx.clk
+        )
 
 
 def main():
