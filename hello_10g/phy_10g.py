@@ -19,14 +19,18 @@
 #   * Or maybe modify the MMC firmware to setup Si570
 
 from sys import argv
+from os.path import join
 from migen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.builder import Builder
 from litex_boards.targets.berkeleylab_marble import BaseSoC
 from litex.soc.cores.freqmeter import FreqMeter
-from os.path import join
+from liteeth.phy.xgmii import LiteEthPHYXGMIITX, LiteEthPHYXGMIIRX
+from liteeth.core import LiteEthIPCore
+
 
 def add_ip(platform, name, module_name, config={}, synth=True):
+    ''' add a Vivado IP core to the design '''
     ip_tcl = [
         f"create_ip -name {name} -vendor xilinx.com -library ip -version 6.0 -module_name {module_name}",
         "set_property -dict [list \\",
@@ -40,15 +44,16 @@ def add_ip(platform, name, module_name, config={}, synth=True):
     platform.toolchain.pre_synthesis_commands += ip_tcl
 
 
-class Test(Module, AutoCSR):
+class Phy10G(Module, AutoCSR):
     def __init__(self, platform):
-        self.xgmii_txd = Signal(64)
-        self.xgmii_txc = Signal(8)
-        self.xgmii_rxd = Signal(64)
-        self.xgmii_rxc = Signal(8)
+        '''
+        10 Gigabit ethernet PHY, using the Xilinx PCS/PMA IP core
+        '''
+        # self.sink, self.source
 
         ###
 
+        self.dw = 64
         self.platform = platform
 
         add_ip(
@@ -68,7 +73,7 @@ class Test(Module, AutoCSR):
         clkmgt_pads = platform.request("clkmgt", 1)  # SI570_CLK
         qsfp_pads = platform.request("qsfp", 0)
 
-        self.coreclk_out = Signal()
+        coreclk_out = Signal()
         areset_datapathclk_out = Signal()
 
         # TODO: attach config / status word to CSR bus
@@ -91,19 +96,26 @@ class Test(Module, AutoCSR):
         drp_drdy_o = Signal()
         drp_drpdo_o = Signal(16)
 
+        self.pads = Record([
+            ('tx_data', 64),
+            ('tx_ctl', 8),
+            ('rx_data', 64),
+            ('rx_ctl', 8),
+        ])
+
         self.specials.pcs_pma = Instance(
             "pcs_pma",
-            i_xgmii_txd=self.xgmii_txd,
-            i_xgmii_txc=self.xgmii_txc,
-            o_xgmii_rxd=self.xgmii_rxd,
-            o_xgmii_rxc=self.xgmii_rxc,
+            i_xgmii_txd=self.pads.tx_data,
+            i_xgmii_txc=self.pads.tx_ctl,
+            o_xgmii_rxd=self.pads.rx_data,
+            o_xgmii_rxc=self.pads.rx_ctl,
 
             # 156.25 MHz transceiver clock / reset
             i_refclk_p=clkmgt_pads.p,
             i_refclk_n=clkmgt_pads.n,
             i_reset=ResetSignal(),  # Asynchronous Master Reset
             # o_resetdone_out=  # in coreclk_out domain
-            o_coreclk_out=self.coreclk_out,  # clock for the TX-datapath
+            o_coreclk_out=coreclk_out,  # clock for the TX-datapath
             # reset signal sync. to coreclk_out
             o_areset_datapathclk_out=areset_datapathclk_out,
 
@@ -146,11 +158,13 @@ class Test(Module, AutoCSR):
         )
 
         # Create clock-domains
-        # self.clock_domains.cd_eth_rx = ClockDomain()
+        self.clock_domains.cd_eth_rx = ClockDomain()
         self.clock_domains.cd_eth_tx = ClockDomain()
         self.comb += [
-            # self.cd_eth_rx.clk.eq(self.coreclk_out),
-            self.cd_eth_tx.clk.eq(self.coreclk_out)
+            self.cd_eth_rx.clk.eq(coreclk_out),
+            self.cd_eth_tx.clk.eq(coreclk_out),
+            self.cd_eth_rx.rst.eq(areset_datapathclk_out),
+            self.cd_eth_tx.rst.eq(areset_datapathclk_out)
         ]
 
         self.comb += [
@@ -165,6 +179,16 @@ class Test(Module, AutoCSR):
             drp_drpdo_i.eq(drp_drpdo_o)
         ]
 
+        # Litex PHY
+        self.submodules.tx = ClockDomainsRenamer('eth_tx')(
+            # dic: deficit idle count
+            LiteEthPHYXGMIITX(self.pads, self.dw, dic=True)
+        )
+        self.submodules.rx = ClockDomainsRenamer('eth_rx')(
+            LiteEthPHYXGMIIRX(self.pads, self.dw)
+        )
+        self.sink, self.source = self.tx.sink, self.rx.source
+
     def add_csr(self):
         # Add frequency-meter to 156.25 MHz reference clock
         self.submodules.f_coreclk = FreqMeter(
@@ -173,8 +197,9 @@ class Test(Module, AutoCSR):
             clk=ClockSignal('eth_tx')
         )
 
-        # Config / Status CSRs. 536 bit config reg is challenging for synth.
+        # Config / Status CSRs
         self.status = CSRStatus(len(self.status_vector))
+        # 536 bit config reg is very challenging for the synthesizer
         # self.configuration = CSRStorage(len(self.configuration_vector))
         self.comb += [
             self.status.status.eq(self.status_vector),
@@ -184,6 +209,7 @@ class Test(Module, AutoCSR):
 
 class TestSoc(BaseSoC):
     def __init__(self):
+        ''' for testing on the berkeleylab_marble target '''
         BaseSoC.__init__(
             self,
             cpu_type=None,
@@ -195,12 +221,24 @@ class TestSoc(BaseSoC):
             uart_name='uartbone',
             uart_baudrate=1152000  # not a typo
         )
-        self.submodules.t = Test(self.platform)
-        self.t.add_csr()
+
+        self.submodules.phy = Phy10G(self.platform)
+        self.phy.add_csr()
         self.platform.add_false_path_constraints(
             self.crg.cd_sys.clk,
-            self.t.cd_eth_tx.clk,
-            # self.t.cd_eth_rx.clk
+            self.phy.cd_eth_tx.clk,
+            self.phy.cd_eth_rx.clk
+        )
+
+        my_ip = "192.168.1.50"
+        my_mac = 0x10e2d5000000
+        self.submodules.ip = LiteEthIPCore(
+            phy=self.phy,
+            mac_address=my_mac,
+            ip_address=my_ip,
+            clk_freq=self.clk_freq,
+            with_icmp=True,
+            dw=self.phy.dw
         )
 
 
