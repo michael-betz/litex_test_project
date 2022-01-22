@@ -24,7 +24,7 @@ from litex.soc.interconnect.csr import *
 from litex.soc.integration.builder import Builder
 from litex_boards.targets.berkeleylab_marble import BaseSoC
 from litex.soc.cores.freqmeter import FreqMeter
-
+from os.path import join
 
 def add_ip(platform, name, module_name, config={}, synth=True):
     ip_tcl = [
@@ -65,7 +65,7 @@ class Test(Module, AutoCSR):
             }
         )
 
-        clkmgt_pads = platform.request("clkmgt", 0)
+        clkmgt_pads = platform.request("clkmgt", 1)  # SI570_CLK
         qsfp_pads = platform.request("qsfp", 0)
 
         self.coreclk_out = Signal()

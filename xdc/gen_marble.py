@@ -78,7 +78,12 @@ p.getGroup('clk125', (
     ('n', 'DDR_REF_CLK_C_N'),
 ))
 
-print('    # 4x Multi gigabit clocks from cross-point switch, source configured by MMC')
+print('    # 4x Multi gigabit clocks from ADN4600 cross-point switch')
+print('    # default configuration:')
+print('    #   clkmgt[0]: FPGA_REF_CLK0 (125 MHz)')
+print('    #   clkmgt[1]: SI570_CLK')
+print('    #   clkmgt[2]: FMC1_GBTCLK0_M2C')
+print('    #   clkmgt[3]: FMC2_GBTCLK0_M2C')
 
 for i in range(4):
     # Nuke the IOSTANDARD for these GTX transceiver pins (avoids synth. error)
