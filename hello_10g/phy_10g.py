@@ -27,6 +27,7 @@ from litex_boards.targets.berkeleylab_marble import BaseSoC
 from litex.soc.cores.freqmeter import FreqMeter
 from liteeth.phy.xgmii import LiteEthPHYXGMIITX, LiteEthPHYXGMIIRX
 from liteeth.core import LiteEthIPCore
+# from litescope import LiteScopeAnalyzer
 
 
 def add_ip(platform, name, module_name, config={}, synth=True):
@@ -65,16 +66,17 @@ class Phy10G(Module, AutoCSR):
                 "SupportLevel": 1,
                 "baser32": "64bit",
                 "refclkrate": 156.25,
-                "DClkRate": 156.25,
+                "DClkRate": 125.00,
                 "SupportLevel": 1  # Add shared logic to core
             }
         )
 
         clkmgt_pads = platform.request("clkmgt", 1)  # SI570_CLK
-        qsfp_pads = platform.request("qsfp", 0)
+        qsfp_pads = platform.request("qsfp", 1)
 
         coreclk_out = Signal()
         areset_datapathclk_out = Signal()
+        self.core_status = Signal()
 
         # TODO: attach config / status word to CSR bus
         self.configuration_vector = Signal(536)
@@ -114,7 +116,6 @@ class Phy10G(Module, AutoCSR):
             i_refclk_p=clkmgt_pads.p,
             i_refclk_n=clkmgt_pads.n,
             i_reset=ResetSignal(),  # Asynchronous Master Reset
-            # o_resetdone_out=  # in coreclk_out domain
             o_coreclk_out=coreclk_out,  # clock for the TX-datapath
             # reset signal sync. to coreclk_out
             o_areset_datapathclk_out=areset_datapathclk_out,
@@ -134,7 +135,7 @@ class Phy10G(Module, AutoCSR):
             # MDIO configuration / status word
             i_configuration_vector=self.configuration_vector,
             o_status_vector=self.status_vector,
-            # o_core_status=  # Bit 0 = PCS Block Lock, Bits [7:1] are reserved
+            o_core_status=self.core_status,  # Bit 0 = PCS Block Lock, Bits [7:1] are reserved
 
             # DRP port
             i_dclk=ClockSignal(),
@@ -240,6 +241,18 @@ class TestSoc(BaseSoC):
             with_icmp=True,
             dw=self.phy.dw
         )
+
+    #     # Litescope, add signals to probe here
+    #     debug = [
+    #         self.phy.core_status,
+    #         self.phy.qplllock_out,
+    #         self.phy.areset_datapathclk_out
+    #     ]
+    #     self.submodules.analyzer = LiteScopeAnalyzer(debug, 512)
+
+    # def do_exit(self, vns):
+    #     self.analyzer.export_csv(vns, "build/analyzer.csv")
+
 
 
 def main():
