@@ -1,9 +1,21 @@
-# TODO: QSFP+ control lines:
+# Demo 10 Gigabit ethernet on Marble board
+#
+# Needs updated Marble platform file:
+# cd ../xdc
+# python gen_marble.py Marble.xdc > <...>/litex/litex-boards/litex_boards/platforms/berkeleylab_marble.py
+#
+# # TODO:
+# * QSFP+ control lines:
 #   * ModSelL=0 to enable I2C interface
 #   * LPMode=0 to disable low power mode (ignored?)
 #   * ModPrsL reads 0 when QSFP module is inserted
 #   * IntL reads 0 on fault / critical status (to be read over I2C then)
+# * Add IBERT IP for GTX diagnostics over JTAG
+# * Fix timing constraint Critical Warnings (broken in litex?)
+# * don't always re-generate the IP
 #
+#
+# # Clocking
 # Options to get the 156.25 MHz transceiver clock on Marble:
 # 1. Modify CDCM61004RHBT configuration
 #   * strapping pins: PR0 PR1  OD0 OD1 OD2  OS1 OS0, internal pullup!
@@ -16,7 +28,8 @@
 #   * I2C_APP bus, port 6 of multiplexer
 #   * No HW modification needed
 #   * By default routed on ADN4600ACPZ: Si570, INP3 --> OP1, MGT_CLK_1
-#   * Or maybe modify the MMC firmware to setup Si570
+#   * Use modified MMC firmware to init Si570 on powerup:
+#     https://github.com/yetifrisstlama/Marble-MMC/tree/si570
 
 from sys import argv
 from os.path import join
@@ -74,7 +87,7 @@ class Phy10G(Module, AutoCSR):
         clkmgt_pads = platform.request("clkmgt", 1)  # SI570_CLK
         qsfp_pads = platform.request("qsfp", 1)
 
-        coreclk_out = Signal()
+        self.coreclk_out = Signal()
         areset_datapathclk_out = Signal()
         self.core_status = Signal()
 
@@ -116,7 +129,7 @@ class Phy10G(Module, AutoCSR):
             i_refclk_p=clkmgt_pads.p,
             i_refclk_n=clkmgt_pads.n,
             i_reset=ResetSignal(),  # Asynchronous Master Reset
-            o_coreclk_out=coreclk_out,  # clock for the TX-datapath
+            o_coreclk_out=self.coreclk_out,  # clock for the TX-datapath
             # reset signal sync. to coreclk_out
             o_areset_datapathclk_out=areset_datapathclk_out,
 
@@ -162,8 +175,8 @@ class Phy10G(Module, AutoCSR):
         self.clock_domains.cd_eth_rx = ClockDomain()
         self.clock_domains.cd_eth_tx = ClockDomain()
         self.comb += [
-            self.cd_eth_rx.clk.eq(coreclk_out),
-            self.cd_eth_tx.clk.eq(coreclk_out),
+            self.cd_eth_rx.clk.eq(self.coreclk_out),
+            self.cd_eth_tx.clk.eq(self.coreclk_out),
             self.cd_eth_rx.rst.eq(areset_datapathclk_out),
             self.cd_eth_tx.rst.eq(areset_datapathclk_out)
         ]
@@ -210,11 +223,11 @@ class Phy10G(Module, AutoCSR):
 
 class TestSoc(BaseSoC):
     def __init__(self):
-        ''' for testing on the berkeleylab_marble target '''
+        ''' for testing on the berkeleylab_marble target. Ping-able. '''
         BaseSoC.__init__(
             self,
             cpu_type=None,
-            sys_clk_freq=int(125e6),  # TODO test at 200 MHz
+            sys_clk_freq=int(125e6),
             integrated_main_ram_size=8,
             integrated_sram_size=0,
             with_timer=False,
@@ -225,10 +238,17 @@ class TestSoc(BaseSoC):
 
         self.submodules.phy = Phy10G(self.platform)
         self.phy.add_csr()
-        self.platform.add_false_path_constraints(
+
+        # TODO this overrides the constraint from the IP file and causes a
+        # critical warning. But without it Vivado fails to apply the false_path
+        # constraint below.
+        self.platform.add_period_constraint(
+            self.phy.coreclk_out,
+            1e9 / 156.25e6
+        )
+        self.platform.add_false_path_constraint(
             self.crg.cd_sys.clk,
-            self.phy.cd_eth_tx.clk,
-            self.phy.cd_eth_rx.clk
+            self.phy.coreclk_out
         )
 
         my_ip = "192.168.1.50"
