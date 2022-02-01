@@ -39,7 +39,8 @@ from litex.soc.integration.builder import Builder
 from litex_boards.targets.berkeleylab_marble import BaseSoC
 from litex.soc.cores.freqmeter import FreqMeter
 from liteeth.phy.xgmii import LiteEthPHYXGMIITX, LiteEthPHYXGMIIRX
-from liteeth.core import LiteEthIPCore
+from liteeth.core import LiteEthIPCore, LiteEthUDPIPCore
+from liteeth.frontend.etherbone import LiteEthEtherbone
 # from litescope import LiteScopeAnalyzer
 
 
@@ -69,6 +70,7 @@ class Phy10G(Module, AutoCSR):
 
         self.dw = 64
         self.platform = platform
+        self.tx_clk_freq = self.rx_clk_freq = 156.25e6
 
         add_ip(
             platform,
@@ -78,8 +80,8 @@ class Phy10G(Module, AutoCSR):
                 "MDIO_Management": False,
                 "SupportLevel": 1,
                 "baser32": "64bit",
-                "refclkrate": 156.25,
-                "DClkRate": 125.00,
+                "refclkrate": self.tx_clk_freq / 1e6,
+                "DClkRate": 100.00,
                 "SupportLevel": 1  # Add shared logic to core
             }
         )
@@ -220,6 +222,9 @@ class Phy10G(Module, AutoCSR):
             # self.configuration_vector.eq(self.configuration.storage)
         ]
 
+    # def add_ibert(self):
+        # in-system IBERT only supported on Ultrascale devices :(
+
 
 class TestSoc(BaseSoC):
     def __init__(self):
@@ -227,6 +232,8 @@ class TestSoc(BaseSoC):
         BaseSoC.__init__(
             self,
             cpu_type=None,
+            # 100 MHz seems to break timing, why??????
+            # TODO look at CDC -.-
             sys_clk_freq=int(125e6),
             integrated_main_ram_size=8,
             integrated_sram_size=0,
@@ -236,37 +243,59 @@ class TestSoc(BaseSoC):
             uart_baudrate=1152000  # not a typo
         )
 
-        self.submodules.phy = Phy10G(self.platform)
-        self.phy.add_csr()
+        self.submodules.ethphy = Phy10G(self.platform)
+        self.ethphy.add_csr()
 
         # TODO this overrides the constraint from the IP file and causes a
         # critical warning. But without it Vivado fails to apply the false_path
         # constraint below.
+        # https://support.xilinx.com/s/article/55248?language=en_US
         self.platform.add_period_constraint(
-            self.phy.coreclk_out,
+            self.ethphy.coreclk_out,
             1e9 / 156.25e6
         )
         self.platform.add_false_path_constraint(
             self.crg.cd_sys.clk,
-            self.phy.coreclk_out
+            self.ethphy.coreclk_out
         )
 
         my_ip = "192.168.1.50"
         my_mac = 0x10e2d5000000
-        self.submodules.ip = LiteEthIPCore(
-            phy=self.phy,
+
+        # This violates timing by 3 ns
+        # and sends a ping response only every 3rd packet :p
+        # self.add_etherbone(
+        #     phy=self.ethphy,
+        #     mac_address=my_mac,
+        #     ip_address=my_ip,
+        #     buffer_depth=32,
+        #     udp_port=1234,
+        #     with_timing_constraints=True
+        # )
+
+        # This meets timing and pings fine. But no UDP :(
+        ethcore = LiteEthUDPIPCore(
+            phy=self.ethphy,
             mac_address=my_mac,
             ip_address=my_ip,
             clk_freq=self.clk_freq,
-            with_icmp=True,
-            dw=self.phy.dw
+            dw=self.ethphy.dw
         )
+        # ethcore = ClockDomainsRenamer({"sys": "eth_rx"})(ethcore)
+        self.submodules.ethcore = ethcore
+
+        self.submodules.etherbone = LiteEthEtherbone(
+            self.ethcore.udp,
+            1234,
+            buffer_depth=32
+        )
+        self.add_wb_master(self.etherbone.wishbone.bus)
 
     #     # Litescope, add signals to probe here
     #     debug = [
-    #         self.phy.core_status,
-    #         self.phy.qplllock_out,
-    #         self.phy.areset_datapathclk_out
+    #         self.ethphy.core_status,
+    #         self.ethphy.qplllock_out,
+    #         self.ethphy.areset_datapathclk_out
     #     ]
     #     self.submodules.analyzer = LiteScopeAnalyzer(debug, 512)
 
