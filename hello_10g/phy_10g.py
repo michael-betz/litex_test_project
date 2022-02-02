@@ -31,6 +31,10 @@
 #   * Use modified MMC firmware to init Si570 on powerup:
 #     https://github.com/yetifrisstlama/Marble-MMC/tree/si570
 
+import sys
+sys.path.append('/home/michael/fpga_wsp/hello_petsys')
+from test_soc_eth_min import UdpSender
+
 from sys import argv
 from os.path import join
 from migen import *
@@ -60,12 +64,14 @@ def add_ip(platform, name, module_name, config={}, synth=True):
 
 
 class Phy10G(Module, AutoCSR):
-    def __init__(self, platform):
+    def __init__(self, platform, qsfp_pads, refclk_pads):
         '''
         10 Gigabit ethernet PHY, using the Xilinx PCS/PMA IP core
-        '''
-        # self.sink, self.source
 
+        self.sink, self.source: xgmii interface to MAC
+        qsfp_pads.{tx/rx}_{p/n}: pads of the SFP+ transceiver module
+        refclk_pads.{p/n}: pads of a decent 156.25 MHz clock source
+        '''
         ###
 
         self.dw = 64
@@ -81,13 +87,10 @@ class Phy10G(Module, AutoCSR):
                 "SupportLevel": 1,
                 "baser32": "64bit",
                 "refclkrate": self.tx_clk_freq / 1e6,
-                "DClkRate": 100.00,
+                "DClkRate": 166.00,
                 "SupportLevel": 1  # Add shared logic to core
             }
         )
-
-        clkmgt_pads = platform.request("clkmgt", 1)  # SI570_CLK
-        qsfp_pads = platform.request("qsfp", 1)
 
         self.coreclk_out = Signal()
         areset_datapathclk_out = Signal()
@@ -128,9 +131,11 @@ class Phy10G(Module, AutoCSR):
             o_xgmii_rxc=self.pads.rx_ctl,
 
             # 156.25 MHz transceiver clock / reset
-            i_refclk_p=clkmgt_pads.p,
-            i_refclk_n=clkmgt_pads.n,
+            i_refclk_p=refclk_pads.p,
+            i_refclk_n=refclk_pads.n,
             i_reset=ResetSignal(),  # Asynchronous Master Reset
+            # create_waiver -type CDC -id CDC-11 -from [get_pins FDPE_1/C]  -to [get_pins {pcs_pma/inst/ten_gig_eth_pcs_pma_block_i/pcs_pma_local_clock_reset_block/coreclk_areset_sync_i/sync1_r_reg[0]/PRE}]
+            # create_waiver -type CDC -id CDC-11 -from [get_pins FDPE_1/C]  -to [get_pins {pcs_pma/inst/ten_gig_eth_pcs_pma_shared_clock_reset_block/areset_coreclk_sync_i/sync1_r_reg[0]/PRE}]
             o_coreclk_out=self.coreclk_out,  # clock for the TX-datapath
             # reset signal sync. to coreclk_out
             o_areset_datapathclk_out=areset_datapathclk_out,
@@ -174,13 +179,12 @@ class Phy10G(Module, AutoCSR):
         )
 
         # Create clock-domains
-        self.clock_domains.cd_eth_rx = ClockDomain()
-        self.clock_domains.cd_eth_tx = ClockDomain()
+        self.clock_domains.cd_eth = ClockDomain()
         self.comb += [
-            self.cd_eth_rx.clk.eq(self.coreclk_out),
-            self.cd_eth_tx.clk.eq(self.coreclk_out),
-            self.cd_eth_rx.rst.eq(areset_datapathclk_out),
-            self.cd_eth_tx.rst.eq(areset_datapathclk_out)
+            self.cd_eth.clk.eq(self.coreclk_out),
+            # self.cd_eth_tx.clk.eq(self.coreclk_out),
+            self.cd_eth.rst.eq(areset_datapathclk_out),
+            # self.cd_eth_tx.rst.eq(areset_datapathclk_out)
         ]
 
         self.comb += [
@@ -196,11 +200,11 @@ class Phy10G(Module, AutoCSR):
         ]
 
         # Litex PHY
-        self.submodules.tx = ClockDomainsRenamer('eth_tx')(
+        self.submodules.tx = ClockDomainsRenamer('eth')(
             # dic: deficit idle count
             LiteEthPHYXGMIITX(self.pads, self.dw, dic=True)
         )
-        self.submodules.rx = ClockDomainsRenamer('eth_rx')(
+        self.submodules.rx = ClockDomainsRenamer('eth')(
             LiteEthPHYXGMIIRX(self.pads, self.dw)
         )
         self.sink, self.source = self.tx.sink, self.rx.source
@@ -208,7 +212,7 @@ class Phy10G(Module, AutoCSR):
     def add_csr(self):
         # Add frequency-meter to 156.25 MHz reference clock
         self.submodules.f_coreclk = FreqMeter(
-            period=int(125e6),
+            period=int(100e6),
             width=4,
             clk=ClockSignal('eth_tx')
         )
@@ -234,7 +238,7 @@ class TestSoc(BaseSoC):
             cpu_type=None,
             # 100 MHz seems to break timing, why??????
             # TODO look at CDC -.-
-            sys_clk_freq=int(125e6),
+            sys_clk_freq=int(166e6),
             integrated_main_ram_size=8,
             integrated_sram_size=0,
             with_timer=False,
@@ -243,8 +247,12 @@ class TestSoc(BaseSoC):
             uart_baudrate=1152000  # not a typo
         )
 
-        self.submodules.ethphy = Phy10G(self.platform)
-        self.ethphy.add_csr()
+        self.submodules.ethphy = Phy10G(
+            self.platform,
+            self.platform.request("qsfp", 1),
+            self.platform.request("clkmgt", 1)  # SI570_CLK
+        )
+        # self.ethphy.add_csr()
 
         # TODO this overrides the constraint from the IP file and causes a
         # critical warning. But without it Vivado fails to apply the false_path
@@ -254,7 +262,7 @@ class TestSoc(BaseSoC):
             self.ethphy.coreclk_out,
             1e9 / 156.25e6
         )
-        self.platform.add_false_path_constraint(
+        self.platform.add_false_path_constraints(
             self.crg.cd_sys.clk,
             self.ethphy.coreclk_out
         )
@@ -273,7 +281,7 @@ class TestSoc(BaseSoC):
         #     with_timing_constraints=True
         # )
 
-        # This meets timing and pings fine. But no UDP :(
+        # This meets timing (f_sys = 125 MHz) and pings fine. But no UDP :(
         ethcore = LiteEthUDPIPCore(
             phy=self.ethphy,
             mac_address=my_mac,
@@ -284,12 +292,20 @@ class TestSoc(BaseSoC):
         # ethcore = ClockDomainsRenamer({"sys": "eth_rx"})(ethcore)
         self.submodules.ethcore = ethcore
 
-        self.submodules.etherbone = LiteEthEtherbone(
-            self.ethcore.udp,
-            1234,
-            buffer_depth=32
-        )
-        self.add_wb_master(self.etherbone.wishbone.bus)
+        D = 8  # Datapath width [bytes]
+        udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
+        self.submodules.udp_sender = UdpSender(D)
+        self.comb += [
+            self.udp_sender.source.connect(udpp.sink),
+            udpp.source.ready.eq(1)
+        ]
+
+        # self.submodules.etherbone = LiteEthEtherbone(
+        #     self.ethcore.udp,
+        #     1234,
+        #     buffer_depth=32
+        # )
+        # self.add_wb_master(self.etherbone.wishbone.bus)
 
     #     # Litescope, add signals to probe here
     #     debug = [
