@@ -64,7 +64,7 @@ def add_ip(platform, name, module_name, config={}, synth=True):
 
 
 class Phy10G(Module, AutoCSR):
-    def __init__(self, platform, qsfp_pads, refclk_pads):
+    def __init__(self, platform, qsfp_pads, refclk_pads, sys_clk_freq):
         '''
         10 Gigabit ethernet PHY, using the Xilinx PCS/PMA IP core
 
@@ -77,6 +77,7 @@ class Phy10G(Module, AutoCSR):
         self.dw = 64
         self.platform = platform
         self.tx_clk_freq = self.rx_clk_freq = 156.25e6
+        self.sys_clk_freq = sys_clk_freq
 
         add_ip(
             platform,
@@ -87,7 +88,7 @@ class Phy10G(Module, AutoCSR):
                 "SupportLevel": 1,
                 "baser32": "64bit",
                 "refclkrate": self.tx_clk_freq / 1e6,
-                "DClkRate": 166.00,
+                "DClkRate": self.sys_clk_freq / 1e6,
                 "SupportLevel": 1  # Add shared logic to core
             }
         )
@@ -212,7 +213,7 @@ class Phy10G(Module, AutoCSR):
     def add_csr(self):
         # Add frequency-meter to 156.25 MHz reference clock
         self.submodules.f_coreclk = FreqMeter(
-            period=int(100e6),
+            period=int(self.sys_clk_freq),
             width=4,
             clk=ClockSignal('eth_tx')
         )
@@ -250,7 +251,8 @@ class TestSoc(BaseSoC):
         self.submodules.ethphy = Phy10G(
             self.platform,
             self.platform.request("qsfp", 1),
-            self.platform.request("clkmgt", 1)  # SI570_CLK
+            self.platform.request("clkmgt", 1),  # SI570_CLK
+            self.sys_clk_freq
         )
         # self.ethphy.add_csr()
 
@@ -267,7 +269,7 @@ class TestSoc(BaseSoC):
             self.ethphy.coreclk_out
         )
 
-        my_ip = "192.168.1.50"
+        my_ip = "192.168.10.50"
         my_mac = 0x10e2d5000000
 
         # This violates timing by 3 ns
@@ -281,6 +283,9 @@ class TestSoc(BaseSoC):
         #     with_timing_constraints=True
         # )
 
+        # ----------------------
+        #  UDP stack
+        # ----------------------
         # This meets timing (f_sys = 125 MHz) and pings fine. But no UDP :(
         ethcore = LiteEthUDPIPCore(
             phy=self.ethphy,
@@ -289,23 +294,31 @@ class TestSoc(BaseSoC):
             clk_freq=self.clk_freq,
             dw=self.ethphy.dw
         )
-        # ethcore = ClockDomainsRenamer({"sys": "eth_rx"})(ethcore)
         self.submodules.ethcore = ethcore
 
+        # ----------------------
+        #  UDP packet sender
+        # ----------------------
         D = 8  # Datapath width [bytes]
         udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
-        self.submodules.udp_sender = UdpSender(D)
+        self.submodules.udp_sender = UdpSender(D=D, dst_ip="192.168.10.1")
         self.comb += [
             self.udp_sender.source.connect(udpp.sink),
             udpp.source.ready.eq(1)
         ]
 
-        # self.submodules.etherbone = LiteEthEtherbone(
-        #     self.ethcore.udp,
-        #     1234,
-        #     buffer_depth=32
-        # )
-        # self.add_wb_master(self.etherbone.wishbone.bus)
+        # ----------------------
+        #  Etherbone
+        # ----------------------
+        # Doesn't work. What datapath width do we need for the udp user port?
+        self.submodules.etherbone = LiteEthEtherbone(
+            udp=self.ethcore.udp,
+            udp_port=1234,
+            buffer_depth=8,
+            cd="sys",
+            dw=D * 8
+        )
+        self.bus.add_master(master=self.etherbone.wishbone.bus)
 
     #     # Litescope, add signals to probe here
     #     debug = [
