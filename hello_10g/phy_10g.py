@@ -180,12 +180,13 @@ class Phy10G(Module, AutoCSR):
         )
 
         # Create clock-domains
-        self.clock_domains.cd_eth = ClockDomain()
+        self.clock_domains.cd_eth_tx = ClockDomain()
+        self.clock_domains.cd_eth_rx = ClockDomain()
         self.comb += [
-            self.cd_eth.clk.eq(self.coreclk_out),
-            # self.cd_eth_tx.clk.eq(self.coreclk_out),
-            self.cd_eth.rst.eq(areset_datapathclk_out),
-            # self.cd_eth_tx.rst.eq(areset_datapathclk_out)
+            self.cd_eth_tx.clk.eq(self.coreclk_out),
+            self.cd_eth_rx.clk.eq(self.coreclk_out),
+            self.cd_eth_tx.rst.eq(areset_datapathclk_out),
+            self.cd_eth_rx.rst.eq(areset_datapathclk_out),
         ]
 
         self.comb += [
@@ -201,11 +202,11 @@ class Phy10G(Module, AutoCSR):
         ]
 
         # Litex PHY
-        self.submodules.tx = ClockDomainsRenamer('eth')(
+        self.submodules.tx = ClockDomainsRenamer('eth_tx')(
             # dic: deficit idle count
             LiteEthPHYXGMIITX(self.pads, self.dw, dic=True)
         )
-        self.submodules.rx = ClockDomainsRenamer('eth')(
+        self.submodules.rx = ClockDomainsRenamer('eth_rx')(
             LiteEthPHYXGMIIRX(self.pads, self.dw)
         )
         self.sink, self.source = self.tx.sink, self.rx.source
@@ -254,7 +255,7 @@ class TestSoc(BaseSoC):
             self.platform.request("clkmgt", 1),  # SI570_CLK
             self.sys_clk_freq
         )
-        # self.ethphy.add_csr()
+        self.ethphy.add_csr()
 
         # TODO this overrides the constraint from the IP file and causes a
         # critical warning. But without it Vivado fails to apply the false_path
@@ -286,7 +287,7 @@ class TestSoc(BaseSoC):
         # ----------------------
         #  UDP stack
         # ----------------------
-        # This meets timing (f_sys = 125 MHz) and pings fine. But no UDP :(
+        # This meets timing (f_sys = 125 MHz) and pings fine
         ethcore = LiteEthUDPIPCore(
             phy=self.ethphy,
             mac_address=my_mac,
@@ -311,14 +312,14 @@ class TestSoc(BaseSoC):
         #  Etherbone
         # ----------------------
         # Doesn't work. What datapath width do we need for the udp user port?
-        self.submodules.etherbone = LiteEthEtherbone(
-            udp=self.ethcore.udp,
-            udp_port=1234,
-            buffer_depth=8,
-            cd="sys",
-            dw=D * 8
-        )
-        self.bus.add_master(master=self.etherbone.wishbone.bus)
+        # self.submodules.etherbone = LiteEthEtherbone(
+        #     udp=self.ethcore.udp,
+        #     udp_port=1234,
+        #     buffer_depth=8,
+        #     cd="sys",
+        #     dw=D * 8
+        # )
+        # self.bus.add_master(master=self.etherbone.wishbone.bus)
 
     #     # Litescope, add signals to probe here
     #     debug = [
