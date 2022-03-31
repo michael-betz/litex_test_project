@@ -34,13 +34,13 @@ class UdpSender(Module, AutoCSR):
 
         send UDP packets with content
           08 07 06 05 04 03 02 01           for n_words - 1 times
-          32 bit sequence number
+          64 bit sequence number
         '''
         self.source = source = stream.Endpoint(eth_udp_user_description(D * 8))
 
         ###
 
-        seq = Signal(32)
+        seq = Signal(64)
         timer = Signal(32)
         cur_word = Signal(16, reset=1)
         self.period = CSRStorage(32, reset=0x1FFFFFFF)
@@ -106,9 +106,8 @@ class TestSoc(BaseSoC):
         BaseSoC.__init__(
             self,
             cpu_type=None,
-            # 100 MHz seems to break timing, why??????
-            # TODO look at CDC -.-
-            sys_clk_freq=int(166e6),
+            # f_sys must be >= 156.25 MHz
+            sys_clk_freq=int(166.67e6),
             integrated_main_ram_size=8,
             integrated_sram_size=0,
             with_timer=False,
@@ -144,7 +143,6 @@ class TestSoc(BaseSoC):
         # ----------------------
         #  UDP stack
         # ----------------------
-        # This meets timing (f_sys = 125 MHz) and pings fine
         ethcore = LiteEthUDPIPCore(
             phy=self.ethphy,
             mac_address=my_mac,
@@ -158,11 +156,11 @@ class TestSoc(BaseSoC):
         #  UDP packet sender
         # ----------------------
         D = 8  # Datapath width [bytes]
-        udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
+        self.udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
         self.submodules.udp_sender = UdpSender(D=D, dst_ip="192.168.10.1")
         self.comb += [
-            self.udp_sender.source.connect(udpp.sink),
-            udpp.source.ready.eq(1)
+            self.udp_sender.source.connect(self.udpp.sink),
+            self.udpp.source.ready.eq(1)
         ]
 
         # ----------------------
@@ -171,8 +169,138 @@ class TestSoc(BaseSoC):
         # Needs more work to be compatible with 64 bit wide datapath
 
 
+class DevSoC(TestSoc):
+    def __init__(self, **kwargs):
+        from litescope import LiteScopeAnalyzer
+        super().__init__(**kwargs)
+        analyzer_signals = [
+            self.udpp.sink.valid,
+            self.udpp.sink.ready,
+            self.udpp.sink.last,
+            self.udpp.sink.data,
+            # self.xgmii.rx_ctl,
+            # self.xgmii.rx_data,
+            # self.xgmii.tx_ctl,
+            # self.xgmii.tx_data,
+            # self.xgmii.pma_status,
+            # self.xgmii.tx_disable,
+            # self.xgmii.qplllock  ,
+            # self.xgmii.gtrxreset ,
+            # self.xgmii.gttxreset ,
+            # self.xgmii.txusrrdy  ,
+            # self.xgmii.pcs_clear  ,
+            # self.xgmii.pma_multi  ,
+            self.ethphy.rx.source.valid,
+            self.ethphy.rx.source.data,
+            self.ethphy.tx.sink.valid,
+            self.ethphy.tx.sink.data,
+            # self.teng_udp_core.mac.core.sink.valid,
+            # self.teng_udp_core.mac.core.sink.data,
+            # self.teng_udp_core.arp.rx.sink.valid,
+            # self.teng_udp_core.arp.rx.sink.data,
+            # self.teng_udp_core.arp.tx.source.valid,
+            # self.teng_udp_core.arp.tx.source.data,
+        ]
+        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 4096,
+                                                     clock_domain="eth_tx",
+                                                     csr_csv="analyzer.csv")
+        self.add_csr("analyzer")
+
+
+
+# -------------------
+#  Testbench
+# -------------------
+from litex.soc.interconnect.stream_sim import *
+from litex.gen.sim import *
+from liteeth.core import LiteEthUDPIPCore
+import sys
+sys.path.append('/home/michael/fpga_wsp/hello_petsys/')
+from model import phy, mac, arp, ip, icmp, dumps
+
+local_ip = convert_ip('192.168.1.9')
+local_mac = 0x001000000100
+
+dst_ip = convert_ip('192.168.1.10')
+dst_mac = 0x012345654321
+
+class DUT(Module):
+    def __init__(self):
+        self.clock_domains.cd_sys = ClockDomain()
+        self.clock_domains.eth_tx = ClockDomain()
+        self.clock_domains.eth_rx = ClockDomain()
+
+        self.clk_freq = 100000
+        self.submodules.ethphy = phy.PHY(64, debug=True)
+        self.submodules.mac_model = mac.MAC(self.ethphy, debug=True, loopback=False)
+        self.submodules.arp_model = arp.ARP(self.mac_model, dst_mac, dst_ip, debug=True)
+        self.submodules.ip_model = ip.IP(self.mac_model, dst_mac, dst_ip, debug=True, loopback=False)
+        self.submodules.icmp_model = icmp.ICMP(self.ip_model, dst_ip, debug=True)
+
+        ethcore = LiteEthUDPIPCore(
+            phy=self.ethphy,
+            mac_address=local_mac,
+            ip_address=local_ip,
+            clk_freq=self.clk_freq,
+            dw=self.ethphy.dw
+        )
+        self.submodules.ethcore = ethcore
+
+        # ----------------------
+        #  UDP packet sender
+        # ----------------------
+        D = 8  # Datapath width [bytes]
+        self.udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
+        self.submodules.udp_sender = UdpSender(D=D, dst_ip="192.168.1.10")
+        self.comb += [
+            self.udp_sender.source.connect(self.udpp.sink),
+            self.udpp.source.ready.eq(1)
+        ]
+
+
+def fire_ping_request(dut):
+    packet = mac.MACPacket(dumps.ping_request)
+    packet.decode_remove_header()
+    packet = ip.IPPacket(packet)
+    packet.decode()
+    packet = icmp.ICMPPacket(packet)
+    packet.decode()
+    dut.icmp_model.send(packet)
+
+
+def main_generator(dut):
+    '''
+    We will see an ARP request to fetch the MAC belonging to dst_ip
+    Then we should see UDP packets
+    '''
+    yield (dut.udp_sender.period.storage.eq(10))
+
+    # print("---------- Ping request ----------")
+    # fire_ping_request(dut)
+
+    for i in range(512):
+        yield
+
+
+
 def main():
-    soc = TestSoc()
+    if 'sim' in argv:
+        dut = DUT()
+        generators = {
+            "sys" :   [main_generator(dut)],
+            "eth_tx": [dut.ethphy.phy_sink.generator(),
+                       dut.ethphy.generator()],
+            "eth_rx":  dut.ethphy.phy_source.generator()
+        }
+        clocks = {
+            "sys":    10,
+            "eth_rx": 10,
+            "eth_tx": 10
+        }
+        run_simulation(dut, generators, clocks, vcd_name="udp_sender.vcd")
+        return
+
+    soc = DevSoC()
     soc.platform.name = 'hello_10G'
     builder = Builder(
         soc,
@@ -181,7 +309,8 @@ def main():
         csr_json='./build/csr.json',
     )
     if ('build' in argv) or ('synth' in argv):
-        builder.build()
+        vns = builder.build()
+        soc.analyzer.do_exit(vns)
 
     if 'load' in argv:
         prog = soc.platform.create_programmer()

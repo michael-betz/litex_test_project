@@ -31,21 +31,10 @@
 #   * Use modified MMC firmware to init Si570 on powerup:
 #     https://github.com/yetifrisstlama/Marble-MMC/tree/si570
 
-import sys
-sys.path.append('/home/michael/fpga_wsp/hello_petsys')
-from test_soc_eth_min import UdpSender
-
-from sys import argv
-from os.path import join
 from migen import *
 from litex.soc.interconnect.csr import *
-from litex.soc.integration.builder import Builder
-from litex_boards.targets.berkeleylab_marble import BaseSoC
 from litex.soc.cores.freqmeter import FreqMeter
 from liteeth.phy.xgmii import LiteEthPHYXGMIITX, LiteEthPHYXGMIIRX
-from liteeth.core import LiteEthIPCore, LiteEthUDPIPCore
-from liteeth.frontend.etherbone import LiteEthEtherbone
-# from litescope import LiteScopeAnalyzer
 
 
 def add_ip(platform, name, module_name, config={}, synth=True):
