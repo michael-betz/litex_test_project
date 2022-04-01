@@ -86,7 +86,7 @@ class UdpSender(Module, AutoCSR):
                 # which is no longer valid
                 # if all bytes are valid in the last cycle,
                 # set last=1 and last_be=0
-                # source.last_be.eq(0x00),
+                source.last_be.eq(0x80),
                 If(source.ready,
                     NextValue(cur_word, 1),
                     NextValue(seq, seq + 1),
@@ -226,12 +226,14 @@ dst_mac = 0x012345654321
 
 class DUT(Module):
     def __init__(self):
+        D = 8  # Datapath width [bytes]
+
         self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.eth_tx = ClockDomain()
         self.clock_domains.eth_rx = ClockDomain()
 
         self.clk_freq = 100000
-        self.submodules.ethphy = phy.PHY(64, debug=True)
+        self.submodules.ethphy = phy.PHY(D * 8, debug=True)
         self.submodules.mac_model = mac.MAC(self.ethphy, debug=True, loopback=False)
         self.submodules.arp_model = arp.ARP(self.mac_model, dst_mac, dst_ip, debug=True)
         self.submodules.ip_model = ip.IP(self.mac_model, dst_mac, dst_ip, debug=True, loopback=False)
@@ -249,7 +251,6 @@ class DUT(Module):
         # ----------------------
         #  UDP packet sender
         # ----------------------
-        D = 8  # Datapath width [bytes]
         self.udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
         self.submodules.udp_sender = UdpSender(D=D, dst_ip="192.168.1.10")
         self.comb += [
@@ -273,10 +274,10 @@ def main_generator(dut):
     We will see an ARP request to fetch the MAC belonging to dst_ip
     Then we should see UDP packets
     '''
-    yield (dut.udp_sender.period.storage.eq(10))
+    yield (dut.udp_sender.period.storage.eq(0))
 
     # print("---------- Ping request ----------")
-    # fire_ping_request(dut)
+    fire_ping_request(dut)
 
     for i in range(512):
         yield
