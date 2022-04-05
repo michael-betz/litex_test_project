@@ -297,7 +297,8 @@ def main():
         run_simulation(dut, generators, clocks, vcd_name="udp_sender.vcd")
         return
 
-    soc = DevSoC()
+    soc = TestSoC()
+    # soc = DevSoC()
     soc.platform.name = 'hello_10G'
     builder = Builder(
         soc,
