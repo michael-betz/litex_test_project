@@ -24,7 +24,7 @@ from liteeth.core import LiteEthUDPIPCore
 from liteeth.common import convert_ip
 from phy_10g import Phy10G
 from litex.soc.interconnect.csr import CSRStorage, AutoCSR
-from liteeth.common import stream, eth_udp_user_description
+from liteeth.common import stream, eth_udp_user_description, icmp_type_ping_request
 
 
 class UdpSender(Module, AutoCSR):
@@ -100,6 +100,11 @@ class UdpSender(Module, AutoCSR):
         )
 
 
+my_ip = "192.168.10.50"
+my_mac = 0x10e2d5000000
+dst_ip = "192.168.10.1"
+
+
 class TestSoc(BaseSoC):
     def __init__(self):
         ''' for testing on the berkeleylab_marble target. Ping-able. '''
@@ -137,9 +142,6 @@ class TestSoc(BaseSoC):
             self.ethphy.coreclk_out
         )
 
-        my_ip = "192.168.10.50"
-        my_mac = 0x10e2d5000000
-
         # ----------------------
         #  UDP stack
         # ----------------------
@@ -157,7 +159,7 @@ class TestSoc(BaseSoC):
         # ----------------------
         D = 8  # Datapath width [bytes]
         self.udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
-        self.submodules.udp_sender = UdpSender(D=D, dst_ip="192.168.10.1")
+        self.submodules.udp_sender = UdpSender(D=D, dst_ip=dst_ip)
         self.comb += [
             self.udp_sender.source.connect(self.udpp.sink),
             self.udpp.source.ready.eq(1)
@@ -207,22 +209,15 @@ class DevSoC(TestSoc):
         self.add_csr("analyzer")
 
 
-
 # -------------------
 #  Testbench
 # -------------------
 from litex.soc.interconnect.stream_sim import *
 from litex.gen.sim import *
 from liteeth.core import LiteEthUDPIPCore
-import sys
-sys.path.append('/home/michael/fpga_wsp/hello_petsys/')
-from model import phy, mac, arp, ip, icmp, dumps
+# Need to add liteeth directory to PYTHONPATH
+from test.model import phy, mac, arp, ip, icmp, dumps
 
-local_ip = convert_ip('192.168.1.9')
-local_mac = 0x001000000100
-
-dst_ip = convert_ip('192.168.1.10')
-dst_mac = 0x012345654321
 
 class DUT(Module):
     def __init__(self):
@@ -233,16 +228,18 @@ class DUT(Module):
         self.clock_domains.eth_rx = ClockDomain()
 
         self.clk_freq = 100000
-        self.submodules.ethphy = phy.PHY(D * 8, debug=True)
+        dst_ip_ = convert_ip(dst_ip)
+        dst_mac = my_mac + 32
+        self.submodules.ethphy = phy.PHY(D * 8, debug=True, pcap_file='dump.pcap')
         self.submodules.mac_model = mac.MAC(self.ethphy, debug=True, loopback=False)
-        self.submodules.arp_model = arp.ARP(self.mac_model, dst_mac, dst_ip, debug=True)
-        self.submodules.ip_model = ip.IP(self.mac_model, dst_mac, dst_ip, debug=True, loopback=False)
-        self.submodules.icmp_model = icmp.ICMP(self.ip_model, dst_ip, debug=True)
+        self.submodules.arp_model = arp.ARP(self.mac_model, dst_mac, dst_ip_, debug=True)
+        self.submodules.ip_model = ip.IP(self.mac_model, dst_mac, dst_ip_, debug=True, loopback=False)
+        self.submodules.icmp_model = icmp.ICMP(self.ip_model, dst_ip_, debug=True)
 
         ethcore = LiteEthUDPIPCore(
             phy=self.ethphy,
-            mac_address=local_mac,
-            ip_address=local_ip,
+            mac_address=my_mac,
+            ip_address=convert_ip(my_ip),
             clk_freq=self.clk_freq,
             dw=self.ethphy.dw
         )
@@ -252,21 +249,21 @@ class DUT(Module):
         #  UDP packet sender
         # ----------------------
         self.udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
-        self.submodules.udp_sender = UdpSender(D=D, dst_ip="192.168.1.10")
+        self.submodules.udp_sender = UdpSender(D=D, dst_ip=dst_ip)
         self.comb += [
             self.udp_sender.source.connect(self.udpp.sink),
             self.udpp.source.ready.eq(1)
         ]
 
 
-def fire_ping_request(dut):
-    packet = mac.MACPacket(dumps.ping_request)
-    packet.decode_remove_header()
-    packet = ip.IPPacket(packet)
-    packet.decode()
-    packet = icmp.ICMPPacket(packet)
-    packet.decode()
-    dut.icmp_model.send(packet)
+def send_icmp(dut, msgtype=icmp_type_ping_request, code=0):
+    p = icmp.ICMPPacket(b"Hello World 123456")
+    p.code = code
+    p.checksum = 0
+    p.msgtype = msgtype
+    p.ident = 0x69b3
+    p.sequence = 0x1
+    dut.icmp_model.send(p, target_ip=convert_ip(my_ip))
 
 
 def main_generator(dut):
@@ -274,14 +271,13 @@ def main_generator(dut):
     We will see an ARP request to fetch the MAC belonging to dst_ip
     Then we should see UDP packets
     '''
-    yield (dut.udp_sender.period.storage.eq(0))
+    yield (dut.udp_sender.period.storage.eq(100))
 
-    # print("---------- Ping request ----------")
-    fire_ping_request(dut)
+    print("---------- Ping request ----------")
+    send_icmp(dut)
 
     for i in range(512):
         yield
-
 
 
 def main():
