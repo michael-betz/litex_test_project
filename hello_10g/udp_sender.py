@@ -32,9 +32,12 @@ class UdpSender(Module, AutoCSR):
         '''
         D must be >= phy datapath width
 
-        send UDP packets with content
-          08 07 06 05 04 03 02 01           for n_words - 1 times
-          64 bit sequence number
+        send UDP packets which can be verified by udprc.c
+        each packet consists of N 8-byte words
+        the first word is the key and increments with each packet
+        each word is calculated as (sta ^ word_id)
+        where sta is initialized with key
+        and incremented by sta = 3 * sta + 1 for every word
         '''
         self.source = source = stream.Endpoint(eth_udp_user_description(D * 8))
 
@@ -62,10 +65,14 @@ class UdpSender(Module, AutoCSR):
 
         self.submodules.fsm = fsm = FSM(reset_state="IDLE")
 
+        key = Signal(64)
+        sta = Signal(64)
+
         self.fsm.act("IDLE",
             NextValue(timer, timer + 1),
             If((self.period.storage > 0) & (timer >= self.period.storage),
                 NextValue(timer, 0),
+                NextValue(sta, key),
                 NextState("SEND")
             )
         )
@@ -75,26 +82,21 @@ class UdpSender(Module, AutoCSR):
             source.dst_port.eq(self.dst_port.storage),
             source.ip_address.eq(self.dst_ip.storage),
             source.length.eq(self.n_words.storage * D),  # payload length
-            If(cur_word == 1,
-                source.data.eq(seq),
-            ).Else(
-                source.data.eq(0x0807060504030201)
-            ),
+            source.data.eq(sta ^ (cur_word - 1)),
             If(cur_word >= self.n_words.storage,
                 source.last.eq(1),
-                # last_be indicates that this byte is the first one
-                # which is no longer valid
-                # if all bytes are valid in the last cycle,
-                # set last=1 and last_be=0
+                # last_be marks the last valid byte
+                # 0b10000000 = 0x80 indicates all 8 bytes are valid
                 source.last_be.eq(0x80),
                 If(source.ready,
                     NextValue(cur_word, 1),
-                    NextValue(seq, seq + 1),
+                    NextValue(key, key + 1),
                     NextState("IDLE"),
                 ),
             ).Else(
                 If(source.ready,
-                    NextValue(cur_word, cur_word + 1)
+                    NextValue(cur_word, cur_word + 1),
+                    NextValue(sta, sta * 3 + 1)
                 )
             ),
         )
@@ -171,44 +173,6 @@ class TestSoc(BaseSoC):
         # Needs more work to be compatible with 64 bit wide datapath
 
 
-class DevSoC(TestSoc):
-    def __init__(self, **kwargs):
-        from litescope import LiteScopeAnalyzer
-        super().__init__(**kwargs)
-        analyzer_signals = [
-            self.udpp.sink.valid,
-            self.udpp.sink.ready,
-            self.udpp.sink.last,
-            self.udpp.sink.data,
-            # self.xgmii.rx_ctl,
-            # self.xgmii.rx_data,
-            # self.xgmii.tx_ctl,
-            # self.xgmii.tx_data,
-            # self.xgmii.pma_status,
-            # self.xgmii.tx_disable,
-            # self.xgmii.qplllock  ,
-            # self.xgmii.gtrxreset ,
-            # self.xgmii.gttxreset ,
-            # self.xgmii.txusrrdy  ,
-            # self.xgmii.pcs_clear  ,
-            # self.xgmii.pma_multi  ,
-            self.ethphy.rx.source.valid,
-            self.ethphy.rx.source.data,
-            self.ethphy.tx.sink.valid,
-            self.ethphy.tx.sink.data,
-            # self.teng_udp_core.mac.core.sink.valid,
-            # self.teng_udp_core.mac.core.sink.data,
-            # self.teng_udp_core.arp.rx.sink.valid,
-            # self.teng_udp_core.arp.rx.sink.data,
-            # self.teng_udp_core.arp.tx.source.valid,
-            # self.teng_udp_core.arp.tx.source.data,
-        ]
-        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 4096,
-                                                     clock_domain="eth_tx",
-                                                     csr_csv="analyzer.csv")
-        self.add_csr("analyzer")
-
-
 # -------------------
 #  Testbench
 # -------------------
@@ -219,9 +183,18 @@ from liteeth.core import LiteEthUDPIPCore
 from test.model import phy, mac, arp, ip, icmp, dumps
 
 
-class DUT(Module):
-    def __init__(self):
-        D = 8  # Datapath width [bytes]
+class DUT0(Module):
+    def __init__(self, D):
+        ''' D = Datapath width [bytes] '''
+        self.submodules.udp_sender = UdpSender(D=D, dst_ip=dst_ip)
+        self.comb += [
+            self.udp_sender.source.ready.eq(1)
+        ]
+
+
+class DUT1(DUT0):
+    def __init__(self, D):
+        super().__init__(D)
 
         self.clock_domains.cd_sys = ClockDomain()
         self.clock_domains.eth_tx = ClockDomain()
@@ -249,10 +222,8 @@ class DUT(Module):
         #  UDP packet sender
         # ----------------------
         self.udpp = self.ethcore.udp.crossbar.get_port(1337, D * 8)
-        self.submodules.udp_sender = UdpSender(D=D, dst_ip=dst_ip)
         self.comb += [
             self.udp_sender.source.connect(self.udpp.sink),
-            self.udpp.source.ready.eq(1)
         ]
 
 
@@ -266,39 +237,54 @@ def send_icmp(dut, msgtype=icmp_type_ping_request, code=0):
     dut.icmp_model.send(p, target_ip=convert_ip(my_ip))
 
 
-def main_generator(dut):
-    '''
-    We will see an ARP request to fetch the MAC belonging to dst_ip
-    Then we should see UDP packets
-    '''
-    yield (dut.udp_sender.period.storage.eq(100))
-
-    print("---------- Ping request ----------")
-    send_icmp(dut)
-
-    for i in range(512):
-        yield
-
-
 def main():
-    if 'sim' in argv:
-        dut = DUT()
+    D = 8
+
+    if 'sim0' in argv:
+        # ---------------------------------------
+        #  look at the UdpSender output stream
+        # ---------------------------------------
+        dut = DUT0(D)
+
+        def generator0(dut):
+            yield (dut.udp_sender.period.storage.eq(3))
+            for i in range(64):
+                yield
+        run_simulation(dut, generator0(dut), vcd_name="udp_sender.vcd")
+        return
+
+    if 'sim1' in argv:
+        # ---------------------------------------
+        #  look at the liteeth UDP packets
+        # ---------------------------------------
+        dut = DUT1(D)
+
+        def generator1(dut):
+            # We will see an ARP request to fetch the MAC belonging to dst_ip
+            # Then we should see UDP packets
+            yield (dut.udp_sender.period.storage.eq(100))
+            send_icmp(dut)
+            for i in range(512):
+                yield
         generators = {
-            "sys" :   [main_generator(dut)],
+            "sys" :   [generator1(dut)],
             "eth_tx": [dut.ethphy.phy_sink.generator(),
                        dut.ethphy.generator()],
             "eth_rx":  dut.ethphy.phy_source.generator()
         }
         clocks = {
             "sys":    10,
-            "eth_rx": 10,
-            "eth_tx": 10
+            "eth_rx": 9,
+            "eth_tx": 8
         }
         run_simulation(dut, generators, clocks, vcd_name="udp_sender.vcd")
         return
 
-    soc = TestSoC()
-    # soc = DevSoC()
+    # ---------------------------------------
+    #  synthesize for Marble board / load
+    # ---------------------------------------
+    soc = TestSoc()
+    # soc = DevSoc()
     soc.platform.name = 'hello_10G'
     builder = Builder(
         soc,
@@ -308,7 +294,7 @@ def main():
     )
     if ('build' in argv) or ('synth' in argv):
         vns = builder.build()
-        soc.analyzer.do_exit(vns)
+        # soc.analyzer.do_exit(vns)
 
     if 'load' in argv:
         prog = soc.platform.create_programmer()
