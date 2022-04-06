@@ -142,6 +142,8 @@ static void setup_receive(int usd, unsigned int interface, short port)
 		fprintf(stderr,"could not bind to udp port %d\n",port);
 		exit(1);
 	}
+	uint64_t receive_buf_size = 1 * GBYTE;
+	setsockopt(usd, SOL_SOCKET, SO_RCVBUF, &receive_buf_size, sizeof(receive_buf_size));
 }
 
 int main(int argc, char *argv[])
