@@ -10,6 +10,8 @@
 #include <arpa/inet.h>
 #include <time.h>
 
+#define GBYTE (1024 * 1024 * 1024)
+
 int print_per_rx_packet = 0;
 
 /* MTU = 9710, subtract 28 octets for IP and UDP header? */
@@ -46,8 +48,8 @@ static unsigned udp_handle(char *data, unsigned data_len)
 	if (ts - last_ts > 1) {
 		printf(
 			"%4.1f GB (%4.1f GB), dropped %lu / %lu packets (%.1e)\n",
-			(float)(tot_bytes - last_tot_bytes) / 1073741824,
-			(float)tot_bytes / 1073741824,
+			(float)(tot_bytes - last_tot_bytes) / GBYTE,
+			(float)tot_bytes / GBYTE,
 			tot_dropped,
 			tot_received,
 			(float)tot_dropped / tot_received
