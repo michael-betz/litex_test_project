@@ -58,7 +58,7 @@ static unsigned udp_handle(char *data, unsigned data_len)
 		last_tot_bytes = tot_bytes;
 	}
 
-	if (1) for (unsigned i=0; i<n_words; i++) {
+	for (unsigned i=0; i<n_words; i++) {
 		uint64_t want_d = sta ^ i;
 		if (words[i] != want_d) {
 			printf("words[%2u] = %016x != %016x\n", i, words[i], want_d);
@@ -132,6 +132,7 @@ static void primary_loop(int usd, unsigned npack, unsigned juggle)
 
 static void setup_receive(int usd, unsigned int interface, short port)
 {
+	int ret;
 	struct sockaddr_in sa_rcvr;
 	memset(&sa_rcvr,0,sizeof sa_rcvr);
 	sa_rcvr.sin_family=AF_INET;
@@ -139,11 +140,18 @@ static void setup_receive(int usd, unsigned int interface, short port)
 	sa_rcvr.sin_port=htons(port);
 	if(bind(usd,(struct sockaddr *) &sa_rcvr,sizeof sa_rcvr) == -1) {
 		perror("bind");
-		fprintf(stderr,"could not bind to udp port %d\n",port);
+		fprintf(stderr,"could not bind to udp port %d\n", port);
 		exit(1);
 	}
-	uint64_t receive_buf_size = 1 * GBYTE;
-	setsockopt(usd, SOL_SOCKET, SO_RCVBUF, &receive_buf_size, sizeof(receive_buf_size));
+
+	// make sure `cat /proc/sys/net/core/rmem_max` returns a number
+	// which is >= receive_buf_size
+	// otherwise fix it with `sudo sysctl -w net.core.rmem_max=<receive_buf_size>`
+	uint64_t receive_buf_size = 1024 * 1024 * 100;
+	if (setsockopt(usd, SOL_SOCKET, SO_RCVBUF, &receive_buf_size, sizeof(receive_buf_size)) == -1) {
+		perror("setsockopt");
+		fprintf(stderr,"could not set RX buffer to %d MB.\n", receive_buf_size / 1024 / 1024);
+	}
 }
 
 int main(int argc, char *argv[])
