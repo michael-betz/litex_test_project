@@ -14,6 +14,14 @@
 
 int print_per_rx_packet = 0;
 
+// Return a timestamp in [ms]
+uint64_t get_ms(void)
+{
+    struct timespec s;
+    clock_gettime(CLOCK_MONOTONIC, &s);
+    return ((uint64_t)(s.tv_sec) * 1000 + (s.tv_nsec / 1000000));
+}
+
 /* MTU = 9710, subtract 28 octets for IP and UDP header? */
 #define NEXT(x) ((x) * 3 + 1)
 static unsigned udp_handle(char *data, unsigned data_len)
@@ -21,7 +29,7 @@ static unsigned udp_handle(char *data, unsigned data_len)
 	static uint64_t tot_received = 0;
 	static uint64_t tot_bytes;
 	static uint64_t last_tot_bytes;
-	static time_t last_ts = 0;
+	static uint64_t last_ts = 0;
 	unsigned fail = 0;
 
 	tot_received++;
@@ -44,11 +52,12 @@ static unsigned udp_handle(char *data, unsigned data_len)
 	}
 	last_key = key;
 
-	time_t ts = time(NULL);
-	if (ts - last_ts > 1) {
+	uint64_t ts = get_ms();
+	uint64_t t_diff = ts - last_ts;
+	if (t_diff > 1000) {
 		printf(
-			"%4.1f GB (%4.1f GB), dropped %lu / %lu packets (%.1e)\n",
-			(float)(tot_bytes - last_tot_bytes) / GBYTE,
+			"%6.3f GB/s (%4.1f GB), dropped %lu / %lu packets (%.1e)\n",
+			(float)(tot_bytes - last_tot_bytes) / GBYTE * 1000 / t_diff,
 			(float)tot_bytes / GBYTE,
 			tot_dropped,
 			tot_received,
@@ -147,7 +156,7 @@ static void setup_receive(int usd, unsigned int interface, short port)
 	// make sure `cat /proc/sys/net/core/rmem_max` returns a number
 	// which is >= receive_buf_size
 	// otherwise fix it with `sudo sysctl -w net.core.rmem_max=<receive_buf_size>`
-	uint64_t receive_buf_size = 1024 * 1024 * 100;
+	uint64_t receive_buf_size = 1024 * 1024 * 512;
 	if (setsockopt(usd, SOL_SOCKET, SO_RCVBUF, &receive_buf_size, sizeof(receive_buf_size)) == -1) {
 		perror("setsockopt");
 		fprintf(stderr,"could not set RX buffer to %d MB.\n", receive_buf_size / 1024 / 1024);
