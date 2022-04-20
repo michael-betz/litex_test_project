@@ -22,9 +22,12 @@ from litex.soc.integration.builder import Builder
 from litex_boards.targets.berkeleylab_marble import BaseSoC
 from liteeth.core import LiteEthUDPIPCore
 from liteeth.common import convert_ip
+from liteeth.frontend.etherbone import LiteEthEtherbone
 from phy_10g import Phy10G
 from litex.soc.interconnect.csr import CSRStorage, AutoCSR
+from litex.soc.interconnect import wishbone
 from liteeth.common import stream, eth_udp_user_description, icmp_type_ping_request
+from litescope import LiteScopeAnalyzer
 
 
 class UdpSender(Module, AutoCSR):
@@ -152,7 +155,8 @@ class TestSoc(BaseSoC):
             mac_address=my_mac,
             ip_address=my_ip,
             clk_freq=self.clk_freq,
-            dw=self.ethphy.dw
+            dw=self.ethphy.dw,
+            anti_underflow=0
         )
         self.submodules.ethcore = ethcore
 
@@ -171,6 +175,29 @@ class TestSoc(BaseSoC):
         #  Etherbone
         # ----------------------
         # Needs more work to be compatible with 64 bit wide datapath
+        self.submodules.etherbone = LiteEthEtherbone(
+            self.ethcore.udp,
+            1234,
+            buffer_depth=8
+        )
+        # self.bus.add_master(master=self.etherbone.wishbone.bus)
+        self.submodules.sram = wishbone.SRAM(1024)
+        self.comb += self.etherbone.wishbone.bus.connect(self.sram.bus)
+
+        # ----------------------
+        #  Analyzer
+        # ----------------------
+        analyzer_signals = [
+            self.sram.bus,
+            self.etherbone.packet.source
+        ]
+        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
+            depth        = 512,
+            clock_domain = "sys",
+            samplerate   = self.sys_clk_freq,
+            csr_csv      = "analyzer.csv"
+        )
+        self.add_csr("analyzer")
 
 
 # -------------------
@@ -178,7 +205,6 @@ class TestSoc(BaseSoC):
 # -------------------
 from litex.soc.interconnect.stream_sim import *
 from litex.gen.sim import *
-from liteeth.core import LiteEthUDPIPCore
 # Need to add liteeth directory to PYTHONPATH
 from test.model import phy, mac, arp, ip, icmp, dumps
 
