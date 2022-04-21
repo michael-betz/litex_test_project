@@ -180,24 +180,24 @@ class TestSoc(BaseSoC):
             1234,
             buffer_depth=8
         )
-        # self.bus.add_master(master=self.etherbone.wishbone.bus)
-        self.submodules.sram = wishbone.SRAM(1024)
-        self.comb += self.etherbone.wishbone.bus.connect(self.sram.bus)
+        self.bus.add_master(master=self.etherbone.wishbone.bus)
+        # self.submodules.sram = wishbone.SRAM(1024)
+        # self.comb += self.etherbone.wishbone.bus.connect(self.sram.bus)
 
         # ----------------------
         #  Analyzer
         # ----------------------
-        analyzer_signals = [
-            self.sram.bus,
-            self.etherbone.packet.source
-        ]
-        self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
-            depth        = 512,
-            clock_domain = "sys",
-            samplerate   = self.sys_clk_freq,
-            csr_csv      = "analyzer.csv"
-        )
-        self.add_csr("analyzer")
+        # analyzer_signals = [
+        #     self.sram.bus,
+        #     self.etherbone.packet.source
+        # ]
+        # self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals,
+        #     depth        = 512,
+        #     clock_domain = "sys",
+        #     samplerate   = self.sys_clk_freq,
+        #     csr_csv      = "analyzer.csv"
+        # )
+        # self.add_csr("analyzer")
 
 
 # -------------------
