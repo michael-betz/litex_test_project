@@ -1,0 +1,15 @@
+[options]
+mode bmc
+depth 100
+
+[engines]
+smtbmc
+
+[script]
+read -formal sim.sv
+read -formal anti_underflow.v
+prep -top sim
+
+[files]
+sim.sv
+anti_underflow.v
