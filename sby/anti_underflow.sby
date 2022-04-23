@@ -6,10 +6,9 @@ depth 100
 smtbmc
 
 [script]
-read -formal sim.sv
 read -formal anti_underflow.v
-prep -top sim
+prep -top anti_underflow
 
 [files]
-sim.sv
+formal.sv
 anti_underflow.v
