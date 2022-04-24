@@ -1,9 +1,9 @@
 [options]
 mode bmc
-depth 100
+depth 16
 
 [engines]
-smtbmc
+smtbmc yices
 
 [script]
 read -formal anti_underflow.v
