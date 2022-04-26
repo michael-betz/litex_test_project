@@ -117,7 +117,7 @@ class TestSoc(BaseSoC):
             self,
             cpu_type=None,
             # f_sys must be >= 156.25 MHz
-            sys_clk_freq=int(166.67e6),
+            sys_clk_freq=int(156.25e6),
             integrated_main_ram_size=8,
             integrated_sram_size=0,
             with_timer=False,
@@ -125,6 +125,11 @@ class TestSoc(BaseSoC):
             uart_name='uartbone',
             uart_baudrate=1152000  # not a typo
         )
+
+        # running at f_sys 125 MHz: WNS 0.212 ns
+        # but max. UDP packet size: 6 words. Larger leads to corrupted data
+
+        # f_sys 156.25 MHz: WNS 0.080 ns, fully working
 
         self.submodules.ethphy = Phy10G(
             self.platform,
@@ -150,12 +155,17 @@ class TestSoc(BaseSoC):
         # ----------------------
         #  UDP stack
         # ----------------------
+        # just LiteEthUDPIPCore without anything else: WNS 0.063 ns
+        # With UdpSender and LiteEthEtherbone:
+        #   * with_sys_datapath=True:  WNS -0.600 ns
+        #   * with_sys_datapath=False: WNS -1.584 ns
         ethcore = LiteEthUDPIPCore(
             phy=self.ethphy,
             mac_address=my_mac,
             ip_address=my_ip,
             clk_freq=self.clk_freq,
-            dw=self.ethphy.dw
+            dw=self.ethphy.dw,
+            with_sys_datapath=False
         )
         self.submodules.ethcore = ethcore
 
@@ -173,12 +183,15 @@ class TestSoc(BaseSoC):
         # ----------------------
         #  Etherbone
         # ----------------------
-        # Needs more work to be compatible with 64 bit wide datapath
+        # commenting entire etherbone module:
+        #   * WNS  0.161 ns (etherbone testing)
+        #   * WNS -0.135 ns (yfl)
         self.submodules.etherbone = LiteEthEtherbone(
             self.ethcore.udp,
             1234,
             buffer_depth=8
         )
+        # without bus attachment: WNS -0.417 ns
         self.bus.add_master(master=self.etherbone.wishbone.bus)
         # self.submodules.sram = wishbone.SRAM(1024)
         # self.comb += self.etherbone.wishbone.bus.connect(self.sram.bus)
@@ -204,7 +217,11 @@ class TestSoc(BaseSoC):
 # -------------------
 from litex.soc.interconnect.stream_sim import *
 from litex.gen.sim import *
-# Need to add liteeth directory to PYTHONPATH
+
+# Make python import from liteeth test directory by force
+import sys
+# sys.modules.pop('test')
+sys.path.insert(0, '/home/michael/fpga_wsp/litex/liteeth')
 from test.model import phy, mac, arp, ip, icmp, dumps
 
 
