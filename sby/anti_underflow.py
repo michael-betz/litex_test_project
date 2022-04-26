@@ -39,7 +39,7 @@ class LiteEthAntiUnderflow(Module):
         )
         fsm.act("FLUSH",
             fifo.source.connect(source, keep=['valid', 'ready']),
-            If(fifo.source.valid & fifo.source.last,
+            If(fifo.source.valid & fifo.source.last & source.ready,
                 NextState("STORE")
             )
         )

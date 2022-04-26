@@ -155,8 +155,7 @@ class TestSoc(BaseSoC):
             mac_address=my_mac,
             ip_address=my_ip,
             clk_freq=self.clk_freq,
-            dw=self.ethphy.dw,
-            anti_underflow=0
+            dw=self.ethphy.dw
         )
         self.submodules.ethcore = ethcore
 
