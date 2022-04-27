@@ -35,6 +35,11 @@ from migen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.cores.freqmeter import FreqMeter
 from liteeth.phy.xgmii import LiteEthPHYXGMIITX, LiteEthPHYXGMIIRX
+from liteeth.common import eth_phy_description
+
+import sys
+sys.path.append('..')
+from sby.anti_underflow import LiteEthAntiUnderflow
 
 
 def add_ip(platform, name, module_name, config={}, synth=True):
@@ -53,7 +58,7 @@ def add_ip(platform, name, module_name, config={}, synth=True):
 
 
 class Phy10G(Module, AutoCSR):
-    def __init__(self, platform, qsfp_pads, refclk_pads, sys_clk_freq):
+    def __init__(self, platform, qsfp_pads, refclk_pads, sys_clk_freq, tx_fifo_depth=0):
         '''
         10 Gigabit ethernet PHY, using the Xilinx PCS/PMA IP core
 
@@ -199,6 +204,16 @@ class Phy10G(Module, AutoCSR):
             LiteEthPHYXGMIIRX(self.pads, self.dw)
         )
         self.sink, self.source = self.tx.sink, self.rx.source
+
+        if tx_fifo_depth > 0:
+            au_ = LiteEthAntiUnderflow(
+                eth_phy_description(self.dw),
+                tx_fifo_depth
+            )
+            self.submodules.au = ClockDomainsRenamer('eth_tx')(au_)
+            self.sink = self.au.sink
+            self.comb += self.au.source.connect(self.tx.sink)
+
 
     def add_csr(self):
         # Add frequency-meter to 156.25 MHz reference clock

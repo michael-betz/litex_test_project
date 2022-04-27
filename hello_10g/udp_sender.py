@@ -122,8 +122,9 @@ class TestSoc(BaseSoC):
             integrated_sram_size=0,
             with_timer=False,
             with_etherbone=False,
-            uart_name='uartbone',
-            uart_baudrate=1152000  # not a typo
+            with_uart=False
+            # uart_name='uartbone',
+            # uart_baudrate=1152000  # not a typo
         )
 
         # running at f_sys 125 MHz: WNS 0.212 ns
@@ -135,7 +136,8 @@ class TestSoc(BaseSoC):
             self.platform,
             self.platform.request("qsfp", 1),
             self.platform.request("clkmgt", 1),  # SI570_CLK
-            self.sys_clk_freq
+            self.sys_clk_freq,
+            tx_fifo_depth=0
         )
         self.ethphy.add_csr()
 

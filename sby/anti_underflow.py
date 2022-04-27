@@ -5,24 +5,26 @@
 
 from sys import argv
 from liteeth.common import *
+from litex.soc.interconnect.packet import PacketFIFO
 from litex.gen.fhdl.verilog import convert
 
 
 class LiteEthAntiUnderflow(Module):
-    def __init__(self, dw, depth=32):
+    def __init__(self, stream_description, depth=32):
         '''
         buffers a whole packet and releases it at once
         workaround for driving PHYs with wide datapaths which expect a
         continuous stream
         '''
-        self.sink   = sink   = stream.Endpoint(eth_phy_description(dw))
-        self.source = source = stream.Endpoint(eth_phy_description(dw))
+        self.sink   = sink   = stream.Endpoint(stream_description)
+        self.source = source = stream.Endpoint(stream_description)
 
         # # #
 
-        self.submodules.fifo = fifo = stream.SyncFIFO(
-            eth_phy_description(dw),
-            depth,
+        self.submodules.fifo = fifo = PacketFIFO(
+            layout=stream_description,
+            payload_depth=depth,
+            param_depth=1,
             buffered=True
         )
 
@@ -33,7 +35,7 @@ class LiteEthAntiUnderflow(Module):
 
         self.submodules.fsm = fsm = FSM(reset_state="STORE")
         fsm.act("STORE",
-            If(sink.valid & sink.last | (fifo.level >= fifo.depth - 1),
+            If(sink.valid & sink.last | (fifo.payload_fifo.level >= fifo.payload_fifo.depth - 1),
                 NextState("FLUSH")
             )
         )
@@ -50,7 +52,7 @@ def main():
     # ------------------------------------------
     #  Generate Verilog
     # ------------------------------------------
-    dut = LiteEthAntiUnderflow(32, 4)
+    dut = LiteEthAntiUnderflow(eth_phy_description(32), 4)
     dut.clock_domains.sys = ClockDomain('sys')
     convert(
         dut,
